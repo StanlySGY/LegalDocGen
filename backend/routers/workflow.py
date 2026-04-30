@@ -57,6 +57,11 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
     pm = PromptManager(db)
     stage = StageType(req.stage)
 
+    progress = engine.get_stage_progress(case_id)
+    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
+    if stage_info and stage_info["locked"]:
+        raise HTTPException(400, stage_info["locked_reason"])
+
     prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
     materials_context = engine.get_case_context(case_id)
     previous_context = engine.get_previous_stages_output(case_id, stage)
@@ -83,6 +88,11 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
     stage = StageType(req.stage)
+
+    progress = engine.get_stage_progress(case_id)
+    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
+    if stage_info and stage_info["locked"]:
+        raise HTTPException(400, stage_info["locked_reason"])
 
     prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
     materials_context = engine.get_case_context(case_id)

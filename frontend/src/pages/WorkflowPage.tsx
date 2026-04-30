@@ -70,9 +70,13 @@ export default function WorkflowPage() {
         {STAGE_ORDER.map((stage,i) => {
           const p = progress.find(x=>x.stage===stage)
           const isDone = p?.status==='completed', isOn = stage===activeStage
+          const isLocked = p?.locked ?? false
           return (
             <div key={stage} className="flex items-center">
-              <div className={`step ${isOn?'on':isDone?'done':'pending'}`} onClick={()=>setActiveStage(stage)}>
+              <div className={`step ${isOn?'on':isDone?'done':isLocked?'locked':'pending'}`}
+                onClick={()=>!isLocked && setActiveStage(stage)}
+                title={isLocked ? p?.locked_reason : ''}
+                style={isLocked ? {opacity:0.4,cursor:'not-allowed'} : undefined}>
                 <div className="step-dot">{isDone?'✓':icons[stage]}</div>
                 <span className="step-name">{STAGE_NAMES[stage]}</span>
                 {p&&p.version>0 && <span className="step-ver">v{p.version}</span>}

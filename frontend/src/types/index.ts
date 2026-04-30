@@ -36,6 +36,8 @@ export interface StageProgress {
   status: string
   has_output: boolean
   version: number
+  locked: boolean
+  locked_reason: string
 }
 
 export interface PromptTemplate {

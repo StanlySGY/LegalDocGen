@@ -102,14 +102,24 @@ class WorkflowEngine:
 
     def get_stage_progress(self, case_id: str) -> list[dict]:
         result = []
-        for stage in STAGE_ORDER:
+        for i, stage in enumerate(STAGE_ORDER):
             node = self.get_stage_node(case_id, stage)
+            has_output = bool(node and node.output)
+            if i == 0:
+                locked, locked_reason = False, ""
+            else:
+                prev = self.get_stage_node(case_id, STAGE_ORDER[i - 1])
+                prev_done = bool(prev and prev.output)
+                locked = not prev_done
+                locked_reason = "" if not locked else f"需要先完成「{STAGE_NAMES[STAGE_ORDER[i-1]]}」阶段"
             result.append({
                 "stage": stage.value,
                 "name": STAGE_NAMES[stage],
                 "status": node.status if node else "pending",
-                "has_output": bool(node and node.output),
+                "has_output": has_output,
                 "version": node.version if node else 0,
+                "locked": locked,
+                "locked_reason": locked_reason,
             })
         return result
 
