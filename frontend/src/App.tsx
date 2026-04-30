@@ -2,6 +2,7 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
 import WorkflowPage from './pages/WorkflowPage'
+import DocumentEditor from './pages/DocumentEditor'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
 
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="/" element={<CaseList />} />
             <Route path="/cases/:id" element={<CaseDetail />} />
             <Route path="/cases/:id/workflow" element={<WorkflowPage />} />
+            <Route path="/cases/:id/editor" element={<DocumentEditor />} />
             <Route path="/channels" element={<ChannelManage />} />
             <Route path="/config" element={<ModelConfig />} />
           </Routes>

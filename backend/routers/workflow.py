@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -290,3 +290,64 @@ def review_select(case_id: str, data: dict, db: Session = Depends(get_db)):
     )
     db.commit()
     return {"output": selected_output, "model": selected_model}
+
+
+class ExportRequest(BaseModel):
+    content: str = ""
+
+
+@router.post("/export/{case_id}")
+def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db)):
+    from docx import Document
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    import re
+
+    content = req.content
+    if not content:
+        node = WorkflowEngine(db).get_stage_node(case_id, StageType.DRAFT_GENERATION)
+        if not node or not node.output:
+            raise HTTPException(404, "无文书内容可导出")
+        content = node.output
+
+    doc = Document()
+    style = doc.styles['Normal']
+    style.font.name = 'SimSun'
+    style.font.size = Pt(12)
+    style.paragraph_format.line_spacing = 1.5
+
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            doc.add_paragraph('')
+            continue
+        if line.startswith('### '):
+            p = doc.add_paragraph(line[4:])
+            p.style = doc.styles['Heading 3']
+        elif line.startswith('## '):
+            p = doc.add_paragraph(line[3:])
+            p.style = doc.styles['Heading 2']
+        elif line.startswith('# '):
+            p = doc.add_paragraph(line[2:])
+            p.style = doc.styles['Heading 1']
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif line.startswith('- ') or line.startswith('* '):
+            doc.add_paragraph(line[2:], style='List Bullet')
+        elif re.match(r'^\d+\.\s', line):
+            doc.add_paragraph(re.sub(r'^\d+\.\s', '', line), style='List Number')
+        elif line.startswith('**') and line.endswith('**'):
+            p = doc.add_paragraph()
+            run = p.add_run(line[2:-2])
+            run.bold = True
+        else:
+            doc.add_paragraph(line)
+
+    import io
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename=document.docx"},
+    )
