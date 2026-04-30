@@ -24,6 +24,7 @@ export default function WorkflowPage() {
   const [selModel, setSelModel] = useState('')
   const [caseName, setCaseName] = useState('')
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const [variables, setVariables] = useState<{name:string;description:string}[]>([])
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const loadProgress = useCallback(async () => { if(!caseId)return; const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
@@ -32,6 +33,7 @@ export default function WorkflowPage() {
 
   useEffect(() => { loadProgress() }, [loadProgress])
   useEffect(() => { loadNode(activeStage) }, [activeStage, loadNode])
+  useEffect(() => { api.config.getStageVariables(activeStage).then(d => setVariables(d.variables)).catch(() => setVariables([])) }, [activeStage])
   useEffect(() => { api.config.getModels().then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} }) }, [])
 
   const handleGenerate = async () => {
@@ -102,6 +104,14 @@ export default function WorkflowPage() {
               <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭':'历史'}</button>
             </div>
           </div>
+          {variables.length > 0 && (
+            <div className="flex flex-wrap gap-2" style={{marginBottom:8}}>
+              {variables.map(v => (
+                <span key={v.name} className="tag t-purple" style={{cursor:'pointer'}} title={v.description}
+                  onClick={() => setPrompt(prompt + `{${v.name}}`)}>{`{${v.name}}`}</span>
+              ))}
+            </div>
+          )}
           <textarea className="textarea" style={{height:260}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
           <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:12}} onClick={handleGenerate} disabled={generating}>
             {generating ? <span className="flex items-center justify-center gap-2"><svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>生成中...</span> : node?.output?'重新生成':'开始生成'}

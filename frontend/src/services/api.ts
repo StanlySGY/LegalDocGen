@@ -71,6 +71,7 @@ export const api = {
     createPrompt: (data: any) => request<any>('/config/prompts', { method: 'POST', body: JSON.stringify(data) }),
     updatePrompt: (id: string, data: any) => request<any>(`/config/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     getStages: () => request<any[]>('/config/stages'),
+    getStageVariables: (stage: string) => request<{variables:{name:string;description:string}[]}>(`/config/stage-variables/${stage}`),
   },
   channel: {
     list: () => request<any[]>('/channel'),

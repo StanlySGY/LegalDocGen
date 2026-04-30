@@ -105,3 +105,25 @@ STAGE_PROMPTS = {
 {materials}
 {previous_context}""",
 }
+
+STAGE_VARIABLES = {
+    StageType.FACT_EXTRACTION: [
+        {"name": "materials", "description": "案件材料内容"},
+    ],
+    StageType.LEGAL_ANALYSIS: [
+        {"name": "materials", "description": "案件材料内容"},
+        {"name": "previous_context", "description": "前置阶段输出（案件要素提取结果）"},
+    ],
+    StageType.DISPUTE_FOCUS: [
+        {"name": "materials", "description": "案件材料内容"},
+        {"name": "previous_context", "description": "前置阶段输出（要素提取+法律分析）"},
+    ],
+    StageType.DRAFT_GENERATION: [
+        {"name": "materials", "description": "案件材料内容"},
+        {"name": "previous_context", "description": "前置阶段输出（要素+分析+争议焦点）"},
+    ],
+    StageType.REVIEW_OPTIMIZATION: [
+        {"name": "materials", "description": "案件材料内容"},
+        {"name": "previous_context", "description": "前置阶段输出（含文书初稿）"},
+    ],
+}

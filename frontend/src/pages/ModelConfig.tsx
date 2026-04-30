@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 
+function PromptVariablePills({ stage, onInsert }: { stage: string; onInsert: (name: string) => void }) {
+  const [vars, setVars] = useState<{name:string;description:string}[]>([])
+  useEffect(() => { if(stage) api.config.getStageVariables(stage).then(d => setVars(d.variables)).catch(() => setVars([])) }, [stage])
+  if (!vars.length) return null
+  return (
+    <div className="flex flex-wrap gap-2" style={{marginBottom:6}}>
+      {vars.map(v => (
+        <span key={v.name} className="tag t-purple" style={{cursor:'pointer'}} title={v.description} onClick={() => onInsert(v.name)}>
+          {`{${v.name}}`}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function ModelConfig() {
   const [models, setModels] = useState<any[]>([])
   const [form, setForm] = useState({ openai_api_key:'', openai_base_url:'https://api.openai.com/v1', claude_api_key:'', custom_api_key:'', custom_base_url:'', custom_model_name:'', default_model:'openai' })
@@ -98,7 +113,11 @@ export default function ModelConfig() {
             <h3>编辑 Prompt 模板</h3>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>模板名称</label><input className="input" value={editingPrompt.name} onChange={e=>setEditingPrompt({...editingPrompt,name:e.target.value})}/></div>
-              <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>Prompt 内容</label><textarea className="textarea" style={{height:380}} value={editingPrompt.content} onChange={e=>setEditingPrompt({...editingPrompt,content:e.target.value})}/></div>
+              <div>
+                <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>Prompt 内容</label>
+                <PromptVariablePills stage={editingPrompt.stage} onInsert={v=>setEditingPrompt({...editingPrompt,content:editingPrompt.content+`{${v}}`})}/>
+                <textarea className="textarea" style={{height:350}} value={editingPrompt.content} onChange={e=>setEditingPrompt({...editingPrompt,content:e.target.value})}/>
+              </div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
                 <button className="btn btn-o" onClick={()=>setEditingPrompt(null)}>取消</button>
                 <button className="btn btn-p" onClick={savePrompt}>保存</button>

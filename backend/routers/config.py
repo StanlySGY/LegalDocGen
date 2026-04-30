@@ -51,3 +51,10 @@ def update_prompt(template_id: str, data: dict, db: Session = Depends(get_db)):
 @router.get("/stages")
 def get_stages():
     return [{"value": s.value, "name": STAGE_NAMES[s]} for s in StageType]
+
+
+@router.get("/stage-variables/{stage}")
+def get_stage_variables(stage: str):
+    from backend.services.workflow_engine.stages import STAGE_VARIABLES
+    variables = STAGE_VARIABLES.get(StageType(stage), [])
+    return {"variables": variables}
