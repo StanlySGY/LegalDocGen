@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
-import type { Case, Material, DocumentTypeOption } from '../types'
+import type { Case, Material, DocumentTypeOption, Party } from '../types'
 import { STAGE_NAMES_LAWYER } from '../types'
 
 export default function CaseDetail() {
@@ -20,8 +20,19 @@ export default function CaseDetail() {
   const [quickStage, setQuickStage] = useState('')
   const [quickDone, setQuickDone] = useState(false)
 
+  // Party state
+  const [parties, setParties] = useState<Party[]>([])
+  const [extracting, setExtracting] = useState(false)
+  const [showPartyForm, setShowPartyForm] = useState(false)
+  const [partyForm, setPartyForm] = useState({name:'',role:'',id_number:'',address:'',phone:'',legal_representative:'',notes:''})
+  const [editingPartyId, setEditingPartyId] = useState('')
+
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = async () => { if(!caseId)return; const [c,m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)]); setCaseData(c); setMaterials(m) }
+  const load = async () => {
+    if(!caseId)return
+    const [c,m,p] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.parties.list(caseId)])
+    setCaseData(c); setMaterials(m); setParties(p)
+  }
   useEffect(() => { load() }, [caseId])
   useEffect(() => { api.config.getDocumentTypes().then(d => { setDocTypes(d.types); if(d.types.length) setSelectedDocType(d.types[0].key) }) }, [])
 
@@ -50,7 +61,48 @@ export default function CaseDetail() {
     setQuickGenerating(false)
   }
 
+  const handleExtractParties = async () => {
+    if (!caseId) return
+    if (materials.length === 0) { showToast('请先上传案件材料', 'err'); return }
+    setExtracting(true)
+    try {
+      const result = await api.parties.extract(caseId)
+      setParties(result)
+      showToast(`已提取 ${result.length} 位当事人`)
+    } catch(e:any) { showToast(e.message||'提取失败','err') }
+    setExtracting(false)
+  }
+
+  const handleSaveParty = async () => {
+    if (!caseId || !partyForm.name.trim()) { showToast('请填写姓名', 'err'); return }
+    try {
+      if (editingPartyId) {
+        await api.parties.update(editingPartyId, partyForm)
+        showToast('已更新')
+      } else {
+        await api.parties.create({ ...partyForm, case_id: caseId })
+        showToast('已添加')
+      }
+      setShowPartyForm(false); setEditingPartyId(''); setPartyForm({name:'',role:'',id_number:'',address:'',phone:'',legal_representative:'',notes:''})
+      load()
+    } catch(e:any) { showToast(e.message||'操作失败','err') }
+  }
+
+  const handleEditParty = (p: Party) => {
+    setPartyForm({name:p.name,role:p.role,id_number:p.id_number,address:p.address,phone:p.phone,legal_representative:p.legal_representative,notes:p.notes})
+    setEditingPartyId(p.id)
+    setShowPartyForm(true)
+  }
+
+  const handleDeleteParty = async (id: string) => {
+    await api.parties.delete(id)
+    load()
+    showToast('已删除')
+  }
+
   if (!caseData) return <div style={{textAlign:'center',padding:80,color:'#86909c'}}>加载中...</div>
+
+  const roleColors: Record<string,string> = {原告:'t-blue',被告:'t-red',申请人:'t-purple',被申请人:'t-orange',第三人:'t-gray',上诉人:'t-blue',被上诉人:'t-red',代理人:'t-green'}
 
   return (
     <div>
@@ -97,6 +149,79 @@ export default function CaseDetail() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Party Information Section */}
+      <div className="card" style={{marginBottom:24}}>
+        <div className="card-hd">
+          <span className="card-title">当事人信息</span>
+          <div className="flex gap-2">
+            <button className="btn btn-o btn-sm" onClick={handleExtractParties} disabled={extracting || materials.length===0}>
+              {extracting ? '提取中...' : '从材料提取'}
+            </button>
+            <button className="btn btn-p btn-sm" onClick={()=>{setShowPartyForm(true);setEditingPartyId('');setPartyForm({name:'',role:'',id_number:'',address:'',phone:'',legal_representative:'',notes:''})}}>手动添加</button>
+          </div>
+        </div>
+        <p style={{fontSize:12,color:'#86909c',marginBottom:12}}>AI自动提取或手动录入当事人信息，生成文书时自动填入</p>
+
+        {showPartyForm && (
+          <div style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:16,marginBottom:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>姓名/名称 *</label><input className="input" value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>角色</label>
+                <select className="select" value={partyForm.role} onChange={e=>setPartyForm({...partyForm,role:e.target.value})}>
+                  <option value="">选择角色</option>
+                  <option value="原告">原告</option><option value="被告">被告</option>
+                  <option value="申请人">申请人</option><option value="被申请人">被申请人</option>
+                  <option value="第三人">第三人</option><option value="上诉人">上诉人</option>
+                  <option value="被上诉人">被上诉人</option><option value="代理人">代理人</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>身份证/统一社会信用代码</label><input className="input" value={partyForm.id_number} onChange={e=>setPartyForm({...partyForm,id_number:e.target.value})}/></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>住址</label><input className="input" value={partyForm.address} onChange={e=>setPartyForm({...partyForm,address:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>电话</label><input className="input" value={partyForm.phone} onChange={e=>setPartyForm({...partyForm,phone:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>法定代表人</label><input className="input" value={partyForm.legal_representative} onChange={e=>setPartyForm({...partyForm,legal_representative:e.target.value})}/></div>
+            </div>
+            <div style={{marginBottom:10}}><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>备注</label><input className="input" value={partyForm.notes} onChange={e=>setPartyForm({...partyForm,notes:e.target.value})}/></div>
+            <div className="flex gap-2">
+              <button className="btn btn-p btn-sm" onClick={handleSaveParty}>{editingPartyId?'更新':'添加'}</button>
+              <button className="btn btn-o btn-sm" onClick={()=>{setShowPartyForm(false);setEditingPartyId('')}}>取消</button>
+            </div>
+          </div>
+        )}
+
+        {parties.length > 0 ? (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
+            {parties.map(p => (
+              <div key={p.id} style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:'12px 16px'}}>
+                <div className="flex items-center justify-between" style={{marginBottom:6}}>
+                  <div className="flex items-center gap-2">
+                    <span style={{fontWeight:600,fontSize:14}}>{p.name}</span>
+                    {p.role && <span className={`tag ${roleColors[p.role]||'t-gray'}`}>{p.role}</span>}
+                  </div>
+                  <div className="flex gap-1">
+                    <button style={{fontSize:11,color:'#6366f1',cursor:'pointer',background:'none',border:'none'}} onClick={()=>handleEditParty(p)}>编辑</button>
+                    <button style={{fontSize:11,color:'#ef4444',cursor:'pointer',background:'none',border:'none'}} onClick={()=>handleDeleteParty(p.id)}>删除</button>
+                  </div>
+                </div>
+                <div style={{fontSize:12,color:'#86909c',display:'flex',flexDirection:'column',gap:2}}>
+                  {p.id_number && <div>证件号：{p.id_number}</div>}
+                  {p.address && <div>住址：{p.address}</div>}
+                  {p.phone && <div>电话：{p.phone}</div>}
+                  {p.legal_representative && <div>法定代表人：{p.legal_representative}</div>}
+                  {p.notes && <div>备注：{p.notes}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty" style={{padding:'30px 0'}}>
+            <p>暂无当事人信息，可从材料中提取或手动添加</p>
+          </div>
+        )}
       </div>
 
       <div className="stat-row">

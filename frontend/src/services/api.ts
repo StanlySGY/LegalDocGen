@@ -150,4 +150,11 @@ export const api = {
     fetchModelsDirect: (data: any) => request<any>('/channel/fetch_models', { method: 'POST', body: JSON.stringify(data) }),
     getAllModels: () => request<any[]>('/channel/models/all'),
   },
+  parties: {
+    list: (caseId: string) => request<any[]>(`/parties/case/${caseId}`),
+    create: (data: any) => request<any>('/parties', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request<any>(`/parties/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<any>(`/parties/${id}`, { method: 'DELETE' }),
+    extract: (caseId: string) => request<any[]>(`/parties/extract/${caseId}`, { method: 'POST' }),
+  },
 }

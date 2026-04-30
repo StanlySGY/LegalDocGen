@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from backend.database import init_db, SessionLocal
-from backend.routers import cases, materials, workflow, config, channel
+from backend.routers import cases, materials, workflow, config, channel, parties
 from backend.services.prompt_manager.manager import PromptManager
 
 
@@ -35,6 +35,7 @@ app.include_router(materials.router)
 app.include_router(workflow.router)
 app.include_router(config.router)
 app.include_router(channel.router)
+app.include_router(parties.router)
 
 
 @app.get("/api/health")

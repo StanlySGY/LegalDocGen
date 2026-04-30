@@ -87,3 +87,15 @@ export const STAGE_NAMES_LAWYER: Record<string, string> = {
   draft_generation: '文书生成',
   review_optimization: '审查优化',
 }
+
+export interface Party {
+  id: string
+  name: string
+  role: string
+  id_number: string
+  address: string
+  phone: string
+  legal_representative: string
+  notes: string
+  created_at?: string
+}
