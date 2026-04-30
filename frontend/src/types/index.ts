@@ -3,6 +3,10 @@ export interface Case {
   name: string
   description: string
   case_type: string
+  case_number: string
+  court: string
+  cause: string
+  filing_date: string
   status: string
   created_at: string
   updated_at: string

@@ -41,11 +41,19 @@ async function* streamSSE(url: string, body: any): AsyncGenerator<any> {
 
 export const api = {
   cases: {
-    list: () => request<any[]>('/cases'),
+    list: (params?: {status?:string;search?:string;case_type?:string}) => {
+      const qs = new URLSearchParams()
+      if (params?.status) qs.set('status', params.status)
+      if (params?.search) qs.set('search', params.search)
+      if (params?.case_type) qs.set('case_type', params.case_type)
+      const query = qs.toString()
+      return request<any[]>(`/cases${query ? `?${query}` : ''}`)
+    },
     get: (id: string) => request<any>(`/cases/${id}`),
     create: (data: any) => request<any>('/cases', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => request<any>(`/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/cases/${id}`, { method: 'DELETE' }),
+    batchDelete: (ids: string[]) => request<any>('/cases/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
   },
   materials: {
     list: (caseId: string) => request<any[]>(`/materials/case/${caseId}`),
