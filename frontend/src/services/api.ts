@@ -64,6 +64,48 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
+    reviewChain: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/review-chain/${caseId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
+    multiCompare: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/multi-compare/${caseId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
+    reviewSelect: (caseId: string, data: any) =>
+      request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
   },
   config: {
     getModels: () => request<any>('/config/models'),

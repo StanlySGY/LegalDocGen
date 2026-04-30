@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
-import type { StageProgress, WorkflowNode, StageType } from '../types'
+import type { StageProgress, WorkflowNode, StageType, ReviewMode } from '../types'
 import { STAGE_NAMES, STAGE_ORDER } from '../types'
 
 export default function WorkflowPage() {
@@ -26,6 +26,15 @@ export default function WorkflowPage() {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
   const [variables, setVariables] = useState<{name:string;description:string}[]>([])
 
+  // Review mode state
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('single')
+  const [chainModels, setChainModels] = useState<any[]>([{}, {}, {}])
+  const [compareModels, setCompareModels] = useState<any[]>([])
+  const [chainSteps, setChainSteps] = useState<Record<string, string>>({})
+  const [compareOutputs, setCompareOutputs] = useState<Record<string, string>>({})
+  const [activeChainStep, setActiveChainStep] = useState<string>('generate')
+  const [reviewId, setReviewId] = useState('')
+
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const loadProgress = useCallback(async () => { if(!caseId)return; const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
   const loadNode = useCallback(async (s: StageType) => { if(!caseId)return; const n = await api.workflow.getNode(caseId, s); setNode(n); setPrompt(n.prompt||''); setOutput(n.output||''); setEditingOutput(false); setStreamingText('') }, [caseId])
@@ -34,7 +43,14 @@ export default function WorkflowPage() {
   useEffect(() => { loadProgress() }, [loadProgress])
   useEffect(() => { loadNode(activeStage) }, [activeStage, loadNode])
   useEffect(() => { api.config.getStageVariables(activeStage).then(d => setVariables(d.variables)).catch(() => setVariables([])) }, [activeStage])
-  useEffect(() => { api.config.getModels().then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} }) }, [])
+  useEffect(() => { api.config.getModels().then(d => {
+    setModels(d.available)
+    if(d.available.length){
+      setSelChannelId(d.available[0].channel_id); setSelModel(d.available[0].model)
+      setChainModels(d.available.slice(0,3).map((m:any)=>({channel_id:m.channel_id,model:m.model})))
+      setCompareModels(d.available.slice(0,2).map((m:any)=>({channel_id:m.channel_id,model:m.model,channel_name:m.channel_name})))
+    }
+  }) }, [])
 
   const handleGenerate = async () => {
     if(!caseId)return
@@ -52,6 +68,60 @@ export default function WorkflowPage() {
       showToast('生成完成')
     } catch(e:any){showToast(e.message||'生成失败','err')}
     setGenerating(false)
+  }
+
+  const handleChainReview = async () => {
+    if(!caseId) return
+    setGenerating(true); setChainSteps({}); setActiveChainStep('generate')
+    try {
+      let currentStep = 'generate'
+      let currentParts: Record<string, string[]> = {generate:[], review:[], optimize:[]}
+      for await (const event of api.workflow.reviewChain(caseId, {models: chainModels, prompt})) {
+        if(event.error){showToast(event.error,'err');break}
+        if(event.step && event.status === 'running') {
+          currentStep = event.step; setActiveChainStep(event.step)
+        }
+        if(event.chunk) {
+          currentParts[currentStep] = [...(currentParts[currentStep]||[]), event.chunk]
+          setChainSteps(prev => ({...prev, [currentStep]: (currentParts[currentStep]||[]).join('')}))
+        }
+        if(event.step && event.status === 'done') {
+          setChainSteps(prev => ({...prev, [event.step]: event.output}))
+        }
+        if(event.all_done || event.final) {
+          const finalOutput = event.output || chainSteps.optimize || ''
+          setOutput(finalOutput)
+          await loadProgress(); await loadNode(activeStage); await loadHistory(activeStage)
+          showToast('链式审查完成')
+        }
+      }
+    } catch(e:any){showToast(e.message||'链式审查失败','err')}
+    setGenerating(false)
+  }
+
+  const handleMultiCompare = async () => {
+    if(!caseId) return
+    setGenerating(true); setCompareOutputs({})
+    try {
+      for await (const event of api.workflow.multiCompare(caseId, {models: compareModels, prompt})) {
+        if(event.error){showToast(event.error,'err');break}
+        if(event.status === 'done' && event.outputs) {
+          setCompareOutputs(event.outputs)
+          showToast('多版本对比完成')
+        }
+      }
+    } catch(e:any){showToast(e.message||'多版本对比失败','err')}
+    setGenerating(false)
+  }
+
+  const handleSelectModel = async (modelKey: string) => {
+    if(!caseId || !reviewId) return
+    try {
+      await api.workflow.reviewSelect(caseId, {review_id: reviewId, selected_model: modelKey})
+      setOutput(compareOutputs[modelKey] || '')
+      await loadProgress(); await loadNode(activeStage)
+      showToast('已选择该版本')
+    } catch(e:any){showToast(e.message||'选择失败','err')}
   }
 
   const handleSave = async () => { if(!caseId)return; await api.workflow.saveOutput(caseId,activeStage,outputDraft); setOutput(outputDraft); setEditingOutput(false); showToast('已保存') }
@@ -113,9 +183,61 @@ export default function WorkflowPage() {
             </div>
           )}
           <textarea className="textarea" style={{height:260}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
+
+          {activeStage === 'review_optimization' && (
+            <div style={{marginTop:12,marginBottom:12}}>
+              <div style={{fontSize:12,color:'#86909c',marginBottom:6,fontWeight:600}}>审查模式</div>
+              <div className="flex gap-2">
+                {(['single','chain','compare'] as ReviewMode[]).map(m => (
+                  <button key={m} className={`btn btn-sm ${reviewMode===m?'btn-p':'btn-o'}`} onClick={()=>setReviewMode(m)}>
+                    {m==='single'?'单模型':m==='chain'?'链式审查':'多版本对比'}
+                  </button>
+                ))}
+              </div>
+
+              {reviewMode === 'chain' && (
+                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
+                  {['生成模型','审查模型','优化模型'].map((label,i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span style={{fontSize:12,color:'#86909c',minWidth:65}}>{label}</span>
+                      <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
+                        onChange={e=>{const[cid,mid]=e.target.value.split('|');const nm=[...chainModels];nm[i]={channel_id:cid,model:mid};setChainModels(nm)}}>
+                        {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.channel_name}/{m.model}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {reviewMode === 'compare' && (
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:11,color:'#86909c',marginBottom:4}}>勾选参与对比的模型（至少2个）：</div>
+                  {models.map((m,i) => {
+                    const key = `${m.channel_id}|${m.model}`
+                    const checked = compareModels.some(c => c.channel_id===m.channel_id && c.model===m.model)
+                    return (
+                      <label key={i} className="flex items-center gap-2" style={{padding:'3px 0',fontSize:12,cursor:'pointer'}}>
+                        <input type="checkbox" checked={checked} onChange={() => {
+                          setCompareModels(prev => checked ? prev.filter(c=>!(c.channel_id===m.channel_id&&c.model===m.model)) : [...prev, {channel_id:m.channel_id,model:m.model,channel_name:m.channel_name}])
+                        }}/>
+                        {m.channel_name} / {m.model}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeStage === 'review_optimization' && reviewMode !== 'single' ? (
+            <button className="btn btn-p btn-lg" style={{width:'100%'}} onClick={reviewMode==='chain'?handleChainReview:handleMultiCompare} disabled={generating || (reviewMode==='chain'&&chainModels.length<3) || (reviewMode==='compare'&&compareModels.length<2)}>
+              {generating ? '处理中...' : reviewMode==='chain'?'开始链式审查':'开始多版本对比'}
+            </button>
+          ) : (
           <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:12}} onClick={handleGenerate} disabled={generating}>
             {generating ? <span className="flex items-center justify-center gap-2"><svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>生成中...</span> : node?.output?'重新生成':'开始生成'}
           </button>
+          )}
           {showHistory && history.length>0 && (
             <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid #e5e7eb'}}>
               <div style={{fontSize:12,color:'#86909c',marginBottom:8,fontWeight:600}}>版本历史</div>
@@ -138,7 +260,7 @@ export default function WorkflowPage() {
           <div className="card-hd">
             <span className="card-title">生成结果</span>
             <div className="flex gap-2">
-              {output&&!editingOutput && <>
+              {output&&!editingOutput && !(activeStage==='review_optimization'&&reviewMode!=='single') && <>
                 <button className="btn btn-o btn-sm" onClick={()=>{setEditingOutput(true);setOutputDraft(output)}}>编辑</button>
                 <button className="btn btn-o btn-sm" onClick={()=>{navigator.clipboard.writeText(output);showToast('已复制')}}>复制</button>
               </>}
@@ -151,6 +273,39 @@ export default function WorkflowPage() {
                 <button className="btn btn-p btn-sm" onClick={handleSave}>保存</button>
                 <button className="btn btn-o btn-sm" onClick={()=>setEditingOutput(false)}>取消</button>
               </div>
+            </div>
+          ) : activeStage==='review_optimization' && reviewMode==='chain' && (generating || Object.keys(chainSteps).length>0) ? (
+            <div>
+              <div className="flex gap-2" style={{marginBottom:12,borderBottom:'1px solid #e5e7eb',paddingBottom:8}}>
+                {[{key:'generate',label:'生成'},{key:'review',label:'审查'},{key:'optimize',label:'优化'}].map(s=>(
+                  <button key={s.key} className={`btn btn-sm ${activeChainStep===s.key?'btn-p':'btn-o'}`}
+                    onClick={()=>setActiveChainStep(s.key)}>
+                    {s.label}{chainSteps[s.key]?' ✓':''}
+                  </button>
+                ))}
+              </div>
+              <div style={{height:420,overflow:'auto',border:'1px solid #e5e7eb',borderRadius:8,padding:20}}>
+                {chainSteps[activeChainStep] ? (
+                  <div className="md"><ReactMarkdown>{chainSteps[activeChainStep]}</ReactMarkdown></div>
+                ) : generating ? (
+                  <span className="cursor-blink"/>
+                ) : (
+                  <p style={{color:'#86909c'}}>等待执行...</p>
+                )}
+                {generating && chainSteps[activeChainStep] && <span className="cursor-blink"/>}
+              </div>
+            </div>
+          ) : activeStage==='review_optimization' && reviewMode==='compare' && Object.keys(compareOutputs).length>0 ? (
+            <div style={{display:'grid',gridTemplateColumns:`repeat(${Math.min(Object.keys(compareOutputs).length,3)},1fr)`,gap:12,height:520,overflow:'auto'}}>
+              {Object.entries(compareOutputs).map(([key,text])=>(
+                <div key={key} style={{border:'1px solid #e5e7eb',borderRadius:8,display:'flex',flexDirection:'column'}}>
+                  <div style={{padding:'8px 12px',borderBottom:'1px solid #e5e7eb',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:12,fontWeight:600,color:'#4f46e5'}}>{key}</span>
+                    <button className="btn btn-p btn-sm" onClick={()=>handleSelectModel(key)}>采用此版本</button>
+                  </div>
+                  <div style={{flex:1,overflow:'auto',padding:12}} className="md"><ReactMarkdown>{text}</ReactMarkdown></div>
+                </div>
+              ))}
             </div>
           ) : generating && streamingText ? (
             <div style={{height:500,overflow:'auto',border:'1px solid #e5e7eb',borderRadius:8,padding:20}}>

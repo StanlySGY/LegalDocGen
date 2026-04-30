@@ -163,3 +163,130 @@ def save_output(case_id: str, stage: str, output: str = "", db: Session = Depend
     node.output = output
     db.commit()
     return {"message": "已保存"}
+
+
+class ReviewChainRequest(BaseModel):
+    models: list[dict]
+    prompt: str = ""
+
+
+class MultiCompareRequest(BaseModel):
+    models: list[dict]
+    prompt: str = ""
+
+
+@router.post("/review-chain/{case_id}")
+async def review_chain(case_id: str, req: ReviewChainRequest, db: Session = Depends(get_db)):
+    if len(req.models) != 3:
+        raise HTTPException(400, "链式审查需要3个模型（生成/审查/优化）")
+
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+    stage = StageType.REVIEW_OPTIMIZATION
+    prompt_template = req.prompt or pm.get_prompt(stage)
+    materials_context = engine.get_case_context(case_id)
+    previous_context = engine.get_previous_stages_output(case_id, stage)
+    context_prompt = prompt_template.format(
+        materials=materials_context["materials"],
+        previous_context=previous_context,
+    )
+
+    from backend.services.review_orchestrator.orchestrator import ReviewOrchestrator
+    orchestrator = ReviewOrchestrator()
+
+    async def stream():
+        step_outputs = {}
+        final_output = ""
+        try:
+            async for event in orchestrator.review_chain(case_id, req.models, context_prompt):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("step") and event.get("status") == "done":
+                    step_outputs[event["step"]] = event["output"]
+                if event.get("final"):
+                    final_output = event.get("output", "")
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            return
+
+        engine.create_or_update_node(
+            case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
+            output=final_output, model_used="review_chain",
+        )
+        from backend.models.review import ReviewResult
+        db.add(ReviewResult(
+            case_id=case_id, review_mode="chain",
+            step_outputs=json.dumps(step_outputs, ensure_ascii=False),
+            final_output=final_output, status="completed",
+        ))
+        db.commit()
+        yield f"data: {json.dumps({'all_done': True})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/multi-compare/{case_id}")
+async def multi_compare(case_id: str, req: MultiCompareRequest, db: Session = Depends(get_db)):
+    if len(req.models) < 2:
+        raise HTTPException(400, "多版本对比需要至少2个模型")
+
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+    stage = StageType.REVIEW_OPTIMIZATION
+    prompt_template = req.prompt or pm.get_prompt(stage)
+    materials_context = engine.get_case_context(case_id)
+    previous_context = engine.get_previous_stages_output(case_id, stage)
+    context_prompt = prompt_template.format(
+        materials=materials_context["materials"],
+        previous_context=previous_context,
+    )
+
+    from backend.services.review_orchestrator.orchestrator import ReviewOrchestrator
+    orchestrator = ReviewOrchestrator()
+
+    async def stream():
+        try:
+            async for event in orchestrator.multi_compare(case_id, req.models, context_prompt):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("final"):
+                    model_outputs = event.get("outputs", {})
+                    from backend.models.review import ReviewResult
+                    db.add(ReviewResult(
+                        case_id=case_id, review_mode="compare",
+                        model_outputs=json.dumps(model_outputs, ensure_ascii=False),
+                        status="completed",
+                    ))
+                    db.commit()
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/review-select/{case_id}")
+def review_select(case_id: str, data: dict, db: Session = Depends(get_db)):
+    review_id = data.get("review_id")
+    selected_model = data.get("selected_model", "")
+    if not review_id:
+        raise HTTPException(400, "review_id 必填")
+
+    from backend.models.review import ReviewResult
+    rr = db.query(ReviewResult).filter(ReviewResult.id == review_id).first()
+    if not rr:
+        raise HTTPException(404, "审查记录不存在")
+
+    outputs = json.loads(rr.model_outputs) if rr.model_outputs else {}
+    selected_output = outputs.get(selected_model, "")
+    if not selected_output:
+        raise HTTPException(400, f"未找到模型 {selected_model} 的输出")
+
+    rr.selected_model = selected_model
+    rr.final_output = selected_output
+
+    engine = WorkflowEngine(db)
+    engine.create_or_update_node(
+        case_id=case_id, stage=StageType.REVIEW_OPTIMIZATION,
+        prompt="multi_compare", output=selected_output,
+        model_used=f"compare:{selected_model}",
+    )
+    db.commit()
+    return {"output": selected_output, "model": selected_model}

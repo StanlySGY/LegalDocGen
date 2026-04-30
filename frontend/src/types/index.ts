@@ -72,3 +72,5 @@ export const STAGE_ORDER: StageType[] = [
   'draft_generation',
   'review_optimization',
 ]
+
+export type ReviewMode = 'single' | 'chain' | 'compare'
