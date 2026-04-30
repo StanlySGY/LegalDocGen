@@ -137,6 +137,8 @@ export const api = {
     getStages: () => request<any[]>('/config/stages'),
     getStageVariables: (stage: string) => request<{variables:{name:string;description:string}[]}>(`/config/stage-variables/${stage}`),
     getDocumentTypes: () => request<{types:{key:string;name:string}[]}>(`/config/document-types`),
+    optimizePrompt: (data: {prompt:string;instruction:string;provider?:string;model?:string}) =>
+      request<{result:string}>('/config/optimize-prompt', { method: 'POST', body: JSON.stringify(data) }),
   },
   channel: {
     list: () => request<any[]>('/channel'),

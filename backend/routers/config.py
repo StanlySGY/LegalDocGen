@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from backend.database import get_db
 from backend.services.model_dispatcher.dispatcher import dispatcher
@@ -64,3 +65,29 @@ def get_stage_variables(stage: str):
 def get_document_types():
     from backend.services.workflow_engine.stages import DOCUMENT_TYPES
     return {"types": [{"key": k, "name": v} for k, v in DOCUMENT_TYPES.items()]}
+
+
+class OptimizePromptRequest(BaseModel):
+    prompt: str
+    instruction: str
+    provider: str = ""
+    model: str = ""
+
+
+@router.post("/optimize-prompt")
+async def optimize_prompt(req: OptimizePromptRequest):
+    system = (
+        "你是一位Prompt工程专家，专门为法律文书生成系统优化Prompt模板。"
+        "用户会给你当前的Prompt模板和优化需求，你需要返回优化后的完整Prompt文本。"
+        "规则：\n"
+        "1. 只返回优化后的完整Prompt，不要添加任何解释、说明或前缀\n"
+        "2. 保留模板中的变量占位符（如 {materials}、{previous_context}）\n"
+        "3. 确保优化后的Prompt仍然适用于原始阶段（文书生成/审查等）\n"
+        "4. 使Prompt更加具体、有针对性，符合中国法律实务需求"
+    )
+    prompt = f"当前Prompt模板：\n---\n{req.prompt}\n---\n\n用户的优化需求：{req.instruction}\n\n请返回优化后的完整Prompt："
+    try:
+        result = await dispatcher.generate(prompt, req.provider, req.model)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(500, f"优化失败: {e}")
