@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
+import type { Party, Material } from '../types'
 
 type AIAction = { label: string; instruction: string }
 const AI_ACTIONS: AIAction[] = [
@@ -11,6 +12,8 @@ const AI_ACTIONS: AIAction[] = [
   { label: '精简', instruction: '精简以下法律文书段落，删除冗余表述，保留核心法律论点，使文字更加简洁有力：' },
   { label: '展开论述', instruction: '展开以下法律文书段落，增加详细的事实分析、法律论证和逻辑推理，使论述更加充分：' },
 ]
+
+type RefTab = 'parties' | 'materials' | 'analysis' | 'dispute'
 
 export default function DocumentEditor() {
   const { id: caseId } = useParams<{ id: string }>()
@@ -22,14 +25,32 @@ export default function DocumentEditor() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
 
+  // Undo stack
+  const [undoStack, setUndoStack] = useState<string[]>([])
+  const pushUndo = () => setUndoStack(prev => [...prev.slice(-50), content])
+  const undo = () => {
+    if (undoStack.length === 0) return
+    const prev = undoStack[undoStack.length - 1]
+    setUndoStack(s => s.slice(0, -1))
+    setContent(prev)
+    showToast('已撤销')
+  }
+
   // AI edit state
   const [selectedText, setSelectedText] = useState('')
-  const [selRange, setSelRange] = useState<{start:number;end:number}|null>(null)
-  const [toolbarPos, setToolbarPos] = useState<{x:number;y:number}|null>(null)
+  const [selRange, setSelRange] = useState<{ start: number; end: number } | null>(null)
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState('')
   const [customInstruction, setCustomInstruction] = useState('')
   const [showCompare, setShowCompare] = useState(false)
+
+  // Ref panel state
+  const [refTab, setRefTab] = useState<RefTab>('parties')
+  const [parties, setParties] = useState<Party[]>([])
+  const [materials, setMaterials] = useState<Material[]>([])
+  const [analysisText, setAnalysisText] = useState('')
+  const [disputeText, setDisputeText] = useState('')
 
   useEffect(() => {
     if (!caseId) return
@@ -39,12 +60,37 @@ export default function DocumentEditor() {
       setContent(text)
       setOriginal(text)
     })
+    api.parties.list(caseId).then(setParties)
+    api.materials.list(caseId).then(setMaterials)
+    api.workflow.getNode(caseId, 'legal_analysis').then((n: any) => setAnalysisText(n.output || ''))
+    api.workflow.getNode(caseId, 'dispute_focus').then((n: any) => setDisputeText(n.output || ''))
   }, [caseId])
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 2500)
   }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (changed) handleSave()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (!e.shiftKey) {
+          e.preventDefault()
+          undo()
+        }
+      }
+      if (e.key === 'Escape') {
+        if (showCompare) { setShowCompare(false); setAiResult('') }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
 
   const handleSelectionChange = useCallback(() => {
     const ta = textareaRef.current
@@ -76,6 +122,7 @@ export default function DocumentEditor() {
 
   const handleAIEdit = async (instruction: string) => {
     if (!selectedText) return
+    pushUndo()
     setAiLoading(true)
     setAiResult('')
     setShowCompare(true)
@@ -148,7 +195,19 @@ export default function DocumentEditor() {
     }
   }
 
+  const handleContentChange = (val: string) => {
+    pushUndo()
+    setContent(val)
+  }
+
   const changed = content !== original
+
+  const REF_TABS: { key: RefTab; label: string }[] = [
+    { key: 'parties', label: '当事人' },
+    { key: 'materials', label: '案件材料' },
+    { key: 'analysis', label: '法律分析' },
+    { key: 'dispute', label: '争议归纳' },
+  ]
 
   return (
     <div>
@@ -162,38 +221,40 @@ export default function DocumentEditor() {
         <div className="card-hd">
           <span className="card-title">文书编辑器</span>
           <div className="flex gap-2">
+            {undoStack.length > 0 && <span style={{ fontSize: 11, color: '#86909c', alignSelf: 'center' }}>Ctrl+Z 撤销</span>}
             {changed && <span style={{ fontSize: 11, color: '#f59e0b', alignSelf: 'center' }}>未保存</span>}
             <button className="btn btn-o btn-sm" onClick={handleSave} disabled={saving || !changed}>
               {saving ? '保存中...' : '保存'}
             </button>
+            <button className="btn btn-o btn-sm" onClick={() => window.print()}>打印预览</button>
             <button className="btn btn-p btn-sm" onClick={handleExport}>导出 Word</button>
           </div>
         </div>
-        <p style={{fontSize:12,color:'#86909c',marginTop:-8}}>选中文字后可使用 AI 辅助编辑（润色、补充法律依据、改写等）</p>
+        <p style={{ fontSize: 12, color: '#86909c', marginTop: -8 }}>选中文字后可使用 AI 辅助编辑 | Ctrl+S 保存 | Ctrl+Z 撤销</p>
       </div>
 
       {/* Floating AI toolbar */}
       {toolbarPos && selectedText && !showCompare && (
         <div style={{
-          position:'fixed', left: toolbarPos.x, top: toolbarPos.y,
-          transform:'translateX(-50%)', zIndex:90,
-          background:'#fff', borderRadius:10, padding:'6px 8px',
-          boxShadow:'0 4px 20px rgba(0,0,0,0.15)', border:'1px solid #e5e7eb',
-          display:'flex', alignItems:'center', gap:4, flexWrap:'wrap',
-          maxWidth:420,
+          position: 'fixed', left: toolbarPos.x, top: toolbarPos.y,
+          transform: 'translateX(-50%)', zIndex: 90,
+          background: '#fff', borderRadius: 10, padding: '6px 8px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e5e7eb',
+          display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+          maxWidth: 420,
         }}>
           {AI_ACTIONS.map(a => (
             <button key={a.label} className="btn btn-sm" style={{
-              background:'#f3f4f6', color:'#4f46e5', border:'none', fontSize:11, padding:'4px 10px', borderRadius:6,
+              background: '#f3f4f6', color: '#4f46e5', border: 'none', fontSize: 11, padding: '4px 10px', borderRadius: 6,
             }} onClick={() => handleAIEdit(a.instruction)} disabled={aiLoading}>
               {a.label}
             </button>
           ))}
-          <div style={{display:'flex',alignItems:'center',gap:4,marginLeft:4,borderLeft:'1px solid #e5e7eb',paddingLeft:8}}>
-            <input className="input" style={{width:120,fontSize:11,padding:'4px 8px',height:28}} placeholder="自定义指令..."
-              value={customInstruction} onChange={e=>setCustomInstruction(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter')handleCustomEdit()}}/>
-            <button className="btn btn-sm btn-p" style={{fontSize:11,padding:'4px 8px',height:28}} onClick={handleCustomEdit} disabled={!customInstruction.trim()||aiLoading}>执行</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4, borderLeft: '1px solid #e5e7eb', paddingLeft: 8 }}>
+            <input className="input" style={{ width: 120, fontSize: 11, padding: '4px 8px', height: 28 }} placeholder="自定义指令..."
+              value={customInstruction} onChange={e => setCustomInstruction(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCustomEdit() }} />
+            <button className="btn btn-sm btn-p" style={{ fontSize: 11, padding: '4px 8px', height: 28 }} onClick={handleCustomEdit} disabled={!customInstruction.trim() || aiLoading}>执行</button>
           </div>
         </div>
       )}
@@ -201,30 +262,30 @@ export default function DocumentEditor() {
       {/* AI Compare Panel */}
       {showCompare && (
         <div style={{
-          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', backdropFilter:'blur(4px)',
-          display:'flex', alignItems:'center', justifyContent:'center', zIndex:100,
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
         }}>
           <div style={{
-            background:'#fff', borderRadius:16, padding:24, width:'90%', maxWidth:900, maxHeight:'80vh',
-            overflow:'auto', boxShadow:'0 24px 48px rgba(0,0,0,0.15)',
+            background: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 900, maxHeight: '80vh',
+            overflow: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
           }}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <span style={{fontSize:15,fontWeight:600}}>AI 修改建议</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>AI 修改建议</span>
               <button className="btn btn-o btn-sm" onClick={handleReject}>关闭</button>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
-                <div style={{fontSize:12,color:'#86909c',marginBottom:8,fontWeight:600}}>原文</div>
-                <div style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:8,padding:16,maxHeight:400,overflow:'auto'}}>
-                  <pre style={{whiteSpace:'pre-wrap',fontSize:13,lineHeight:1.7,fontFamily:'inherit',margin:0}}>{selectedText}</pre>
+                <div style={{ fontSize: 12, color: '#86909c', marginBottom: 8, fontWeight: 600 }}>原文</div>
+                <div style={{ background: '#f7f8fa', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', margin: 0 }}>{selectedText}</pre>
                 </div>
               </div>
               <div>
-                <div style={{fontSize:12,color:'#6366f1',marginBottom:8,fontWeight:600}}>AI 修改后</div>
-                <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:16,maxHeight:400,overflow:'auto'}}>
+                <div style={{ fontSize: 12, color: '#6366f1', marginBottom: 8, fontWeight: 600 }}>AI 修改后</div>
+                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
                   {aiLoading ? (
-                    <div style={{display:'flex',alignItems:'center',gap:8,color:'#86909c',fontSize:13}}>
-                      <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#86909c', fontSize: 13 }}>
+                      <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25" /><path d="M12 2a10 10 0 0110 10" /></svg>
                       AI 正在处理...
                     </div>
                   ) : (
@@ -234,7 +295,7 @@ export default function DocumentEditor() {
               </div>
             </div>
             {aiResult && !aiLoading && (
-              <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
                 <button className="btn btn-o" onClick={handleReject}>放弃修改</button>
                 <button className="btn btn-p" onClick={handleAccept}>采纳修改</button>
               </div>
@@ -243,21 +304,70 @@ export default function DocumentEditor() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, height: 'calc(100vh - 260px)' }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600 }}>
-            编辑区 <span style={{color:'#c9cdd4',fontWeight:400}}>| 选中文字后出现AI工具栏</span>
+      {/* Three-column layout */}
+      <div className="editor-layout" style={{ display: 'grid', gridTemplateColumns: '260px 1fr 1fr', gap: 0, height: 'calc(100vh - 260px)', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+        {/* Left: Reference Panel */}
+        <div className="ref-panel" style={{ borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+            {REF_TABS.map(t => (
+              <div key={t.key} style={{
+                flex: 1, padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                color: refTab === t.key ? '#6366f1' : '#86909c', borderBottom: refTab === t.key ? '2px solid #6366f1' : '2px solid transparent',
+                transition: 'all 0.15s',
+              }} onClick={() => setRefTab(t.key)}>{t.label}</div>
+            ))}
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', padding: 12, fontSize: 12, lineHeight: 1.7 }}>
+            {refTab === 'parties' && (
+              parties.length > 0 ? parties.map(p => (
+                <div key={p.id} style={{ background: '#f7f8fa', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}
+                    {p.role && <span style={{ fontSize: 11, color: '#6366f1', marginLeft: 6 }}>{p.role}</span>}
+                  </div>
+                  {p.id_number && <div style={{ color: '#86909c', marginTop: 2 }}>证件：{p.id_number}</div>}
+                  {p.address && <div style={{ color: '#86909c' }}>住址：{p.address}</div>}
+                  {p.phone && <div style={{ color: '#86909c' }}>电话：{p.phone}</div>}
+                </div>
+              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无当事人信息</div>
+            )}
+            {refTab === 'materials' && (
+              materials.length > 0 ? materials.map(m => (
+                <div key={m.id} style={{ background: '#f7f8fa', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 500 }}>{m.filename}</div>
+                  <div style={{ color: '#86909c', marginTop: 4, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 11 }}>
+                    {m.parsed_content?.slice(0, 300)}{m.parsed_content?.length > 300 ? '...' : ''}
+                  </div>
+                </div>
+              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无案件材料</div>
+            )}
+            {refTab === 'analysis' && (
+              analysisText ? <div className="md" style={{ fontSize: 12 }}>{<ReactMarkdown>{analysisText}</ReactMarkdown>}</div>
+                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无法律分析</div>
+            )}
+            {refTab === 'dispute' && (
+              disputeText ? <div className="md" style={{ fontSize: 12 }}>{<ReactMarkdown>{disputeText}</ReactMarkdown>}</div>
+                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无争议归纳</div>
+            )}
+          </div>
+        </div>
+
+        {/* Center: Editor */}
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600, flexShrink: 0 }}>
+            编辑区 <span style={{ color: '#c9cdd4', fontWeight: 400 }}>| 选中文字后出现AI工具栏</span>
           </div>
           <textarea
             ref={textareaRef}
             className="textarea"
             style={{ flex: 1, border: 'none', borderRadius: 0, resize: 'none', minHeight: 0 }}
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={e => handleContentChange(e.target.value)}
           />
         </div>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600 }}>
+
+        {/* Right: Preview */}
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e5e7eb' }}>
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600, flexShrink: 0 }}>
             实时预览
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
