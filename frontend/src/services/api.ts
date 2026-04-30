@@ -12,6 +12,33 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+async function* streamSSE(url: string, body: any): AsyncGenerator<any> {
+  const res = await fetch(`${BASE}${url}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Request failed')
+  }
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try { yield JSON.parse(line.slice(6)) } catch {}
+      }
+    }
+  }
+}
+
 export const api = {
   cases: {
     list: () => request<any[]>('/cases'),
@@ -35,99 +62,19 @@ export const api = {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),
     getNode: (caseId: string, stage: string) => request<any>(`/workflow/node/${caseId}/${stage}`),
     generate: (caseId: string, data: any) => request<any>(`/workflow/generate/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
-    generateStream: async function* (caseId: string, data: any) {
-      const res = await fetch(`${BASE}/workflow/generate-stream/${caseId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              yield JSON.parse(line.slice(6))
-            } catch {}
-          }
-        }
-      }
-    },
+    generateStream: (caseId: string, data: any) => streamSSE(`/workflow/generate-stream/${caseId}`, data),
     rollback: (caseId: string, nodeId: string) =>
       request<any>(`/workflow/rollback/${caseId}`, { method: 'POST', body: JSON.stringify({ node_id: nodeId }) }),
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
-    reviewChain: async function* (caseId: string, data: any) {
-      const res = await fetch(`${BASE}/workflow/review-chain/${caseId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-      })
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try { yield JSON.parse(line.slice(6)) } catch {}
-          }
-        }
-      }
-    },
-    multiCompare: async function* (caseId: string, data: any) {
-      const res = await fetch(`${BASE}/workflow/multi-compare/${caseId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-      })
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try { yield JSON.parse(line.slice(6)) } catch {}
-          }
-        }
-      }
-    },
+    reviewChain: (caseId: string, data: any) => streamSSE(`/workflow/review-chain/${caseId}`, data),
+    multiCompare: (caseId: string, data: any) => streamSSE(`/workflow/multi-compare/${caseId}`, data),
     reviewSelect: (caseId: string, data: any) =>
       request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
-    aiEdit: (data: {text:string;instruction?:string;provider?:string;model?:string}) =>
-      request<{result:string}>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
-    quickGenerate: async function* (caseId: string, data: any) {
-      const res = await fetch(`${BASE}/workflow/quick-generate/${caseId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-      })
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try { yield JSON.parse(line.slice(6)) } catch {}
-          }
-        }
-      }
-    },
+    aiEdit: (data: { text: string; instruction?: string; provider?: string; model?: string }) =>
+      request<{ result: string }>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
+    quickGenerate: (caseId: string, data: any) => streamSSE(`/workflow/quick-generate/${caseId}`, data),
   },
   config: {
     getModels: () => request<any>('/config/models'),
@@ -135,10 +82,10 @@ export const api = {
     createPrompt: (data: any) => request<any>('/config/prompts', { method: 'POST', body: JSON.stringify(data) }),
     updatePrompt: (id: string, data: any) => request<any>(`/config/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     getStages: () => request<any[]>('/config/stages'),
-    getStageVariables: (stage: string) => request<{variables:{name:string;description:string}[]}>(`/config/stage-variables/${stage}`),
-    getDocumentTypes: () => request<{types:{key:string;name:string}[]}>(`/config/document-types`),
-    optimizePrompt: (data: {prompt:string;instruction:string;provider?:string;model?:string}) =>
-      request<{result:string}>('/config/optimize-prompt', { method: 'POST', body: JSON.stringify(data) }),
+    getStageVariables: (stage: string) => request<{ variables: { name: string; description: string }[] }>(`/config/stage-variables/${stage}`),
+    getDocumentTypes: () => request<{ types: { key: string; name: string }[] }>('/config/document-types'),
+    optimizePrompt: (data: { prompt: string; instruction: string; provider?: string; model?: string }) =>
+      request<{ result: string }>('/config/optimize-prompt', { method: 'POST', body: JSON.stringify(data) }),
   },
   channel: {
     list: () => request<any[]>('/channel'),

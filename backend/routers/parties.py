@@ -130,8 +130,8 @@ async def extract_parties(case_id: str, db: Session = Depends(get_db)):
     if not isinstance(parties_data, list):
         raise HTTPException(500, "AI返回格式异常，请重试")
 
-    # Clear existing and save new
-    db.query(Party).filter(Party.case_id == case_id).delete()
+    # Only delete AI-extracted parties, keep manually added ones
+    db.query(Party).filter(Party.case_id == case_id, Party.notes == "AI提取").delete()
     created = []
     for pd_item in parties_data:
         p = Party(
@@ -142,7 +142,7 @@ async def extract_parties(case_id: str, db: Session = Depends(get_db)):
             address=pd_item.get("address", ""),
             phone=pd_item.get("phone", ""),
             legal_representative=pd_item.get("legal_representative", ""),
-            notes=pd_item.get("notes", ""),
+            notes="AI提取",
         )
         db.add(p)
         created.append(p)

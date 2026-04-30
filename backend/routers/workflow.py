@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.database import get_db
-from backend.models.workflow import StageType, STAGE_NAMES
+from backend.models.workflow import StageType, STAGE_NAMES, STAGE_ORDER
 from backend.models.material import Material
 from backend.services.workflow_engine.engine import WorkflowEngine
 from backend.services.workflow_engine.stages import STAGE_PROMPTS
