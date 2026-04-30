@@ -15,6 +15,7 @@ export interface Material {
   file_type: string
   file_size: number
   parsed_content: string
+  structured_data: string
   parse_status: string
   created_at: string
 }

@@ -7,6 +7,7 @@ from typing import Optional
 
 from backend.database import get_db
 from backend.models.workflow import StageType, STAGE_NAMES
+from backend.models.material import Material
 from backend.services.workflow_engine.engine import WorkflowEngine
 from backend.services.workflow_engine.stages import STAGE_PROMPTS
 from backend.services.model_dispatcher.dispatcher import dispatcher
@@ -80,10 +81,15 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
         output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
     )
+
+    if stage == StageType.FACT_EXTRACTION:
+        from backend.services.structurer.structurer import structure_facts
+        structured = structure_facts(output)
+        for m in db.query(Material).filter(Material.case_id == case_id).all():
+            m.structured_data = json.dumps(structured, ensure_ascii=False)
+        db.commit()
+
     return {"node_id": node.id, "output": output, "version": node.version}
-
-
-@router.post("/generate-stream/{case_id}")
 async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
@@ -114,6 +120,12 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
                 case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
             )
+            if stage == StageType.FACT_EXTRACTION:
+                from backend.services.structurer.structurer import structure_facts
+                structured = structure_facts(output)
+                for m in db.query(Material).filter(Material.case_id == case_id).all():
+                    m.structured_data = json.dumps(structured, ensure_ascii=False)
+                db.commit()
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
