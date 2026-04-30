@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Case, Material } from '../types'
 
-interface Props { caseId: string; nav: { cases: () => void; workflow: (id: string) => void } }
-
-export default function CaseDetail({ caseId, nav }: Props) {
+export default function CaseDetail() {
+  const { id: caseId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [uploading, setUploading] = useState(false)
@@ -12,11 +13,11 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = async () => { const [c,m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)]); setCaseData(c); setMaterials(m) }
+  const load = async () => { if(!caseId)return; const [c,m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)]); setCaseData(c); setMaterials(m) }
   useEffect(() => { load() }, [caseId])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files; if (!files) return
+    const files = e.target.files; if (!files || !caseId) return
     setUploading(true)
     for (const f of files) await api.materials.upload(caseId, f)
     setUploading(false); load(); showToast('上传成功')
@@ -40,7 +41,10 @@ export default function CaseDetail({ caseId, nav }: Props) {
           </div>
           {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}
         </div>
-        <button className="btn btn-p" onClick={()=>nav.workflow(caseId)}>进入工作流 →</button>
+        <div className="flex gap-2">
+          <button className="btn btn-o" onClick={()=>navigate(`/cases/${caseId}/editor`)}>编辑文书</button>
+          <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/workflow`)}>进入工作流 →</button>
+        </div>
       </div>
 
       <div className="stat-row">

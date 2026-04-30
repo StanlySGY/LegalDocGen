@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Case } from '../types'
 
-interface Props { nav: { detail: (id: string) => void; workflow: (id: string) => void } }
-
-export default function CaseList({ nav }: Props) {
+export default function CaseList() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<Case[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', case_type: '' })
@@ -19,7 +19,7 @@ export default function CaseList({ nav }: Props) {
     const c = await api.cases.create(form)
     setForm({ name: '', description: '', case_type: '' })
     setShowCreate(false)
-    nav.detail(c.id)
+    navigate(`/cases/${c.id}`)
   }
 
   return (
@@ -80,7 +80,7 @@ export default function CaseList({ nav }: Props) {
           </thead>
           <tbody>
             {cases.map(c => (
-              <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>nav.detail(c.id)}>
+              <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>navigate(`/cases/${c.id}`)}>
                 <td>
                   <div style={{fontWeight:500}}>{c.name}</div>
                   {c.description && <div style={{fontSize:12,color:'#86909c',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:300}}>{c.description}</div>}
@@ -94,8 +94,8 @@ export default function CaseList({ nav }: Props) {
                 <td style={{color:'#86909c',fontSize:12}}>{new Date(c.created_at).toLocaleDateString('zh-CN')}</td>
                 <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
                   <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
-                    <button className="btn btn-o btn-sm" onClick={()=>nav.detail(c.id)}>详情</button>
-                    <button className="btn btn-p btn-sm" onClick={()=>nav.workflow(c.id)}>工作流</button>
+                    <button className="btn btn-o btn-sm" onClick={()=>navigate(`/cases/${c.id}`)}>详情</button>
+                    <button className="btn btn-p btn-sm" onClick={()=>navigate(`/cases/${c.id}/workflow`)}>工作流</button>
                   </div>
                 </td>
               </tr>

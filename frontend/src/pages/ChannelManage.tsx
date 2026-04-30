@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 
 interface Channel {
@@ -17,9 +18,8 @@ interface Channel {
   created_at: string
 }
 
-interface Props { onBack: () => void }
-
-export default function ChannelManage({ onBack }: Props) {
+export default function ChannelManage() {
+  const navigate = useNavigate()
   const [channels, setChannels] = useState<Channel[]>([])
   const [showDrawer, setShowDrawer] = useState(false)
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
@@ -130,7 +130,6 @@ export default function ChannelManage({ onBack }: Props) {
         </button>
       </div>
 
-      {/* Channel table */}
       <div className="card" style={{ padding: 0 }}>
         <table className="data-table">
           <thead>
@@ -184,7 +183,6 @@ export default function ChannelManage({ onBack }: Props) {
         </table>
       </div>
 
-      {/* Add/Edit Drawer */}
       {showDrawer && (
         <div className="modal-mask" onClick={() => setShowDrawer(false)}>
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
@@ -223,7 +221,6 @@ export default function ChannelManage({ onBack }: Props) {
         </div>
       )}
 
-      {/* Models Dialog */}
       {showModelsDialog && (
         <div className="modal-mask" onClick={() => setShowModelsDialog(null)}>
           <div className="modal-box" style={{ maxWidth: 640, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>

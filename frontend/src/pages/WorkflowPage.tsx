@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType } from '../types'
 import { STAGE_NAMES, STAGE_ORDER } from '../types'
 
-interface Props { caseId: string; onBack: () => void; onCaseNav: () => void }
-
-export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
+export default function WorkflowPage() {
+  const { id: caseId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [progress, setProgress] = useState<StageProgress[]>([])
   const [activeStage, setActiveStage] = useState<StageType>('fact_extraction')
   const [node, setNode] = useState<WorkflowNode | null>(null)
@@ -25,15 +26,16 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const loadProgress = useCallback(async () => { const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
-  const loadNode = useCallback(async (s: StageType) => { const n = await api.workflow.getNode(caseId, s); setNode(n); setPrompt(n.prompt||''); setOutput(n.output||''); setEditingOutput(false); setStreamingText('') }, [caseId])
-  const loadHistory = useCallback(async (s: StageType) => { setHistory(await api.workflow.history(caseId, s)) }, [caseId])
+  const loadProgress = useCallback(async () => { if(!caseId)return; const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
+  const loadNode = useCallback(async (s: StageType) => { if(!caseId)return; const n = await api.workflow.getNode(caseId, s); setNode(n); setPrompt(n.prompt||''); setOutput(n.output||''); setEditingOutput(false); setStreamingText('') }, [caseId])
+  const loadHistory = useCallback(async (s: StageType) => { if(!caseId)return; setHistory(await api.workflow.history(caseId, s)) }, [caseId])
 
   useEffect(() => { loadProgress() }, [loadProgress])
   useEffect(() => { loadNode(activeStage) }, [activeStage, loadNode])
   useEffect(() => { api.config.getModels().then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} }) }, [])
 
   const handleGenerate = async () => {
+    if(!caseId)return
     if(!selChannelId){showToast('请先在「渠道管理」中添加API渠道','err');return}
     setGenerating(true); setStreamingText(''); setOutput('')
     try {
@@ -50,8 +52,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
     setGenerating(false)
   }
 
-  const handleSave = async () => { await api.workflow.saveOutput(caseId,activeStage,outputDraft); setOutput(outputDraft); setEditingOutput(false); showToast('已保存') }
-  const handleRollback = async (id:string) => { const r=await api.workflow.rollback(caseId,id); setOutput(r.output); setNode({...node!,output:r.output,version:r.version}); await loadProgress(); await loadHistory(activeStage); showToast('已回滚') }
+  const handleSave = async () => { if(!caseId)return; await api.workflow.saveOutput(caseId,activeStage,outputDraft); setOutput(outputDraft); setEditingOutput(false); showToast('已保存') }
+  const handleRollback = async (id:string) => { if(!caseId)return; const r=await api.workflow.rollback(caseId,id); setOutput(r.output); setNode({...node!,output:r.output,version:r.version}); await loadProgress(); await loadHistory(activeStage); showToast('已回滚') }
 
   const idx = STAGE_ORDER.indexOf(activeStage)
   const icons:Record<StageType,string> = {fact_extraction:'📋',legal_analysis:'⚖️',dispute_focus:'🎯',draft_generation:'📝',review_optimization:'🔍'}
@@ -59,8 +61,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   return (
     <div>
       <div className="breadcrumb mb-5">
-        <a onClick={onCaseNav}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
-        <a onClick={onBack}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={()=>navigate('/cases')}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={()=>navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
         <span className="current">工作流</span>
       </div>
 
@@ -82,7 +84,6 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
-        {/* Prompt */}
         <div className="card">
           <div className="card-hd">
             <span className="card-title">Prompt 配置</span>
@@ -119,7 +120,6 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
           )}
         </div>
 
-        {/* Output */}
         <div className="card">
           <div className="card-hd">
             <span className="card-title">生成结果</span>
