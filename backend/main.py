@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from backend.database import init_db, SessionLocal
 from backend.routers import cases, materials, workflow, config, channel, parties
 from backend.services.prompt_manager.manager import PromptManager
+from backend.seed import seed_demo_data
 
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
     try:
         pm = PromptManager(db)
         pm.init_default_templates()
+        seed_demo_data(db)
     finally:
         db.close()
     yield

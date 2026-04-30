@@ -91,7 +91,7 @@ export const api = {
     updatePrompt: (id: string, data: any) => request<any>(`/config/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     getStages: () => request<any[]>('/config/stages'),
     getStageVariables: (stage: string) => request<{ variables: { name: string; description: string }[] }>(`/config/stage-variables/${stage}`),
-    getDocumentTypes: () => request<{ types: { key: string; name: string }[] }>('/config/document-types'),
+    getDocumentTypes: () => request<{ types: import('../types').DocumentTypeOption[] }>('/config/document-types'),
     optimizePrompt: (data: { prompt: string; instruction: string; provider?: string; model?: string }) =>
       request<{ result: string }>('/config/optimize-prompt', { method: 'POST', body: JSON.stringify(data) }),
   },

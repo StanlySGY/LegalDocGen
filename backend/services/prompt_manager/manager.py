@@ -27,7 +27,7 @@ class PromptManager:
                     )
                 )
         for doc_type, prompts in DOCUMENT_TYPE_PROMPTS.items():
-            doc_name = DOCUMENT_TYPES.get(doc_type, doc_type)
+            doc_name = DOCUMENT_TYPES.get(doc_type, {}).get("name", doc_type)
             for stage_key, content in prompts.items():
                 existing = (
                     self.db.query(PromptTemplate)

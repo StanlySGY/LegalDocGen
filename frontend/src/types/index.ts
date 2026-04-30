@@ -82,6 +82,8 @@ export type ReviewMode = 'single' | 'chain' | 'compare'
 export interface DocumentTypeOption {
   key: string
   name: string
+  desc: string
+  scenario: string
 }
 
 export const STAGE_NAMES_LAWYER: Record<string, string> = {

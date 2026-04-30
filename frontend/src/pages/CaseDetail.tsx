@@ -131,7 +131,8 @@ export default function CaseDetail() {
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginBottom:16}}>
           {docTypes.map(dt => (
             <div key={dt.key} className={`doc-type-card ${selectedDocType===dt.key?'selected':''}`}
-              onClick={()=>setSelectedDocType(dt.key)}>
+              onClick={()=>setSelectedDocType(dt.key)}
+              title={`${dt.desc}\n适用：${dt.scenario}`}>
               {dt.name}
             </div>
           ))}
@@ -223,6 +224,38 @@ export default function CaseDetail() {
           </div>
         )}
       </div>
+
+      {/* Timeline visualization from materials */}
+      {materials.some(m => { try { const s = JSON.parse(m.structured_data||'{}'); return !!s.timeline } catch { return false } }) && (
+        <div className="card" style={{marginBottom:24}}>
+          <div className="card-hd">
+            <span className="card-title">案件时间线</span>
+          </div>
+          <div style={{paddingLeft:20}}>
+            {materials.filter(m => { try { return !!JSON.parse(m.structured_data||'{}').timeline } catch { return false } }).map(m => {
+              const sd = JSON.parse(m.structured_data)
+              const events = sd.timeline.split('\\n').filter((s:string)=>s.trim())
+              return events.map((ev:string, i:number) => {
+                const match = ev.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*(.*)/)
+                return (
+                  <div key={`${m.id}-${i}`} style={{display:'flex',gap:12,marginBottom:0,position:'relative'}}>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:12}}>
+                      <div style={{width:10,height:10,borderRadius:'50%',background:i===events.length-1?'#6366f1':'#c9cdd4',flexShrink:0,marginTop:4}}/>
+                      {i<events.length-1 && <div style={{width:2,flex:1,background:'#e5e7eb'}}/>}
+                    </div>
+                    <div style={{paddingBottom:14}}>
+                      {match ? <>
+                        <span style={{fontSize:12,fontWeight:600,color:'#6366f1'}}>{match[1]}</span>
+                        <span style={{fontSize:13,marginLeft:8,color:'#4e5969'}}>{match[2]}</span>
+                      </> : <span style={{fontSize:13,color:'#4e5969'}}>{ev}</span>}
+                    </div>
+                  </div>
+                )
+              })
+            }).flat()}
+          </div>
+        </div>
+      )}
 
       <div className="stat-row">
         <div className="stat-card s-purple"><div className="s-label">材料数量</div><div className="s-value">{materials.length}</div></div>

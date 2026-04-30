@@ -129,15 +129,15 @@ STAGE_VARIABLES = {
 }
 
 DOCUMENT_TYPES = {
-    "civil_complaint": "民事起诉状",
-    "civil_defense": "民事答辩状",
-    "representation": "代理词",
-    "defense_opinion": "辩护词",
-    "lawyer_letter": "律师函",
-    "legal_opinion": "法律意见书",
-    "evidence_list": "证据目录",
-    "cross_examination": "质证意见",
-    "contract_review": "合同审查意见书",
+    "civil_complaint": {"name": "民事起诉状", "desc": "向法院提起民事诉讼的正式文书", "scenario": "合同违约、债务追偿、侵权索赔等民事纠纷"},
+    "civil_defense": {"name": "民事答辩状", "desc": "针对起诉状的正式答辩文书", "scenario": "作为被告回应原告的起诉主张"},
+    "representation": {"name": "代理词", "desc": "诉讼代理人向法庭提交的意见书", "scenario": "开庭审理阶段发表代理意见"},
+    "defense_opinion": {"name": "辩护词", "desc": "刑事案件中为被告人辩护的意见书", "scenario": "刑事案件庭审辩护阶段"},
+    "lawyer_letter": {"name": "律师函", "desc": "以律师名义发出的正式函件", "scenario": "催收债务、警告侵权、要求履行合同等"},
+    "legal_opinion": {"name": "法律意见书", "desc": "对特定法律问题出具的专业意见", "scenario": "企业合规、投资尽调、法律风险评估等"},
+    "evidence_list": {"name": "证据目录", "desc": "系统整理案件证据的清单文书", "scenario": "整理提交法庭的全部证据材料"},
+    "cross_examination": {"name": "质证意见", "desc": "对对方证据发表意见的文书", "scenario": "庭审质证阶段对证据真实性/合法性/关联性发表意见"},
+    "contract_review": {"name": "合同审查意见书", "desc": "对合同条款的法律审查报告", "scenario": "审查合同条款的法律风险和修改建议"},
 }
 
 DOCUMENT_TYPE_PROMPTS = {
