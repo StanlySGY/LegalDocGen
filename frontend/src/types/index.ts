@@ -74,3 +74,16 @@ export const STAGE_ORDER: StageType[] = [
 ]
 
 export type ReviewMode = 'single' | 'chain' | 'compare'
+
+export interface DocumentTypeOption {
+  key: string
+  name: string
+}
+
+export const STAGE_NAMES_LAWYER: Record<string, string> = {
+  fact_extraction: '案件梳理',
+  legal_analysis: '法律分析',
+  dispute_focus: '争议归纳',
+  draft_generation: '文书生成',
+  review_optimization: '审查优化',
+}

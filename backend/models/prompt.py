@@ -10,6 +10,7 @@ class PromptTemplate(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     stage = Column(String(50), nullable=False)
+    document_type = Column(String(100), default="")
     name = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
     version = Column(Integer, default=1)

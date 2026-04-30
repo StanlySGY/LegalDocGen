@@ -22,6 +22,7 @@ class GenerateRequest(BaseModel):
     provider: str = ""
     model: str = ""
     template_id: str = ""
+    document_type: str = ""
 
 
 class RollbackRequest(BaseModel):
@@ -63,7 +64,7 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
     if stage_info and stage_info["locked"]:
         raise HTTPException(400, stage_info["locked_reason"])
 
-    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
+    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
     materials_context = engine.get_case_context(case_id)
     previous_context = engine.get_previous_stages_output(case_id, stage)
 
@@ -71,7 +72,6 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         materials=materials_context["materials"],
         previous_context=previous_context,
     )
-
     try:
         output = await dispatcher.generate(final_prompt, req.provider, req.model)
     except Exception as e:
@@ -100,7 +100,7 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
     if stage_info and stage_info["locked"]:
         raise HTTPException(400, stage_info["locked_reason"])
 
-    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
+    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
     materials_context = engine.get_case_context(case_id)
     previous_context = engine.get_previous_stages_output(case_id, stage)
 
@@ -108,7 +108,6 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
         materials=materials_context["materials"],
         previous_context=previous_context,
     )
-
     async def stream_generator():
         try:
             full_output = []

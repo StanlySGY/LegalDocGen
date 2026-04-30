@@ -58,3 +58,9 @@ def get_stage_variables(stage: str):
     from backend.services.workflow_engine.stages import STAGE_VARIABLES
     variables = STAGE_VARIABLES.get(StageType(stage), [])
     return {"variables": variables}
+
+
+@router.get("/document-types")
+def get_document_types():
+    from backend.services.workflow_engine.stages import DOCUMENT_TYPES
+    return {"types": [{"key": k, "name": v} for k, v in DOCUMENT_TYPES.items()]}
