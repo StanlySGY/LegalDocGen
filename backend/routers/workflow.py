@@ -294,6 +294,24 @@ def review_select(case_id: str, data: dict, db: Session = Depends(get_db)):
     return {"output": selected_output, "model": selected_model}
 
 
+class AIEditRequest(BaseModel):
+    text: str
+    instruction: str = ""
+    provider: str = ""
+    model: str = ""
+
+
+@router.post("/ai-edit")
+async def ai_edit(req: AIEditRequest):
+    instruction = req.instruction or "润色以下法律文书文本，使其更加专业、严谨、符合法律文书的行文规范，保持原意不变："
+    prompt = f"{instruction}\n\n---\n\n{req.text}"
+    try:
+        result = await dispatcher.generate(prompt, req.provider, req.model)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(500, f"AI编辑失败: {e}")
+
+
 class QuickGenerateRequest(BaseModel):
     document_type: str = ""
     provider: str = ""

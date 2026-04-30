@@ -106,6 +106,8 @@ export const api = {
     },
     reviewSelect: (caseId: string, data: any) =>
       request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
+    aiEdit: (data: {text:string;instruction?:string;provider?:string;model?:string}) =>
+      request<{result:string}>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
     quickGenerate: async function* (caseId: string, data: any) {
       const res = await fetch(`${BASE}/workflow/quick-generate/${caseId}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
