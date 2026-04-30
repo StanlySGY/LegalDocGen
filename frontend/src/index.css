@@ -454,3 +454,55 @@ body {
   from { transform: translateX(120%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+/* ===== Document Type Cards ===== */
+.doc-type-card {
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  background: #fff;
+  user-select: none;
+}
+
+.doc-type-card:hover { border-color: #a78bfa; color: #6366f1; background: #faf5ff; }
+
+.doc-type-card.selected {
+  border-color: #6366f1;
+  background: #6366f1;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.25);
+}
+
+/* ===== Guide Text ===== */
+.guide-text {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* ===== Collapse Panel ===== */
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f7f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #86909c;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+  width: fit-content;
+}
+
+.collapse-toggle:hover { background: #eef2ff; color: #6366f1; border-color: #c7d2fe; }
+
+.collapse-panel { margin-top: 12px; }

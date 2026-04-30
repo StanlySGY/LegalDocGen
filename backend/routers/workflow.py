@@ -90,6 +90,9 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         db.commit()
 
     return {"node_id": node.id, "output": output, "version": node.version}
+
+
+@router.post("/generate-stream/{case_id}")
 async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
@@ -289,6 +292,52 @@ def review_select(case_id: str, data: dict, db: Session = Depends(get_db)):
     )
     db.commit()
     return {"output": selected_output, "model": selected_model}
+
+
+class QuickGenerateRequest(BaseModel):
+    document_type: str = ""
+    provider: str = ""
+    model: str = ""
+
+
+@router.post("/quick-generate/{case_id}")
+async def quick_generate(case_id: str, req: QuickGenerateRequest, db: Session = Depends(get_db)):
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+    total = len(STAGE_ORDER)
+
+    async def run():
+        for i, stage in enumerate(STAGE_ORDER):
+            yield f"data: {json.dumps({'stage': stage.value, 'name': STAGE_NAMES[stage], 'status': 'running', 'progress': int(i / total * 100)}, ensure_ascii=False)}\n\n"
+            doc_type = req.document_type if stage in (StageType.DRAFT_GENERATION, StageType.REVIEW_OPTIMIZATION) else ""
+            prompt_template = pm.get_prompt(stage, document_type=doc_type)
+            materials_context = engine.get_case_context(case_id)
+            previous_context = engine.get_previous_stages_output(case_id, stage)
+            try:
+                final_prompt = prompt_template.format(
+                    materials=materials_context["materials"],
+                    previous_context=previous_context,
+                )
+                output = await dispatcher.generate(final_prompt, req.provider, req.model)
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'{STAGE_NAMES[stage]}失败: {e}'}, ensure_ascii=False)}\n\n"
+                return
+            node = engine.create_or_update_node(
+                case_id=case_id, stage=stage, prompt=prompt_template,
+                output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "auto",
+            )
+            if stage == StageType.FACT_EXTRACTION:
+                from backend.services.structurer.structurer import structure_facts
+                structured = structure_facts(output)
+                for m in db.query(Material).filter(Material.case_id == case_id).all():
+                    m.structured_data = json.dumps(structured, ensure_ascii=False)
+                db.commit()
+            yield f"data: {json.dumps({'stage': stage.value, 'name': STAGE_NAMES[stage], 'status': 'done', 'progress': int((i + 1) / total * 100)}, ensure_ascii=False)}\n\n"
+        final_node = engine.get_stage_node(case_id, StageType.REVIEW_OPTIMIZATION)
+        final_output = final_node.output if final_node else ""
+        yield f"data: {json.dumps({'done': True, 'output': final_output, 'document_type': req.document_type}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(run(), media_type="text/event-stream")
 
 
 class ExportRequest(BaseModel):

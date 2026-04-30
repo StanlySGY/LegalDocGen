@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
-import type { Case, Material } from '../types'
+import type { Case, Material, DocumentTypeOption } from '../types'
+import { STAGE_NAMES_LAWYER } from '../types'
 
 export default function CaseDetail() {
   const { id: caseId } = useParams<{ id: string }>()
@@ -12,9 +13,17 @@ export default function CaseDetail() {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const [docTypes, setDocTypes] = useState<DocumentTypeOption[]>([])
+  const [selectedDocType, setSelectedDocType] = useState('')
+  const [quickGenerating, setQuickGenerating] = useState(false)
+  const [quickProgress, setQuickProgress] = useState(0)
+  const [quickStage, setQuickStage] = useState('')
+  const [quickDone, setQuickDone] = useState(false)
+
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = async () => { if(!caseId)return; const [c,m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)]); setCaseData(c); setMaterials(m) }
   useEffect(() => { load() }, [caseId])
+  useEffect(() => { api.config.getDocumentTypes().then(d => { setDocTypes(d.types); if(d.types.length) setSelectedDocType(d.types[0].key) }) }, [])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files; if (!files || !caseId) return
@@ -25,6 +34,21 @@ export default function CaseDetail() {
   }
 
   const del = async (id: string) => { await api.materials.delete(id); load(); showToast('已删除') }
+
+  const handleQuickGenerate = async () => {
+    if (!caseId || !selectedDocType) return
+    if (materials.length === 0) { showToast('请先上传案件材料', 'err'); return }
+    setQuickGenerating(true); setQuickProgress(0); setQuickStage('准备中...'); setQuickDone(false)
+    try {
+      for await (const event of api.workflow.quickGenerate(caseId, { document_type: selectedDocType })) {
+        if (event.error) { showToast(event.error, 'err'); setQuickGenerating(false); return }
+        if (event.status === 'running') { setQuickStage(event.name || STAGE_NAMES_LAWYER[event.stage] || event.stage); setQuickProgress(event.progress) }
+        if (event.status === 'done') { setQuickProgress(event.progress) }
+        if (event.done) { setQuickProgress(100); setQuickDone(true); showToast('文书生成完成') }
+      }
+    } catch(e:any) { showToast(e.message||'生成失败','err') }
+    setQuickGenerating(false)
+  }
 
   if (!caseData) return <div style={{textAlign:'center',padding:80,color:'#86909c'}}>加载中...</div>
 
@@ -42,15 +66,42 @@ export default function CaseDetail() {
           {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-o" onClick={()=>navigate(`/cases/${caseId}/editor`)}>编辑文书</button>
-          <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/workflow`)}>进入工作流 →</button>
+          {quickDone && <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/editor`)}>查看文书 →</button>}
+          <button className="btn btn-o" style={{fontSize:12}} onClick={()=>navigate(`/cases/${caseId}/workflow`)}>分步模式</button>
+        </div>
+      </div>
+
+      <div className="quick-gen-section card" style={{marginBottom:24,background:'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)',borderColor:'#ddd6fe'}}>
+        <div className="card-hd" style={{marginBottom:12}}>
+          <span className="card-title" style={{fontSize:16}}>快速生成文书</span>
+        </div>
+        <p className="guide-text" style={{marginBottom:16}}>选择需要的文书类型，系统将自动梳理案件、分析法律关系、生成文书并审查优化。</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginBottom:16}}>
+          {docTypes.map(dt => (
+            <div key={dt.key} className={`doc-type-card ${selectedDocType===dt.key?'selected':''}`}
+              onClick={()=>setSelectedDocType(dt.key)}>
+              {dt.name}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="btn btn-p btn-lg" style={{minWidth:160}} onClick={handleQuickGenerate} disabled={quickGenerating || !selectedDocType}>
+            {quickGenerating ? '生成中...' : '一键生成'}
+          </button>
+          {quickGenerating && (
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,color:'#6366f1',marginBottom:4}}>{quickStage}</div>
+              <div style={{height:6,background:'#e5e7eb',borderRadius:3,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${quickProgress}%`,background:'linear-gradient(90deg,#6366f1,#a78bfa)',borderRadius:3,transition:'width 0.3s'}}/>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="stat-row">
         <div className="stat-card s-purple"><div className="s-label">材料数量</div><div className="s-value">{materials.length}</div></div>
         <div className="stat-card s-green"><div className="s-label">已解析</div><div className="s-value">{materials.filter(m=>m.parse_status==='completed').length}</div></div>
-        <div className="stat-card s-orange"><div className="s-label">解析失败</div><div className="s-value">{materials.filter(m=>m.parse_status!=='completed').length}</div></div>
       </div>
 
       <div className="card">
@@ -61,6 +112,7 @@ export default function CaseDetail() {
             <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hidden onChange={handleUpload} disabled={uploading}/>
           </label>
         </div>
+        <p style={{fontSize:12,color:'#86909c',marginBottom:12}}>支持 PDF、Word、图片格式，上传后系统自动解析内容</p>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {materials.map(m => (
             <div key={m.id} className="flex items-center justify-between" style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:'14px 16px'}}>
@@ -92,9 +144,9 @@ export default function CaseDetail() {
             </div>
           ))}
           {materials.length===0 && (
-            <div className="empty" style={{padding:'50px 0'}}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-              <p>暂无材料，上传 PDF / Word / 图片文件</p>
+            <div className="empty" style={{padding:'40px 0'}}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{width:40,height:40}}><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              <p>上传案件材料（PDF/Word/图片），选择文书类型后一键生成</p>
             </div>
           )}
         </div>

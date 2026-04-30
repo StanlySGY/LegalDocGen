@@ -106,6 +106,26 @@ export const api = {
     },
     reviewSelect: (caseId: string, data: any) =>
       request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
+    quickGenerate: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/quick-generate/${caseId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
   },
   config: {
     getModels: () => request<any>('/config/models'),
