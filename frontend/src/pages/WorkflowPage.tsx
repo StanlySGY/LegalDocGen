@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType, ReviewMode } from '../types'
-import { STAGE_NAMES, STAGE_ORDER } from '../types'
+import { STAGE_NAMES, STAGE_ORDER, STAGE_NAMES_LAWYER } from '../types'
 
 export default function WorkflowPage() {
   const { id: caseId } = useParams<{ id: string }>()
@@ -34,6 +34,7 @@ export default function WorkflowPage() {
   const [compareOutputs, setCompareOutputs] = useState<Record<string, string>>({})
   const [activeChainStep, setActiveChainStep] = useState<string>('generate')
   const [reviewId, setReviewId] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const loadProgress = useCallback(async () => { if(!caseId)return; const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
@@ -150,7 +151,7 @@ export default function WorkflowPage() {
                 title={isLocked ? p?.locked_reason : ''}
                 style={isLocked ? {opacity:0.4,cursor:'not-allowed'} : undefined}>
                 <div className="step-dot">{isDone?'✓':icons[stage]}</div>
-                <span className="step-name">{STAGE_NAMES[stage]}</span>
+                <span className="step-name">{STAGE_NAMES_LAWYER[stage] || STAGE_NAMES[stage]}</span>
                 {p&&p.version>0 && <span className="step-ver">v{p.version}</span>}
               </div>
               {i<STAGE_ORDER.length-1 && <div className={`step-line ${isDone?'done':''}`}/>}
@@ -162,27 +163,33 @@ export default function WorkflowPage() {
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
         <div className="card">
           <div className="card-hd">
-            <span className="card-title">Prompt 配置</span>
-            <div className="flex gap-2 items-center">
-              <select className="select" style={{width:'auto',fontSize:12,padding:'5px 10px',maxWidth:200}} value={`${selChannelId}|${selModel}`} onChange={e=>{
-                const [cid,mid] = e.target.value.split('|');
-                setSelChannelId(cid); setSelModel(mid);
-              }}>
-                {models.length===0 && <option>未配置渠道</option>}
-                {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.channel_name} / {m.model}</option>)}
-              </select>
-              <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭':'历史'}</button>
+            <span className="card-title">{STAGE_NAMES_LAWYER[activeStage] || STAGE_NAMES[activeStage]}</span>
+            <div className="flex gap-2">
+              <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭历史':'历史版本'}</button>
             </div>
           </div>
-          {variables.length > 0 && (
-            <div className="flex flex-wrap gap-2" style={{marginBottom:8}}>
-              {variables.map(v => (
-                <span key={v.name} className="tag t-purple" style={{cursor:'pointer'}} title={v.description}
-                  onClick={() => setPrompt(prompt + `{${v.name}}`)}>{`{${v.name}}`}</span>
-              ))}
+          <div className="collapse-toggle" onClick={()=>setShowAdvanced(!showAdvanced)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:14,height:14,transform:showAdvanced?'rotate(90deg)':'',transition:'transform 0.2s'}}><path d="M9 18l6-6-6-6"/></svg>
+            高级设置
+          </div>
+          {showAdvanced && (
+            <div className="collapse-panel">
+              <div style={{marginBottom:8}}>
+                <label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:4}}>AI 模型</label>
+                <select className="select" style={{width:'100%',fontSize:12,padding:'5px 10px'}} value={`${selChannelId}|${selModel}`} onChange={e=>{
+                  const [cid,mid] = e.target.value.split('|');
+                  setSelChannelId(cid); setSelModel(mid);
+                }}>
+                  {models.length===0 && <option>未配置渠道</option>}
+                  {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.channel_name} / {m.model}</option>)}
+                </select>
+              </div>
+              <div style={{marginBottom:4}}>
+                <label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:4}}>Prompt 模板</label>
+                <textarea className="textarea" style={{height:200}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt 模板..."/>
+              </div>
             </div>
           )}
-          <textarea className="textarea" style={{height:260}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
 
           {activeStage === 'review_optimization' && (
             <div style={{marginTop:12,marginBottom:12}}>
