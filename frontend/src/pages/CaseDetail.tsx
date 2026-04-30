@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
-import type { Case, Material, DocumentTypeOption, Party } from '../types'
+import type { Case, Material, DocumentTypeOption, Party, StageProgress } from '../types'
 import { STAGE_NAMES_LAWYER } from '../types'
 
 export default function CaseDetail() {
@@ -26,12 +26,13 @@ export default function CaseDetail() {
   const [showPartyForm, setShowPartyForm] = useState(false)
   const [partyForm, setPartyForm] = useState({name:'',role:'',id_number:'',address:'',phone:'',legal_representative:'',notes:''})
   const [editingPartyId, setEditingPartyId] = useState('')
+  const [stageProgress, setStageProgress] = useState<StageProgress[]>([])
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = async () => {
     if(!caseId)return
-    const [c,m,p] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.parties.list(caseId)])
-    setCaseData(c); setMaterials(m); setParties(p)
+    const [c,m,p,sp] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.parties.list(caseId), api.workflow.progress(caseId)])
+    setCaseData(c); setMaterials(m); setParties(p); setStageProgress(sp)
   }
   useEffect(() => { load() }, [caseId])
   useEffect(() => { api.config.getDocumentTypes().then(d => { setDocTypes(d.types); if(d.types.length) setSelectedDocType(d.types[0].key) }) }, [])
@@ -120,6 +121,44 @@ export default function CaseDetail() {
         <div className="flex gap-2">
           {quickDone && <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/editor`)}>查看文书 →</button>}
           <button className="btn btn-o" style={{fontSize:12}} onClick={()=>navigate(`/cases/${caseId}/workflow`)}>分步模式</button>
+        </div>
+      </div>
+
+      {/* Case overview summary */}
+      <div className="card" style={{marginBottom:24,padding:'16px 20px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'auto 1fr auto',gap:20,alignItems:'center'}}>
+          {/* Parties preview */}
+          <div style={{display:'flex',gap:-6}}>
+            {parties.slice(0,4).map((p,i) => (
+              <div key={p.id} style={{
+                width:36,height:36,borderRadius:'50%',background:'#eef2ff',
+                border:'2px solid #fff',display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:13,fontWeight:600,color:'#6366f1',marginLeft:i>0?-8:0,position:'relative',zIndex:i,
+              }} title={`${p.name} (${p.role})`}>{p.name[0]}</div>
+            ))}
+            {parties.length === 0 && <div style={{fontSize:12,color:'#c9cdd4'}}>暂无当事人</div>}
+          </div>
+          {/* Stage progress bar */}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            {stageProgress.map((sp,i) => (
+              <div key={sp.stage} style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{
+                  padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:500,
+                  background: sp.status==='completed'?'#d1fae5':sp.status==='in_progress'?'#eef2ff':'#f5f5f5',
+                  color: sp.status==='completed'?'#059669':sp.status==='in_progress'?'#6366f1':'#86909c',
+                }}>
+                  {sp.name}
+                </div>
+                {i < stageProgress.length - 1 && <div style={{width:12,height:2,background:'#e5e7eb'}}/>}
+              </div>
+            ))}
+            {stageProgress.length===0 && <div style={{fontSize:12,color:'#c9cdd4'}}>尚未开始工作流</div>}
+          </div>
+          {/* Quick stats */}
+          <div style={{display:'flex',gap:16,fontSize:12,color:'#86909c'}}>
+            <span>{materials.length} 份材料</span>
+            <span>{parties.length} 位当事人</span>
+          </div>
         </div>
       </div>
 

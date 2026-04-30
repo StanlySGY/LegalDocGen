@@ -45,6 +45,14 @@ export default function DocumentEditor() {
   const [customInstruction, setCustomInstruction] = useState('')
   const [showCompare, setShowCompare] = useState(false)
 
+  // Template state
+  const [showSaveTpl, setShowSaveTpl] = useState(false)
+  const [tplName, setTplName] = useState('')
+  const [showLoadTpl, setShowLoadTpl] = useState(false)
+  const [savedTpls, setSavedTpls] = useState<any[]>([])
+  const [showExportOpts, setShowExportOpts] = useState(false)
+  const [exportOpts, setExportOpts] = useState({ fontSize: 16, margin: 'standard' })
+
   // Ref panel state
   const [refTab, setRefTab] = useState<RefTab>('parties')
   const [parties, setParties] = useState<Party[]>([])
@@ -179,7 +187,7 @@ export default function DocumentEditor() {
       const res = await fetch(`/api/workflow/export/${caseId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, font_size: exportOpts.fontSize, margin: exportOpts.margin }),
       })
       if (!res.ok) throw new Error('导出失败')
       const blob = await res.blob()
@@ -190,6 +198,7 @@ export default function DocumentEditor() {
       a.click()
       URL.revokeObjectURL(url)
       showToast('已导出')
+      setShowExportOpts(false)
     } catch (e: any) {
       showToast(e.message || '导出失败', 'err')
     }
@@ -198,6 +207,31 @@ export default function DocumentEditor() {
   const handleContentChange = (val: string) => {
     pushUndo()
     setContent(val)
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!tplName.trim()) return
+    try {
+      await api.templates.create({ name: tplName.trim(), document_type: '', content })
+      setShowSaveTpl(false)
+      setTplName('')
+      showToast('已保存为模板')
+    } catch (e: any) { showToast(e.message || '保存失败', 'err') }
+  }
+
+  const handleLoadTemplates = async () => {
+    try {
+      const tpls = await api.templates.list()
+      setSavedTpls(tpls)
+      setShowLoadTpl(true)
+    } catch (e: any) { showToast(e.message || '加载失败', 'err') }
+  }
+
+  const handleApplyTemplate = (tpl: any) => {
+    pushUndo()
+    setContent(tpl.content)
+    setShowLoadTpl(false)
+    showToast('已应用模板')
   }
 
   const changed = content !== original
@@ -227,7 +261,9 @@ export default function DocumentEditor() {
               {saving ? '保存中...' : '保存'}
             </button>
             <button className="btn btn-o btn-sm" onClick={() => window.print()}>打印预览</button>
-            <button className="btn btn-p btn-sm" onClick={handleExport}>导出 Word</button>
+            <button className="btn btn-o btn-sm" onClick={handleLoadTemplates}>从模板创建</button>
+            <button className="btn btn-o btn-sm" onClick={() => setShowSaveTpl(true)} disabled={!content}>保存为模板</button>
+            <button className="btn btn-o btn-sm" onClick={() => setShowExportOpts(true)}>导出 Word</button>
           </div>
         </div>
         <p style={{ fontSize: 12, color: '#86909c', marginTop: -8 }}>选中文字后可使用 AI 辅助编辑 | Ctrl+S 保存 | Ctrl+Z 撤销</p>
@@ -375,6 +411,88 @@ export default function DocumentEditor() {
           </div>
         </div>
       </div>
+
+      {/* Save Template Modal */}
+      {showSaveTpl && (
+        <div className="modal-mask" onClick={() => setShowSaveTpl(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h3>保存为模板</h3>
+            <input className="input" placeholder="输入模板名称" value={tplName} onChange={e => setTplName(e.target.value)} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-o" onClick={() => setShowSaveTpl(false)}>取消</button>
+              <button className="btn btn-p" onClick={handleSaveTemplate}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Template Modal */}
+      {showLoadTpl && (
+        <div className="modal-mask" onClick={() => setShowLoadTpl(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+            <h3>从模板创建</h3>
+            {savedTpls.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {savedTpls.map(t => (
+                  <div key={t.id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: '#f7f8fa', borderRadius: 8, padding: '10px 14px',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: '#86909c', marginTop: 2 }}>{t.content?.slice(0, 80)}...</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-p btn-sm" onClick={() => handleApplyTemplate(t)}>应用</button>
+                      <button className="btn btn-d btn-sm" onClick={async () => {
+                        await api.templates.delete(t.id)
+                        setSavedTpls(tpls => tpls.filter(x => x.id !== t.id))
+                      }}>删除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty" style={{ padding: 30 }}><p>暂无已保存的模板</p></div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-o" onClick={() => setShowLoadTpl(false)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Options Modal */}
+      {showExportOpts && (
+        <div className="modal-mask" onClick={() => setShowExportOpts(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <h3>导出 Word 设置</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#86909c', display: 'block', marginBottom: 6 }}>正文字号</label>
+                <select className="select" value={exportOpts.fontSize} onChange={e => setExportOpts({ ...exportOpts, fontSize: Number(e.target.value) })}>
+                  <option value={14}>小四号 (14pt)</option>
+                  <option value={16}>四号 (16pt)</option>
+                  <option value={18}>小三号 (18pt)</option>
+                  <option value={22}>三号 (22pt)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#86909c', display: 'block', marginBottom: 6 }}>页边距</label>
+                <select className="select" value={exportOpts.margin} onChange={e => setExportOpts({ ...exportOpts, margin: e.target.value })}>
+                  <option value="narrow">窄 (2cm)</option>
+                  <option value="standard">标准 (法院格式)</option>
+                  <option value="wide">宽 (4cm)</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn btn-o" onClick={() => setShowExportOpts(false)}>取消</button>
+              <button className="btn btn-p" onClick={handleExport}>导出</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>

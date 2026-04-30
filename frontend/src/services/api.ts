@@ -114,4 +114,11 @@ export const api = {
     delete: (id: string) => request<any>(`/parties/${id}`, { method: 'DELETE' }),
     extract: (caseId: string) => request<any[]>(`/parties/extract/${caseId}`, { method: 'POST' }),
   },
+  templates: {
+    list: (documentType?: string) => request<any[]>(`/templates${documentType ? `?document_type=${documentType}` : ''}`),
+    create: (data: { name: string; document_type: string; content: string }) =>
+      request<any>('/templates', { method: 'POST', body: JSON.stringify(data) }),
+    get: (id: string) => request<any>(`/templates/${id}`),
+    delete: (id: string) => request<any>(`/templates/${id}`, { method: 'DELETE' }),
+  },
 }

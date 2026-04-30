@@ -360,6 +360,10 @@ async def quick_generate(case_id: str, req: QuickGenerateRequest, db: Session = 
 
 class ExportRequest(BaseModel):
     content: str = ""
+    include_cover: bool = False
+    font_size: int = 16
+    margin: str = "standard"  # standard | narrow | wide
+    content: str = ""
 
 
 @router.post("/export/{case_id}")
@@ -379,12 +383,14 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
 
     doc = Document()
 
-    # Page margins: top 3.7cm, bottom 3.5cm, left 2.8cm, right 2.6cm
+    # Page margins based on margin option
+    margins = {"narrow": (2.0, 2.0, 2.0, 2.0), "wide": (4.0, 4.0, 3.5, 3.5)}
+    mt, mb, ml, mr = margins.get(req.margin, (3.7, 3.5, 2.8, 2.6))
     for section in doc.sections:
-        section.top_margin = Cm(3.7)
-        section.bottom_margin = Cm(3.5)
-        section.left_margin = Cm(2.8)
-        section.right_margin = Cm(2.6)
+        section.top_margin = Cm(mt)
+        section.bottom_margin = Cm(mb)
+        section.left_margin = Cm(ml)
+        section.right_margin = Cm(mr)
 
     def set_font(run, name_ascii: str, name_eastasia: str, size: Pt, bold: bool = False):
         run.font.name = name_ascii
@@ -406,9 +412,10 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
             pf.space_after = space_after
 
     # Normal style defaults
+    fs = Pt(req.font_size)
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
-    style.font.size = Pt(16)
+    style.font.size = fs
     style._element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋_GB2312')
     style.paragraph_format.line_spacing = Pt(28)
 
@@ -417,52 +424,52 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
         if not line:
             continue
 
-        # H1: document title - 黑体 22pt, centered
+        # H1: document title - 黑体, centered
         if line.startswith('# '):
             p = doc.add_paragraph()
             run = p.add_run(line[2:])
-            set_font(run, 'Times New Roman', '黑体', Pt(22), bold=True)
+            set_font(run, 'Times New Roman', '黑体', Pt(req.font_size + 6), bold=True)
             set_paragraph(p, alignment=WD_ALIGN_PARAGRAPH.CENTER, line_spacing=Pt(28), space_before=Pt(10), space_after=Pt(10))
 
-        # H2: section title - 黑体 16pt, bold
+        # H2: section title - 黑体, bold
         elif line.startswith('## '):
             p = doc.add_paragraph()
             run = p.add_run(line[3:])
-            set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            set_font(run, 'Times New Roman', '黑体', fs, bold=True)
             set_paragraph(p, line_spacing=Pt(28), space_before=Pt(6), space_after=Pt(3))
 
-        # H3: subsection - 楷体 16pt, bold
+        # H3: subsection - 楷体, bold
         elif line.startswith('### '):
             p = doc.add_paragraph()
             run = p.add_run(line[4:])
-            set_font(run, 'Times New Roman', '楷体_GB2312', Pt(16), bold=True)
+            set_font(run, 'Times New Roman', '楷体_GB2312', fs, bold=True)
             set_paragraph(p, line_spacing=Pt(28))
 
         # List items
         elif line.startswith('- ') or line.startswith('* '):
             p = doc.add_paragraph()
             run = p.add_run(line[2:])
-            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
         elif re.match(r'^\d+\.\s', line):
             p = doc.add_paragraph()
             run = p.add_run(re.sub(r'^\d+\.\s', '', line))
-            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
         # Bold line
         elif line.startswith('**') and line.endswith('**'):
             p = doc.add_paragraph()
             run = p.add_run(line[2:-2])
-            set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            set_font(run, 'Times New Roman', '黑体', fs, bold=True)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
-        # Normal text: 仿宋 16pt, first line indent 2 chars, line spacing 28pt
+        # Normal text
         else:
             p = doc.add_paragraph()
             run = p.add_run(line)
-            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
     import io
