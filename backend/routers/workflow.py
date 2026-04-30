@@ -365,8 +365,9 @@ class ExportRequest(BaseModel):
 @router.post("/export/{case_id}")
 def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db)):
     from docx import Document
-    from docx.shared import Pt, Cm
+    from docx.shared import Pt, Cm, Twips
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
     import re
 
     content = req.content
@@ -377,36 +378,92 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
         content = node.output
 
     doc = Document()
+
+    # Page margins: top 3.7cm, bottom 3.5cm, left 2.8cm, right 2.6cm
+    for section in doc.sections:
+        section.top_margin = Cm(3.7)
+        section.bottom_margin = Cm(3.5)
+        section.left_margin = Cm(2.8)
+        section.right_margin = Cm(2.6)
+
+    def set_font(run, name_ascii: str, name_eastasia: str, size: Pt, bold: bool = False):
+        run.font.name = name_ascii
+        run.font.size = size
+        run.bold = bold
+        run._element.rPr.rFonts.set(qn('w:eastAsia'), name_eastasia)
+
+    def set_paragraph(paragraph, alignment=None, first_line_indent=None, line_spacing=None, space_before=None, space_after=None):
+        if alignment is not None:
+            paragraph.alignment = alignment
+        pf = paragraph.paragraph_format
+        if first_line_indent is not None:
+            pf.first_line_indent = first_line_indent
+        if line_spacing is not None:
+            pf.line_spacing = line_spacing
+        if space_before is not None:
+            pf.space_before = space_before
+        if space_after is not None:
+            pf.space_after = space_after
+
+    # Normal style defaults
     style = doc.styles['Normal']
-    style.font.name = 'SimSun'
-    style.font.size = Pt(12)
-    style.paragraph_format.line_spacing = 1.5
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(16)
+    style._element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋_GB2312')
+    style.paragraph_format.line_spacing = Pt(28)
 
     for line in content.split('\n'):
         line = line.strip()
         if not line:
-            doc.add_paragraph('')
             continue
-        if line.startswith('### '):
-            p = doc.add_paragraph(line[4:])
-            p.style = doc.styles['Heading 3']
+
+        # H1: document title - 黑体 22pt, centered
+        if line.startswith('# '):
+            p = doc.add_paragraph()
+            run = p.add_run(line[2:])
+            set_font(run, 'Times New Roman', '黑体', Pt(22), bold=True)
+            set_paragraph(p, alignment=WD_ALIGN_PARAGRAPH.CENTER, line_spacing=Pt(28), space_before=Pt(10), space_after=Pt(10))
+
+        # H2: section title - 黑体 16pt, bold
         elif line.startswith('## '):
-            p = doc.add_paragraph(line[3:])
-            p.style = doc.styles['Heading 2']
-        elif line.startswith('# '):
-            p = doc.add_paragraph(line[2:])
-            p.style = doc.styles['Heading 1']
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p = doc.add_paragraph()
+            run = p.add_run(line[3:])
+            set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            set_paragraph(p, line_spacing=Pt(28), space_before=Pt(6), space_after=Pt(3))
+
+        # H3: subsection - 楷体 16pt, bold
+        elif line.startswith('### '):
+            p = doc.add_paragraph()
+            run = p.add_run(line[4:])
+            set_font(run, 'Times New Roman', '楷体_GB2312', Pt(16), bold=True)
+            set_paragraph(p, line_spacing=Pt(28))
+
+        # List items
         elif line.startswith('- ') or line.startswith('* '):
-            doc.add_paragraph(line[2:], style='List Bullet')
+            p = doc.add_paragraph()
+            run = p.add_run(line[2:])
+            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
+
         elif re.match(r'^\d+\.\s', line):
-            doc.add_paragraph(re.sub(r'^\d+\.\s', '', line), style='List Number')
+            p = doc.add_paragraph()
+            run = p.add_run(re.sub(r'^\d+\.\s', '', line))
+            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
+
+        # Bold line
         elif line.startswith('**') and line.endswith('**'):
             p = doc.add_paragraph()
             run = p.add_run(line[2:-2])
-            run.bold = True
+            set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
+
+        # Normal text: 仿宋 16pt, first line indent 2 chars, line spacing 28pt
         else:
-            doc.add_paragraph(line)
+            p = doc.add_paragraph()
+            run = p.add_run(line)
+            set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
     import io
     buf = io.BytesIO()
