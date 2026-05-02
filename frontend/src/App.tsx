@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
@@ -10,7 +9,6 @@ import ModelConfig from './pages/ModelConfig'
 export default function App() {
   const location = useLocation()
   const isCases = location.pathname === '/' || location.pathname.startsWith('/cases')
-  const [showSettings, setShowSettings] = useState(false)
 
   const breadcrumb = () => {
     const m = location.pathname.match(/^\/cases\/([^/]+)(\/(workflow|editor))?/)
@@ -24,8 +22,8 @@ export default function App() {
     <>
       <div className="sidebar">
         <div className="sidebar-logo">
-          <h1><span>⚖️</span> LegalDocGen</h1>
-          <p>法律文书智能生成系统</p>
+          <h1><span>⚖️</span> 法律文书助手</h1>
+          <p>智能文书生成系统</p>
         </div>
         <nav className="sidebar-nav">
           <div className="nav-section">
@@ -36,30 +34,14 @@ export default function App() {
               案件管理
             </NavLink>
           </div>
-          <div className="nav-section">
-            <div className="nav-section-title" style={{cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'}} onClick={()=>setShowSettings(!showSettings)}>
-              <span>系统设置</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12,transform:showSettings?'rotate(90deg)':'',transition:'transform 0.2s'}}><path d="M9 18l6-6-6-6"/></svg>
-            </div>
-            {showSettings && <>
-              <NavLink to="/channels" className="nav-item" style={{ textDecoration:'none',fontSize:12,padding:'9px 14px 9px 24px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{width:16,height:16}}><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                渠道管理
-              </NavLink>
-              <NavLink to="/config" className="nav-item" style={{ textDecoration:'none',fontSize:12,padding:'9px 14px 9px 24px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{width:16,height:16}}><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
-                Prompt模板
-              </NavLink>
-            </>}
-          </div>
         </nav>
-        <div className="sidebar-footer">v1.1.0</div>
+        <div className="sidebar-footer">法律文书助手 v1.2.0</div>
       </div>
 
       <div className="main-wrap">
         <div className="top-bar">
           <div className="breadcrumb">{breadcrumb()}</div>
-          <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书智能生成系统</span>
+          <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书助手</span>
         </div>
         <div className="page-body">
           <Routes>

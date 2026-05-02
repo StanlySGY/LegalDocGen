@@ -120,7 +120,7 @@ export default function CaseDetail() {
         </div>
         <div className="flex gap-2">
           {quickDone && <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/editor`)}>查看文书 →</button>}
-          <button className="btn btn-o" style={{fontSize:12}} onClick={()=>navigate(`/cases/${caseId}/workflow`)}>分步模式</button>
+          <button className="btn btn-o" style={{fontSize:12}} onClick={()=>navigate(`/cases/${caseId}/workflow`)}>逐步精调</button>
         </div>
       </div>
 

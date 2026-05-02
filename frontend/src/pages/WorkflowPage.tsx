@@ -152,7 +152,7 @@ export default function WorkflowPage() {
                 style={isLocked ? {opacity:0.4,cursor:'not-allowed'} : undefined}>
                 <div className="step-dot">{isDone?'✓':icons[stage]}</div>
                 <span className="step-name">{STAGE_NAMES_LAWYER[stage] || STAGE_NAMES[stage]}</span>
-                {p&&p.version>0 && <span className="step-ver">v{p.version}</span>}
+                
               </div>
               {i<STAGE_ORDER.length-1 && <div className={`step-line ${isDone?'done':''}`}/>}
             </div>
@@ -165,7 +165,7 @@ export default function WorkflowPage() {
           <div className="card-hd">
             <span className="card-title">{STAGE_NAMES_LAWYER[activeStage] || STAGE_NAMES[activeStage]}</span>
             <div className="flex gap-2">
-              <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭历史':'历史版本'}</button>
+              <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭历史':'历史记录'}</button>
             </div>
           </div>
           <div className="collapse-toggle" onClick={()=>setShowAdvanced(!showAdvanced)}>
@@ -180,8 +180,8 @@ export default function WorkflowPage() {
                   const [cid,mid] = e.target.value.split('|');
                   setSelChannelId(cid); setSelModel(mid);
                 }}>
-                  {models.length===0 && <option>未配置渠道</option>}
-                  {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.channel_name} / {m.model}</option>)}
+                  {models.length===0 && <option>未配置模型（联系管理员）</option>}
+                  {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
                 </select>
               </div>
               <div style={{marginBottom:4}}>
@@ -209,7 +209,7 @@ export default function WorkflowPage() {
                       <span style={{fontSize:12,color:'#86909c',minWidth:65}}>{label}</span>
                       <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
                         onChange={e=>{const[cid,mid]=e.target.value.split('|');const nm=[...chainModels];nm[i]={channel_id:cid,model:mid};setChainModels(nm)}}>
-                        {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.channel_name}/{m.model}</option>)}
+                        {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
                       </select>
                     </div>
                   ))}
@@ -227,7 +227,7 @@ export default function WorkflowPage() {
                         <input type="checkbox" checked={checked} onChange={() => {
                           setCompareModels(prev => checked ? prev.filter(c=>!(c.channel_id===m.channel_id&&c.model===m.model)) : [...prev, {channel_id:m.channel_id,model:m.model,channel_name:m.channel_name}])
                         }}/>
-                        {m.channel_name} / {m.model}
+                        {m.model}
                       </label>
                     )
                   })}
@@ -252,10 +252,10 @@ export default function WorkflowPage() {
                 {history.map(h=>(
                   <div key={h.id} className="flex items-center justify-between" style={{background:'#f7f8fa',borderRadius:8,padding:'8px 12px'}}>
                     <div className="flex items-center gap-2">
-                      <span className="tag t-purple">v{h.version}</span>
+                      <span className="tag t-purple">{new Date(h.created_at).toLocaleString('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
                       <span style={{fontSize:11,color:'#86909c'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
                     </div>
-                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>回滚</button>
+                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>恢复此版本</button>
                   </div>
                 ))}
               </div>
