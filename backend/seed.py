@@ -38,6 +38,7 @@ def seed_demo_data(db: Session):
     material_id = str(uuid.uuid4())
     db.add(Material(
         id=material_id, case_id=case_id, filename="借款合同.pdf", file_type=".pdf",
+        file_path="demo/借款合同.pdf",
         file_size=102400, parse_status="completed",
         parsed_content="借款合同\n甲方（出借人）：张三\n乙方（借款人）：李四\n借款金额：人民币50万元整\n借款期限：2023年1月1日至2024年1月1日\n年利率：8%\n还款方式：到期一次性还本付息",
         structured_data='{"parties":"甲方：张三（出借人），乙方：李四（借款人）","case_facts":"2023年1月1日，张三向李四出借50万元，约定期限1年，年利率8%，到期一次性还本付息","timeline":"2023-01-01 签订借款合同并转账\\n2024-01-01 借款到期，李四未还款\\n2024-03-15 张三发送催款通知\\n2024-06-15 张三起诉至法院","evidence":"1. 借款合同原件，证明借贷关系\\n2. 银行转账记录，证明已交付借款\\n3. 催款通知及快递回执"}',
