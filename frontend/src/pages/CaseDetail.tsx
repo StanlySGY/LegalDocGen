@@ -111,9 +111,16 @@ export default function CaseDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h2 style={{fontSize:20,fontWeight:700}}>{caseData.name}</h2>
-            <span className={`tag ${caseData.status==='completed'?'t-green':caseData.status==='in_progress'?'t-orange':'t-gray'}`}>
-              {caseData.status==='completed'?'已完成':caseData.status==='in_progress'?'进行中':'草稿'}
-            </span>
+            <select style={{fontSize:11,padding:'2px 6px',borderRadius:6,border:'1px solid #e5e7eb',color:'#86909c',cursor:'pointer'}}
+              value={caseData.status} onChange={async e => {
+              await api.cases.update(caseId!, {status: e.target.value})
+              load()
+              showToast('状态已更新')
+            }}>
+              <option value="draft">草稿</option>
+              <option value="in_progress">进行中</option>
+              <option value="completed">已完成</option>
+            </select>
             {caseData.case_type && <span className="tag t-blue">{caseData.case_type}</span>}
           </div>
           {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}

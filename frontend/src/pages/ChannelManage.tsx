@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface Channel {
   id: string
@@ -28,6 +29,7 @@ export default function ChannelManage() {
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [loading, setLoading] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: '', type: 'openai', base_url: '', api_key: '', priority: 0
@@ -69,8 +71,8 @@ export default function ChannelManage() {
   }
 
   const deleteChannel = async (id: string) => {
-    if (!confirm('确定删除？')) return
     await api.channel.delete(id)
+    setConfirmDelete(null)
     showToast('已删除')
     load()
   }
@@ -167,7 +169,7 @@ export default function ChannelManage() {
                       获取模型
                     </button>
                     <button className="btn btn-o btn-sm" onClick={() => openEdit(ch)}>编辑</button>
-                    <button className="btn btn-d btn-sm" onClick={() => deleteChannel(ch.id)}>删除</button>
+                    <button className="btn btn-d btn-sm" onClick={() => setConfirmDelete(ch.id)}>删除</button>
                   </div>
                 </td>
               </tr>
@@ -258,6 +260,7 @@ export default function ChannelManage() {
         </div>
       )}
 
+      {confirmDelete && <ConfirmDialog message="确定删除该渠道？" onConfirm={() => deleteChannel(confirmDelete)} onCancel={() => setConfirmDelete(null)} />}
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>
   )

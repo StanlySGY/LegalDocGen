@@ -516,3 +516,29 @@ body {
   .editor-layout > div:last-child { border-left: none !important; }
   .editor-layout textarea { display: none !important; }
 }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  #root { grid-template-columns: 1fr !important; }
+  .sidebar { position: fixed; left: -240px; transition: left 0.3s; z-index: 100; }
+  .sidebar.open { left: 0; }
+  .mobile-toggle { display: flex !important; }
+  .page-body { padding: 16px !important; }
+  .editor-layout { grid-template-columns: 1fr !important; }
+  .editor-layout > div:first-child { display: none !important; }
+  .editor-layout > div:nth-child(3) { border-left: none !important; }
+  .data-table th, .data-table td { padding: 8px !important; font-size: 11px !important; }
+  .stat-row { grid-template-columns: 1fr 1fr !important; }
+  .quick-gen-section { padding: 12px !important; }
+}
+
+.mobile-toggle {
+  display: none !important;
+  width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; cursor: pointer; align-items: center; justify-content: center;
+}
+
+.mobile-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 99;
+}
+.mobile-overlay.show { display: block; }

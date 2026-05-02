@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
@@ -9,6 +10,7 @@ import ModelConfig from './pages/ModelConfig'
 export default function App() {
   const location = useLocation()
   const isCases = location.pathname === '/' || location.pathname.startsWith('/cases')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const breadcrumb = () => {
     const m = location.pathname.match(/^\/cases\/([^/]+)(\/(workflow|editor))?/)
@@ -20,7 +22,8 @@ export default function App() {
 
   return (
     <>
-      <div className="sidebar">
+      <div className={`mobile-overlay ${sidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <h1><span>⚖️</span> 法律文书助手</h1>
           <p>智能文书生成系统</p>
@@ -40,7 +43,12 @@ export default function App() {
 
       <div className="main-wrap">
         <div className="top-bar">
-          <div className="breadcrumb">{breadcrumb()}</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <button className="mobile-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
+            <div className="breadcrumb">{breadcrumb()}</div>
+          </div>
           <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书助手</span>
         </div>
         <div className="page-body">

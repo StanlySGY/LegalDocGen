@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Case } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const CASE_TYPES = ['合同纠纷', '劳动争议', '婚姻家庭', '侵权责任', '知识产权', '公司事务', '房产纠纷', '债权债务', '刑事辩护', '行政纠纷', '其他']
 
@@ -18,6 +19,7 @@ export default function CaseList() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', case_type: '', case_number: '', court: '', cause: '', filing_date: '' })
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false)
 
   // Filter state
   const [search, setSearch] = useState('')
@@ -50,6 +52,7 @@ export default function CaseList() {
     if (selected.size === 0) return
     await api.cases.batchDelete(Array.from(selected))
     setSelected(new Set())
+    setShowBatchConfirm(false)
     load()
     showToast(`已删除 ${selected.size} 个案件`)
   }
@@ -89,7 +92,7 @@ export default function CaseList() {
             {CASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           {selected.size > 0 && (
-            <button className="btn btn-d btn-sm" onClick={handleBatchDelete}>删除选中 ({selected.size})</button>
+            <button className="btn btn-d btn-sm" onClick={() => setShowBatchConfirm(true)}>删除选中 ({selected.size})</button>
           )}
         </div>
       </div>
@@ -174,6 +177,7 @@ export default function CaseList() {
           </tbody>
         </table>
       </div>
+      {showBatchConfirm && <ConfirmDialog message={`确定删除选中的 ${selected.size} 个案件？此操作不可恢复。`} onConfirm={handleBatchDelete} onCancel={() => setShowBatchConfirm(false)} />}
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>
   )
