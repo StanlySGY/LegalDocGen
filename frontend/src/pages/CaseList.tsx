@@ -5,6 +5,13 @@ import type { Case } from '../types'
 
 const CASE_TYPES = ['合同纠纷', '劳动争议', '婚姻家庭', '侵权责任', '知识产权', '公司事务', '房产纠纷', '债权债务', '刑事辩护', '行政纠纷', '其他']
 
+const TYPE_COLORS: Record<string, string> = {
+  '合同纠纷': '#6366f1', '劳动争议': '#f59e0b', '婚姻家庭': '#ec4899',
+  '侵权责任': '#ef4444', '知识产权': '#3b82f6', '公司事务': '#10b981',
+  '房产纠纷': '#8b5cf6', '债权债务': '#f97316', '刑事辩护': '#dc2626',
+  '行政纠纷': '#0ea5e9', '其他': '#86909c',
+}
+
 export default function CaseList() {
   const navigate = useNavigate()
   const [cases, setCases] = useState<Case[]>([])
@@ -141,7 +148,7 @@ export default function CaseList() {
                   {c.cause && <div style={{fontSize:11,color:'#86909c',marginTop:2}}>{c.cause}</div>}
                 </td>
                 <td style={{fontSize:12,color:'#86909c'}}>{c.case_number || '-'}</td>
-                <td>{c.case_type ? <span className="tag t-blue">{c.case_type}</span> : <span style={{color:'#c9cdd4'}}>-</span>}</td>
+                <td>{c.case_type ? <span className="tag" style={{background:`${TYPE_COLORS[c.case_type]||'#6366f1'}18`,color:TYPE_COLORS[c.case_type]||'#6366f1'}}>{c.case_type}</span> : <span style={{color:'#c9cdd4'}}>-</span>}</td>
                 <td>
                   <span className={`tag ${c.status==='completed'?'t-green':c.status==='in_progress'?'t-orange':'t-gray'}`}>
                     {c.status==='completed'?'已完成':c.status==='in_progress'?'进行中':'草稿'}

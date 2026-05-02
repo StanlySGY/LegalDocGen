@@ -119,7 +119,21 @@ export default function CaseDetail() {
           {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}
         </div>
         <div className="flex gap-2">
-          {quickDone && <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/editor`)}>查看文书 →</button>}
+          {quickDone && <>
+            <button className="btn btn-p" onClick={()=>navigate(`/cases/${caseId}/editor`)}>查看文书 →</button>
+            <button className="btn btn-o" onClick={async () => {
+              try {
+                const node = await api.workflow.getNode(caseId!, 'draft_generation')
+                const res = await fetch(`/api/workflow/export/${caseId}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content:node.output||''}) })
+                if (!res.ok) throw new Error('导出失败')
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a'); a.href = url; a.download = `${caseData?.name||'文书'}.docx`; a.click()
+                URL.revokeObjectURL(url)
+                showToast('已导出')
+              } catch(e:any) { showToast(e.message||'导出失败','err') }
+            }}>导出 Word</button>
+          </>}
           <button className="btn btn-o" style={{fontSize:12}} onClick={()=>navigate(`/cases/${caseId}/workflow`)}>逐步精调</button>
         </div>
       </div>

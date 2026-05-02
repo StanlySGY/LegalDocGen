@@ -364,7 +364,7 @@ export default function DocumentEditor() {
                   {p.address && <div style={{ color: '#86909c' }}>住址：{p.address}</div>}
                   {p.phone && <div style={{ color: '#86909c' }}>电话：{p.phone}</div>}
                 </div>
-              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无当事人信息</div>
+              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无当事人信息 — 请先在案件详情页添加</div>
             )}
             {refTab === 'materials' && (
               materials.length > 0 ? materials.map(m => (
@@ -374,15 +374,15 @@ export default function DocumentEditor() {
                     {m.parsed_content?.slice(0, 300)}{m.parsed_content?.length > 300 ? '...' : ''}
                   </div>
                 </div>
-              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无案件材料</div>
+              )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无案件材料 — 请先在案件详情页上传</div>
             )}
             {refTab === 'analysis' && (
               analysisText ? <div className="md" style={{ fontSize: 12 }}>{<ReactMarkdown>{analysisText}</ReactMarkdown>}</div>
-                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无法律分析</div>
+                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无法律分析 — 请先执行"法律分析"步骤</div>
             )}
             {refTab === 'dispute' && (
               disputeText ? <div className="md" style={{ fontSize: 12 }}>{<ReactMarkdown>{disputeText}</ReactMarkdown>}</div>
-                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无争议归纳</div>
+                : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无争议归纳 — 请先执行"争议归纳"步骤</div>
             )}
           </div>
         </div>
