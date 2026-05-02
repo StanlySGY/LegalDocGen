@@ -136,7 +136,7 @@ export default function WorkflowPage() {
       <div className="breadcrumb mb-5">
         <a onClick={()=>navigate('/cases')}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
         <a onClick={()=>navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
-        <span className="current">工作流</span>
+        <span className="current">逐步精调</span>
       </div>
 
       <div className="stepper-bar">

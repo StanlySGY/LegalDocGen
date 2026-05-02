@@ -124,6 +124,35 @@ export default function CaseDetail() {
         </div>
       </div>
 
+      {/* Step wizard */}
+      {(() => {
+        const steps = [
+          { label: '上传材料', done: materials.length > 0 },
+          { label: '确认当事人', done: parties.length > 0 },
+          { label: '选择文书类型', done: !!selectedDocType },
+          { label: '一键生成', done: quickDone },
+        ]
+        const current = steps.findIndex(s => !s.done)
+        return (
+          <div style={{display:'flex',alignItems:'center',gap:0,marginBottom:24,background:'#fff',borderRadius:12,border:'1px solid #e5e7eb',padding:'14px 24px'}}>
+            {steps.map((s,i) => (
+              <div key={i} style={{display:'flex',alignItems:'center',gap:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 12px',borderRadius:8,
+                  background: s.done ? '#d1fae5' : current===i ? '#eef2ff' : '#f5f5f5',
+                }}>
+                  <div style={{width:22,height:22,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,
+                    background: s.done ? '#059669' : current===i ? '#6366f1' : '#c9cdd4', color:'#fff'}}>
+                    {s.done ? '✓' : i+1}
+                  </div>
+                  <span style={{fontSize:12,fontWeight:500,color:s.done?'#059669':current===i?'#6366f1':'#86909c'}}>{s.label}</span>
+                </div>
+                {i<steps.length-1 && <div style={{width:32,height:2,background:'#e5e7eb',margin:'0 4px'}}/>}
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* Case overview summary */}
       <div className="card" style={{marginBottom:24,padding:'16px 20px'}}>
         <div style={{display:'grid',gridTemplateColumns:'auto 1fr auto',gap:20,alignItems:'center'}}>
@@ -182,7 +211,7 @@ export default function CaseDetail() {
           </button>
           {quickGenerating && (
             <div style={{flex:1}}>
-              <div style={{fontSize:12,color:'#6366f1',marginBottom:4}}>{quickStage}</div>
+              <div style={{fontSize:12,color:'#6366f1',marginBottom:4}}>{quickStage} <span style={{color:'#86909c',marginLeft:6}}>AI正在处理，请稍候...</span></div>
               <div style={{height:6,background:'#e5e7eb',borderRadius:3,overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${quickProgress}%`,background:'linear-gradient(90deg,#6366f1,#a78bfa)',borderRadius:3,transition:'width 0.3s'}}/>
               </div>
