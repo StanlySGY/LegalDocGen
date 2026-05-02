@@ -101,7 +101,15 @@ export default function CaseDetail() {
     showToast('已删除')
   }
 
-  if (!caseData) return <div style={{textAlign:'center',padding:80,color:'#86909c'}}>加载中...</div>
+  if (!caseData) return (
+    <div style={{padding:'20px 0'}}>
+      <div className="skeleton" style={{height:28,width:200,marginBottom:16}}/>
+      <div className="skeleton" style={{height:80,marginBottom:24}}/>
+      <div className="skeleton" style={{height:120,marginBottom:24}}/>
+      <div className="skeleton" style={{height:60,marginBottom:24}}/>
+      <div className="skeleton" style={{height:200}}/>
+    </div>
+  )
 
   const roleColors: Record<string,string> = {原告:'t-blue',被告:'t-red',申请人:'t-purple',被申请人:'t-orange',第三人:'t-gray',上诉人:'t-blue',被上诉人:'t-red',代理人:'t-green'}
 
@@ -111,7 +119,7 @@ export default function CaseDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h2 style={{fontSize:20,fontWeight:700}}>{caseData.name}</h2>
-            <select style={{fontSize:11,padding:'2px 6px',borderRadius:6,border:'1px solid #e5e7eb',color:'#86909c',cursor:'pointer'}}
+            <select style={{fontSize:11,padding:'2px 6px',borderRadius:6,border:'1px solid var(--border)',color:'var(--text-secondary)',cursor:'pointer'}}
               value={caseData.status} onChange={async e => {
               await api.cases.update(caseId!, {status: e.target.value})
               load()
@@ -123,7 +131,7 @@ export default function CaseDetail() {
             </select>
             {caseData.case_type && <span className="tag t-blue">{caseData.case_type}</span>}
           </div>
-          {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}
+          {caseData.description && <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:6}}>{caseData.description}</p>}
         </div>
         <div className="flex gap-2">
           {quickDone && <>
@@ -155,19 +163,19 @@ export default function CaseDetail() {
         ]
         const current = steps.findIndex(s => !s.done)
         return (
-          <div style={{display:'flex',alignItems:'center',gap:0,marginBottom:24,background:'#fff',borderRadius:12,border:'1px solid #e5e7eb',padding:'14px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:0,marginBottom:24,background:'var(--bg-card)',borderRadius:12,border:'1px solid var(--border)',padding:'14px 24px'}}>
             {steps.map((s,i) => (
               <div key={i} style={{display:'flex',alignItems:'center',gap:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 12px',borderRadius:8,
-                  background: s.done ? '#d1fae5' : current===i ? '#eef2ff' : '#f5f5f5',
+                  background: s.done ? 'var(--success-bg)' : current===i ? 'var(--accent-light)' : 'var(--bg-secondary)',
                 }}>
                   <div style={{width:22,height:22,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,
-                    background: s.done ? '#059669' : current===i ? '#6366f1' : '#c9cdd4', color:'#fff'}}>
+                    background: s.done ? 'var(--success)' : current===i ? 'var(--accent)' : 'var(--text-muted)', color:'#fff'}}>
                     {s.done ? '✓' : i+1}
                   </div>
-                  <span style={{fontSize:12,fontWeight:500,color:s.done?'#059669':current===i?'#6366f1':'#86909c'}}>{s.label}</span>
+                  <span style={{fontSize:12,fontWeight:500,color:s.done?'var(--success)':current===i?'var(--accent)':'var(--text-secondary)'}}>{s.label}</span>
                 </div>
-                {i<steps.length-1 && <div style={{width:32,height:2,background:'#e5e7eb',margin:'0 4px'}}/>}
+                {i<steps.length-1 && <div style={{width:32,height:2,background:'var(--border)',margin:'0 4px'}}/>}
               </div>
             ))}
           </div>
@@ -181,12 +189,12 @@ export default function CaseDetail() {
           <div style={{display:'flex',gap:-6}}>
             {parties.slice(0,4).map((p,i) => (
               <div key={p.id} style={{
-                width:36,height:36,borderRadius:'50%',background:'#eef2ff',
-                border:'2px solid #fff',display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:13,fontWeight:600,color:'#6366f1',marginLeft:i>0?-8:0,position:'relative',zIndex:i,
+                width:36,height:36,borderRadius:'50%',background:'var(--accent-light)',
+                border:'2px solid var(--bg-card)',display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:13,fontWeight:600,color:'var(--accent)',marginLeft:i>0?-8:0,position:'relative',zIndex:i,
               }} title={`${p.name} (${p.role})`}>{p.name[0]}</div>
             ))}
-            {parties.length === 0 && <div style={{fontSize:12,color:'#c9cdd4'}}>暂无当事人</div>}
+            {parties.length === 0 && <div style={{fontSize:12,color:'var(--text-muted)'}}>暂无当事人</div>}
           </div>
           {/* Stage progress bar */}
           <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -194,25 +202,25 @@ export default function CaseDetail() {
               <div key={sp.stage} style={{display:'flex',alignItems:'center',gap:6}}>
                 <div style={{
                   padding:'4px 10px',borderRadius:6,fontSize:11,fontWeight:500,
-                  background: sp.status==='completed'?'#d1fae5':sp.status==='in_progress'?'#eef2ff':'#f5f5f5',
-                  color: sp.status==='completed'?'#059669':sp.status==='in_progress'?'#6366f1':'#86909c',
+                  background: sp.status==='completed'?'var(--success-bg)':sp.status==='in_progress'?'var(--accent-light)':'var(--bg-secondary)',
+                  color: sp.status==='completed'?'var(--success)':sp.status==='in_progress'?'var(--accent)':'var(--text-secondary)',
                 }}>
                   {sp.name}
                 </div>
-                {i < stageProgress.length - 1 && <div style={{width:12,height:2,background:'#e5e7eb'}}/>}
+                {i < stageProgress.length - 1 && <div style={{width:12,height:2,background:'var(--border)'}}/>}
               </div>
             ))}
-            {stageProgress.length===0 && <div style={{fontSize:12,color:'#c9cdd4'}}>尚未开始工作流</div>}
+            {stageProgress.length===0 && <div style={{fontSize:12,color:'var(--text-muted)'}}>尚未开始工作流</div>}
           </div>
           {/* Quick stats */}
-          <div style={{display:'flex',gap:16,fontSize:12,color:'#86909c'}}>
+          <div style={{display:'flex',gap:16,fontSize:12,color:'var(--text-secondary)'}}>
             <span>{materials.length} 份材料</span>
             <span>{parties.length} 位当事人</span>
           </div>
         </div>
       </div>
 
-      <div className="quick-gen-section card" style={{marginBottom:24,background:'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)',borderColor:'#ddd6fe'}}>
+      <div className="quick-gen-section card" style={{marginBottom:24,background:'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)',borderColor:'var(--accent)'}}>
         <div className="card-hd" style={{marginBottom:12}}>
           <span className="card-title" style={{fontSize:16}}>快速生成文书</span>
         </div>
@@ -232,8 +240,8 @@ export default function CaseDetail() {
           </button>
           {quickGenerating && (
             <div style={{flex:1}}>
-              <div style={{fontSize:12,color:'#6366f1',marginBottom:4}}>{quickStage} <span style={{color:'#86909c',marginLeft:6}}>AI正在处理，请稍候...</span></div>
-              <div style={{height:6,background:'#e5e7eb',borderRadius:3,overflow:'hidden'}}>
+              <div style={{fontSize:12,color:'var(--accent)',marginBottom:4}}>{quickStage} <span style={{color:'var(--text-secondary)',marginLeft:6}}>AI正在处理，请稍候...</span></div>
+              <div style={{height:6,background:'var(--border)',borderRadius:3,overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${quickProgress}%`,background:'linear-gradient(90deg,#6366f1,#a78bfa)',borderRadius:3,transition:'width 0.3s'}}/>
               </div>
             </div>
@@ -252,13 +260,13 @@ export default function CaseDetail() {
             <button className="btn btn-p btn-sm" onClick={()=>{setShowPartyForm(true);setEditingPartyId('');setPartyForm({name:'',role:'',id_number:'',address:'',phone:'',legal_representative:'',notes:''})}}>手动添加</button>
           </div>
         </div>
-        <p style={{fontSize:12,color:'#86909c',marginBottom:12}}>AI自动提取或手动录入当事人信息，生成文书时自动填入</p>
+        <p style={{fontSize:12,color:'var(--text-secondary)',marginBottom:12}}>AI自动提取或手动录入当事人信息，生成文书时自动填入</p>
 
         {showPartyForm && (
-          <div style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:16,marginBottom:12}}>
+          <div style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,padding:16,marginBottom:12}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>姓名/名称 *</label><input className="input" value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></div>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>角色</label>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>姓名/名称 *</label><input className="input" value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>角色</label>
                 <select className="select" value={partyForm.role} onChange={e=>setPartyForm({...partyForm,role:e.target.value})}>
                   <option value="">选择角色</option>
                   <option value="原告">原告</option><option value="被告">被告</option>
@@ -268,14 +276,14 @@ export default function CaseDetail() {
                   <option value="其他">其他</option>
                 </select>
               </div>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>身份证/统一社会信用代码</label><input className="input" value={partyForm.id_number} onChange={e=>setPartyForm({...partyForm,id_number:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>身份证/统一社会信用代码</label><input className="input" value={partyForm.id_number} onChange={e=>setPartyForm({...partyForm,id_number:e.target.value})}/></div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>住址</label><input className="input" value={partyForm.address} onChange={e=>setPartyForm({...partyForm,address:e.target.value})}/></div>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>电话</label><input className="input" value={partyForm.phone} onChange={e=>setPartyForm({...partyForm,phone:e.target.value})}/></div>
-              <div><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>法定代表人</label><input className="input" value={partyForm.legal_representative} onChange={e=>setPartyForm({...partyForm,legal_representative:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>住址</label><input className="input" value={partyForm.address} onChange={e=>setPartyForm({...partyForm,address:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>电话</label><input className="input" value={partyForm.phone} onChange={e=>setPartyForm({...partyForm,phone:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>法定代表人</label><input className="input" value={partyForm.legal_representative} onChange={e=>setPartyForm({...partyForm,legal_representative:e.target.value})}/></div>
             </div>
-            <div style={{marginBottom:10}}><label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:3}}>备注</label><input className="input" value={partyForm.notes} onChange={e=>setPartyForm({...partyForm,notes:e.target.value})}/></div>
+            <div style={{marginBottom:10}}><label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:3}}>备注</label><input className="input" value={partyForm.notes} onChange={e=>setPartyForm({...partyForm,notes:e.target.value})}/></div>
             <div className="flex gap-2">
               <button className="btn btn-p btn-sm" onClick={handleSaveParty}>{editingPartyId?'更新':'添加'}</button>
               <button className="btn btn-o btn-sm" onClick={()=>{setShowPartyForm(false);setEditingPartyId('')}}>取消</button>
@@ -286,18 +294,18 @@ export default function CaseDetail() {
         {parties.length > 0 ? (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
             {parties.map(p => (
-              <div key={p.id} style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:'12px 16px'}}>
+              <div key={p.id} style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}>
                 <div className="flex items-center justify-between" style={{marginBottom:6}}>
                   <div className="flex items-center gap-2">
                     <span style={{fontWeight:600,fontSize:14}}>{p.name}</span>
                     {p.role && <span className={`tag ${roleColors[p.role]||'t-gray'}`}>{p.role}</span>}
                   </div>
                   <div className="flex gap-1">
-                    <button style={{fontSize:11,color:'#6366f1',cursor:'pointer',background:'none',border:'none'}} onClick={()=>handleEditParty(p)}>编辑</button>
+                    <button style={{fontSize:11,color:'var(--accent)',cursor:'pointer',background:'none',border:'none'}} onClick={()=>handleEditParty(p)}>编辑</button>
                     <button style={{fontSize:11,color:'#ef4444',cursor:'pointer',background:'none',border:'none'}} onClick={()=>handleDeleteParty(p.id)}>删除</button>
                   </div>
                 </div>
-                <div style={{fontSize:12,color:'#86909c',display:'flex',flexDirection:'column',gap:2}}>
+                <div style={{fontSize:12,color:'var(--text-secondary)',display:'flex',flexDirection:'column',gap:2}}>
                   {p.id_number && <div>证件号：{p.id_number}</div>}
                   {p.address && <div>住址：{p.address}</div>}
                   {p.phone && <div>电话：{p.phone}</div>}
@@ -330,13 +338,13 @@ export default function CaseDetail() {
                   <div key={`${m.id}-${i}`} style={{display:'flex',gap:12,marginBottom:0,position:'relative'}}>
                     <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:12}}>
                       <div style={{width:10,height:10,borderRadius:'50%',background:i===events.length-1?'#6366f1':'#c9cdd4',flexShrink:0,marginTop:4}}/>
-                      {i<events.length-1 && <div style={{width:2,flex:1,background:'#e5e7eb'}}/>}
+                      {i<events.length-1 && <div style={{width:2,flex:1,background:'var(--border)'}}/>}
                     </div>
                     <div style={{paddingBottom:14}}>
                       {match ? <>
-                        <span style={{fontSize:12,fontWeight:600,color:'#6366f1'}}>{match[1]}</span>
-                        <span style={{fontSize:13,marginLeft:8,color:'#4e5969'}}>{match[2]}</span>
-                      </> : <span style={{fontSize:13,color:'#4e5969'}}>{ev}</span>}
+                        <span style={{fontSize:12,fontWeight:600,color:'var(--accent)'}}>{match[1]}</span>
+                        <span style={{fontSize:13,marginLeft:8,color:'var(--text-body)'}}>{match[2]}</span>
+                      </> : <span style={{fontSize:13,color:'var(--text-body)'}}>{ev}</span>}
                     </div>
                   </div>
                 )
@@ -359,16 +367,16 @@ export default function CaseDetail() {
             <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hidden onChange={handleUpload} disabled={uploading}/>
           </label>
         </div>
-        <p style={{fontSize:12,color:'#86909c',marginBottom:12}}>支持 PDF、Word、图片格式，上传后系统自动解析内容</p>
+        <p style={{fontSize:12,color:'var(--text-secondary)',marginBottom:12}}>支持 PDF、Word、图片格式，上传后系统自动解析内容</p>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {materials.map(m => (
-            <div key={m.id} className="flex items-center justify-between" style={{background:'#f7f8fa',border:'1px solid #e5e7eb',borderRadius:10,padding:'14px 16px'}}>
+            <div key={m.id} className="flex items-center justify-between" style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px'}}>
               <div className="flex items-center gap-3">
                 <span style={{fontSize:24}}>{m.file_type==='.pdf'?'📄':m.file_type.startsWith('.doc')?'📝':'🖼️'}</span>
                 <div>
                   <div style={{fontWeight:500,fontSize:13}}>{m.filename}</div>
                   <div className="flex items-center gap-2" style={{marginTop:3}}>
-                    <span style={{fontSize:11,color:'#86909c'}}>{(m.file_size/1024).toFixed(1)} KB</span>
+                    <span style={{fontSize:11,color:'var(--text-secondary)'}}>{(m.file_size/1024).toFixed(1)} KB</span>
                     <span className={`tag ${m.parse_status==='completed'?'t-green':'t-red'}`}>{m.parse_status==='completed'?'已解析':'失败'}</span>
                   </div>
                 </div>

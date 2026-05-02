@@ -61,8 +61,8 @@ export default function CaseList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 style={{fontSize:20,fontWeight:700,color:'#1d2129'}}>案件管理</h2>
-          <p style={{fontSize:13,color:'#86909c',marginTop:4}}>管理和组织您的法律案件</p>
+          <h2 style={{fontSize:20,fontWeight:700,color:'var(--text-primary)'}}>案件管理</h2>
+          <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:4}}>管理和组织您的法律案件</p>
         </div>
         <button className="btn btn-p" onClick={() => setShowCreate(true)}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -103,19 +103,19 @@ export default function CaseList() {
             <h3>新建案件</h3>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件名称 *</label><input className="input" placeholder="输入案件名称" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案号</label><input className="input" placeholder="如：(2024)京0105民初1234号" value={form.case_number} onChange={e=>setForm({...form,case_number:e.target.value})}/></div>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>管辖法院</label><input className="input" placeholder="如：北京市朝阳区人民法院" value={form.court} onChange={e=>setForm({...form,court:e.target.value})}/></div>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案由</label><input className="input" placeholder="如：民间借贷纠纷" value={form.cause} onChange={e=>setForm({...form,cause:e.target.value})}/></div>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件类型</label>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案件名称 *</label><input className="input" placeholder="输入案件名称" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案号</label><input className="input" placeholder="如：(2024)京0105民初1234号" value={form.case_number} onChange={e=>setForm({...form,case_number:e.target.value})}/></div>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>管辖法院</label><input className="input" placeholder="如：北京市朝阳区人民法院" value={form.court} onChange={e=>setForm({...form,court:e.target.value})}/></div>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案由</label><input className="input" placeholder="如：民间借贷纠纷" value={form.cause} onChange={e=>setForm({...form,cause:e.target.value})}/></div>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案件类型</label>
                   <select className="select" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}>
                     <option value="">选择类型</option>
                     {CASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-                <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>立案日期</label><input type="date" className="input" value={form.filing_date} onChange={e=>setForm({...form,filing_date:e.target.value})}/></div>
+                <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>立案日期</label><input type="date" className="input" value={form.filing_date} onChange={e=>setForm({...form,filing_date:e.target.value})}/></div>
               </div>
-              <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件描述</label><textarea className="textarea" style={{height:60}} placeholder="简要描述" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></div>
+              <div><label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案件描述</label><textarea className="textarea" style={{height:60}} placeholder="简要描述" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
                 <button className="btn btn-o" onClick={()=>setShowCreate(false)}>取消</button>
                 <button className="btn btn-p" onClick={create}>创建</button>
@@ -148,16 +148,16 @@ export default function CaseList() {
                 </td>
                 <td>
                   <div style={{fontWeight:500}}>{c.name}</div>
-                  {c.cause && <div style={{fontSize:11,color:'#86909c',marginTop:2}}>{c.cause}</div>}
+                  {c.cause && <div style={{fontSize:11,color:'var(--text-secondary)',marginTop:2}}>{c.cause}</div>}
                 </td>
-                <td style={{fontSize:12,color:'#86909c'}}>{c.case_number || '-'}</td>
-                <td>{c.case_type ? <span className="tag" style={{background:`${TYPE_COLORS[c.case_type]||'#6366f1'}18`,color:TYPE_COLORS[c.case_type]||'#6366f1'}}>{c.case_type}</span> : <span style={{color:'#c9cdd4'}}>-</span>}</td>
+                <td style={{fontSize:12,color:'var(--text-secondary)'}}>{c.case_number || '-'}</td>
+                <td>{c.case_type ? <span className="tag" style={{background:`${TYPE_COLORS[c.case_type]||'#6366f1'}18`,color:TYPE_COLORS[c.case_type]||'#6366f1'}}>{c.case_type}</span> : <span style={{color:'var(--text-muted)'}}>-</span>}</td>
                 <td>
                   <span className={`tag ${c.status==='completed'?'t-green':c.status==='in_progress'?'t-orange':'t-gray'}`}>
                     {c.status==='completed'?'已完成':c.status==='in_progress'?'进行中':'草稿'}
                   </span>
                 </td>
-                <td style={{color:'#86909c',fontSize:12}}>{new Date(c.created_at).toLocaleDateString('zh-CN')}</td>
+                <td style={{color:'var(--text-secondary)',fontSize:12}}>{new Date(c.created_at).toLocaleDateString('zh-CN')}</td>
                 <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
                   <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
                     <button className="btn btn-o btn-sm" onClick={()=>navigate(`/cases/${c.id}`)}>详情</button>

@@ -134,8 +134,8 @@ export default function WorkflowPage() {
   return (
     <div>
       <div className="breadcrumb mb-5">
-        <a onClick={()=>navigate('/cases')}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
-        <a onClick={()=>navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={()=>navigate('/cases')}>案件管理</a><span style={{color:'var(--border)'}}>/</span>
+        <a onClick={()=>navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'var(--border)'}}>/</span>
         <span className="current">逐步精调</span>
       </div>
 
@@ -175,7 +175,7 @@ export default function WorkflowPage() {
           {showAdvanced && (
             <div className="collapse-panel">
               <div style={{marginBottom:8}}>
-                <label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:4}}>AI 模型</label>
+                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>AI 模型</label>
                 <select className="select" style={{width:'100%',fontSize:12,padding:'5px 10px'}} value={`${selChannelId}|${selModel}`} onChange={e=>{
                   const [cid,mid] = e.target.value.split('|');
                   setSelChannelId(cid); setSelModel(mid);
@@ -185,7 +185,7 @@ export default function WorkflowPage() {
                 </select>
               </div>
               <div style={{marginBottom:4}}>
-                <label style={{fontSize:11,color:'#86909c',display:'block',marginBottom:4}}>Prompt 模板</label>
+                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>Prompt 模板</label>
                 <textarea className="textarea" style={{height:200}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt 模板..."/>
               </div>
             </div>
@@ -193,7 +193,7 @@ export default function WorkflowPage() {
 
           {activeStage === 'review_optimization' && (
             <div style={{marginTop:12,marginBottom:12}}>
-              <div style={{fontSize:12,color:'#86909c',marginBottom:6,fontWeight:600}}>审查模式</div>
+              <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6,fontWeight:600}}>审查模式</div>
               <div className="flex gap-2">
                 {(['single','chain','compare'] as ReviewMode[]).map(m => (
                   <button key={m} className={`btn btn-sm ${reviewMode===m?'btn-p':'btn-o'}`} onClick={()=>setReviewMode(m)}>
@@ -206,7 +206,7 @@ export default function WorkflowPage() {
                 <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
                   {['生成模型','审查模型','优化模型'].map((label,i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <span style={{fontSize:12,color:'#86909c',minWidth:65}}>{label}</span>
+                      <span style={{fontSize:12,color:'var(--text-secondary)',minWidth:65}}>{label}</span>
                       <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
                         onChange={e=>{const[cid,mid]=e.target.value.split('|');const nm=[...chainModels];nm[i]={channel_id:cid,model:mid};setChainModels(nm)}}>
                         {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
@@ -218,7 +218,7 @@ export default function WorkflowPage() {
 
               {reviewMode === 'compare' && (
                 <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:'#86909c',marginBottom:4}}>勾选参与对比的模型（至少2个）：</div>
+                  <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:4}}>勾选参与对比的模型（至少2个）：</div>
                   {models.map((m,i) => {
                     const key = `${m.channel_id}|${m.model}`
                     const checked = compareModels.some(c => c.channel_id===m.channel_id && c.model===m.model)
@@ -246,14 +246,14 @@ export default function WorkflowPage() {
           </button>
           )}
           {showHistory && history.length>0 && (
-            <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid #e5e7eb'}}>
-              <div style={{fontSize:12,color:'#86909c',marginBottom:8,fontWeight:600}}>版本历史</div>
+            <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid var(--border)'}}>
+              <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:8,fontWeight:600}}>版本历史</div>
               <div style={{maxHeight:150,overflow:'auto',display:'flex',flexDirection:'column',gap:6}}>
                 {history.map(h=>(
-                  <div key={h.id} className="flex items-center justify-between" style={{background:'#f7f8fa',borderRadius:8,padding:'8px 12px'}}>
+                  <div key={h.id} className="flex items-center justify-between" style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px 12px'}}>
                     <div className="flex items-center gap-2">
                       <span className="tag t-purple">{new Date(h.created_at).toLocaleString('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-                      <span style={{fontSize:11,color:'#86909c'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
+                      <span style={{fontSize:11,color:'var(--text-secondary)'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
                     </div>
                     <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>恢复此版本</button>
                   </div>
@@ -283,7 +283,7 @@ export default function WorkflowPage() {
             </div>
           ) : activeStage==='review_optimization' && reviewMode==='chain' && (generating || Object.keys(chainSteps).length>0) ? (
             <div>
-              <div className="flex gap-2" style={{marginBottom:12,borderBottom:'1px solid #e5e7eb',paddingBottom:8}}>
+              <div className="flex gap-2" style={{marginBottom:12,borderBottom:'1px solid var(--border)',paddingBottom:8}}>
                 {[{key:'generate',label:'生成'},{key:'review',label:'审查'},{key:'optimize',label:'优化'}].map(s=>(
                   <button key={s.key} className={`btn btn-sm ${activeChainStep===s.key?'btn-p':'btn-o'}`}
                     onClick={()=>setActiveChainStep(s.key)}>
@@ -291,13 +291,13 @@ export default function WorkflowPage() {
                   </button>
                 ))}
               </div>
-              <div style={{height:420,overflow:'auto',border:'1px solid #e5e7eb',borderRadius:8,padding:20}}>
+              <div style={{height:420,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
                 {chainSteps[activeChainStep] ? (
                   <div className="md"><ReactMarkdown>{chainSteps[activeChainStep]}</ReactMarkdown></div>
                 ) : generating ? (
                   <span className="cursor-blink"/>
                 ) : (
-                  <p style={{color:'#86909c'}}>等待执行...</p>
+                  <p style={{color:'var(--text-secondary)'}}>等待执行...</p>
                 )}
                 {generating && chainSteps[activeChainStep] && <span className="cursor-blink"/>}
               </div>
@@ -305,9 +305,9 @@ export default function WorkflowPage() {
           ) : activeStage==='review_optimization' && reviewMode==='compare' && Object.keys(compareOutputs).length>0 ? (
             <div style={{display:'grid',gridTemplateColumns:`repeat(${Math.min(Object.keys(compareOutputs).length,3)},1fr)`,gap:12,height:520,overflow:'auto'}}>
               {Object.entries(compareOutputs).map(([key,text])=>(
-                <div key={key} style={{border:'1px solid #e5e7eb',borderRadius:8,display:'flex',flexDirection:'column'}}>
-                  <div style={{padding:'8px 12px',borderBottom:'1px solid #e5e7eb',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <span style={{fontSize:12,fontWeight:600,color:'#4f46e5'}}>{key}</span>
+                <div key={key} style={{border:'1px solid var(--border)',borderRadius:8,display:'flex',flexDirection:'column'}}>
+                  <div style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:12,fontWeight:600,color:'var(--accent-hover)'}}>{key}</span>
                     <button className="btn btn-p btn-sm" onClick={()=>handleSelectModel(key)}>采用此版本</button>
                   </div>
                   <div style={{flex:1,overflow:'auto',padding:12}} className="md"><ReactMarkdown>{text}</ReactMarkdown></div>
@@ -315,12 +315,12 @@ export default function WorkflowPage() {
               ))}
             </div>
           ) : generating && streamingText ? (
-            <div style={{height:500,overflow:'auto',border:'1px solid #e5e7eb',borderRadius:8,padding:20}}>
+            <div style={{height:500,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
               <div className="md"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
               <span className="cursor-blink"/>
             </div>
           ) : output ? (
-            <div style={{height:500,overflow:'auto',border:'1px solid #e5e7eb',borderRadius:8,padding:20}}>
+            <div style={{height:500,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
               <div className="md"><ReactMarkdown>{output}</ReactMarkdown></div>
             </div>
           ) : (

@@ -246,8 +246,8 @@ export default function DocumentEditor() {
   return (
     <div>
       <div className="breadcrumb mb-5">
-        <a onClick={() => navigate('/cases')}>案件管理</a><span style={{ color: '#d1d5db' }}>/</span>
-        <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName || '案件'}</a><span style={{ color: '#d1d5db' }}>/</span>
+        <a onClick={() => navigate('/cases')}>案件管理</a><span style={{ color:'var(--border)' }}>/</span>
+        <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName || '案件'}</a><span style={{ color:'var(--border)' }}>/</span>
         <span className="current">文书编辑</span>
       </div>
 
@@ -255,7 +255,7 @@ export default function DocumentEditor() {
         <div className="card-hd">
           <span className="card-title">文书编辑器</span>
           <div className="flex gap-2">
-            {undoStack.length > 0 && <span style={{ fontSize: 11, color: '#86909c', alignSelf: 'center' }}>Ctrl+Z 撤销</span>}
+            {undoStack.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)', alignSelf: 'center' }}>Ctrl+Z 撤销</span>}
             {changed && <span style={{ fontSize: 11, color: '#f59e0b', alignSelf: 'center' }}>未保存</span>}
             <button className="btn btn-o btn-sm" onClick={handleSave} disabled={saving || !changed}>
               {saving ? '保存中...' : '保存'}
@@ -266,7 +266,7 @@ export default function DocumentEditor() {
             <button className="btn btn-o btn-sm" onClick={() => setShowExportOpts(true)}>导出 Word</button>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: '#86909c', marginTop: -8 }}>选中文字后可使用 AI 辅助编辑 | Ctrl+S 保存 | Ctrl+Z 撤销</p>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: -8 }}>选中文字后可使用 AI 辅助编辑 | Ctrl+S 保存 | Ctrl+Z 撤销</p>
       </div>
 
       {/* Floating AI toolbar */}
@@ -274,19 +274,19 @@ export default function DocumentEditor() {
         <div style={{
           position: 'fixed', left: toolbarPos.x, top: toolbarPos.y,
           transform: 'translateX(-50%)', zIndex: 90,
-          background: '#fff', borderRadius: 10, padding: '6px 8px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e5e7eb',
+          background: 'var(--bg-card)', borderRadius: 10, padding: '6px 8px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
           maxWidth: 420,
         }}>
           {AI_ACTIONS.map(a => (
             <button key={a.label} className="btn btn-sm" style={{
-              background: '#f3f4f6', color: '#4f46e5', border: 'none', fontSize: 11, padding: '4px 10px', borderRadius: 6,
+              background: 'var(--bg-secondary)', color: 'var(--accent-hover)', border: 'none', fontSize: 11, padding: '4px 10px', borderRadius: 6,
             }} onClick={() => handleAIEdit(a.instruction)} disabled={aiLoading}>
               {a.label}
             </button>
           ))}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4, borderLeft: '1px solid #e5e7eb', paddingLeft: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4, borderLeft: '1px solid var(--border)', paddingLeft: 8 }}>
             <input className="input" style={{ width: 120, fontSize: 11, padding: '4px 8px', height: 28 }} placeholder="自定义指令..."
               value={customInstruction} onChange={e => setCustomInstruction(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCustomEdit() }} />
@@ -302,7 +302,7 @@ export default function DocumentEditor() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 900, maxHeight: '80vh',
+            background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '90%', maxWidth: 900, maxHeight: '80vh',
             overflow: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -311,16 +311,16 @@ export default function DocumentEditor() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 12, color: '#86909c', marginBottom: 8, fontWeight: 600 }}>原文</div>
-                <div style={{ background: '#f7f8fa', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>原文</div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
                   <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', margin: 0 }}>{selectedText}</pre>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: '#6366f1', marginBottom: 8, fontWeight: 600 }}>AI 修改后</div>
-                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
+                <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 8, fontWeight: 600 }}>AI 修改后</div>
+                <div style={{ background: '#f5f3ff', border: '1px solid var(--accent)', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
                   {aiLoading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#86909c', fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
                       <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25" /><path d="M12 2a10 10 0 0110 10" /></svg>
                       AI 正在处理...
                     </div>
@@ -341,10 +341,10 @@ export default function DocumentEditor() {
       )}
 
       {/* Three-column layout */}
-      <div className="editor-layout" style={{ display: 'grid', gridTemplateColumns: '260px 1fr 1fr', gap: 0, height: 'calc(100vh - 260px)', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+      <div className="editor-layout" style={{ display: 'grid', gridTemplateColumns: '260px 1fr 1fr', gap: 0, height: 'calc(100vh - 260px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}>
         {/* Left: Reference Panel */}
-        <div className="ref-panel" style={{ borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+        <div className="ref-panel" style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             {REF_TABS.map(t => (
               <div key={t.key} style={{
                 flex: 1, padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 500, cursor: 'pointer',
@@ -356,21 +356,21 @@ export default function DocumentEditor() {
           <div style={{ flex: 1, overflow: 'auto', padding: 12, fontSize: 12, lineHeight: 1.7 }}>
             {refTab === 'parties' && (
               parties.length > 0 ? parties.map(p => (
-                <div key={p.id} style={{ background: '#f7f8fa', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+                <div key={p.id} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}
-                    {p.role && <span style={{ fontSize: 11, color: '#6366f1', marginLeft: 6 }}>{p.role}</span>}
+                    {p.role && <span style={{ fontSize: 11, color: 'var(--accent)', marginLeft: 6 }}>{p.role}</span>}
                   </div>
-                  {p.id_number && <div style={{ color: '#86909c', marginTop: 2 }}>证件：{p.id_number}</div>}
-                  {p.address && <div style={{ color: '#86909c' }}>住址：{p.address}</div>}
-                  {p.phone && <div style={{ color: '#86909c' }}>电话：{p.phone}</div>}
+                  {p.id_number && <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>证件：{p.id_number}</div>}
+                  {p.address && <div style={{ color: 'var(--text-secondary)' }}>住址：{p.address}</div>}
+                  {p.phone && <div style={{ color: 'var(--text-secondary)' }}>电话：{p.phone}</div>}
                 </div>
               )) : <div style={{ color: '#c9cdd4', textAlign: 'center', padding: 20 }}>暂无当事人信息 — 请先在案件详情页添加</div>
             )}
             {refTab === 'materials' && (
               materials.length > 0 ? materials.map(m => (
-                <div key={m.id} style={{ background: '#f7f8fa', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
+                <div key={m.id} style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '8px 10px', marginBottom: 8 }}>
                   <div style={{ fontWeight: 500 }}>{m.filename}</div>
-                  <div style={{ color: '#86909c', marginTop: 4, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 11 }}>
+                  <div style={{ color: 'var(--text-secondary)', marginTop: 4, maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 11 }}>
                     {m.parsed_content?.slice(0, 300)}{m.parsed_content?.length > 300 ? '...' : ''}
                   </div>
                 </div>
@@ -389,7 +389,7 @@ export default function DocumentEditor() {
 
         {/* Center: Editor */}
         <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600, flexShrink: 0 }}>
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, flexShrink: 0 }}>
             编辑区 <span style={{ color: '#c9cdd4', fontWeight: 400 }}>| 选中文字后出现AI工具栏</span>
           </div>
           <textarea
@@ -402,8 +402,8 @@ export default function DocumentEditor() {
         </div>
 
         {/* Right: Preview */}
-        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid #e5e7eb' }}>
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#86909c', fontWeight: 600, flexShrink: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border)' }}>
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, flexShrink: 0 }}>
             实时预览
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
@@ -436,11 +436,11 @@ export default function DocumentEditor() {
                 {savedTpls.map(t => (
                   <div key={t.id} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: '#f7f8fa', borderRadius: 8, padding: '10px 14px',
+                    background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 14px',
                   }}>
                     <div>
                       <div style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</div>
-                      <div style={{ fontSize: 11, color: '#86909c', marginTop: 2 }}>{t.content?.slice(0, 80)}...</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{t.content?.slice(0, 80)}...</div>
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-p btn-sm" onClick={() => handleApplyTemplate(t)}>应用</button>
@@ -469,7 +469,7 @@ export default function DocumentEditor() {
             <h3>导出 Word 设置</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', display: 'block', marginBottom: 6 }}>正文字号</label>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>正文字号</label>
                 <select className="select" value={exportOpts.fontSize} onChange={e => setExportOpts({ ...exportOpts, fontSize: Number(e.target.value) })}>
                   <option value={14}>小四号 (14pt)</option>
                   <option value={16}>四号 (16pt)</option>
@@ -478,7 +478,7 @@ export default function DocumentEditor() {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', display: 'block', marginBottom: 6 }}>页边距</label>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>页边距</label>
                 <select className="select" value={exportOpts.margin} onChange={e => setExportOpts({ ...exportOpts, margin: e.target.value })}>
                   <option value="narrow">窄 (2cm)</option>
                   <option value="standard">标准 (法院格式)</option>
