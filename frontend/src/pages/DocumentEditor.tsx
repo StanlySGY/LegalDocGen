@@ -19,8 +19,10 @@ const AI_ACTIONS: AIAction[] = [
 type RefTab = 'parties' | 'materials' | 'analysis' | 'dispute'
 
 function diffWords(oldStr: string, newStr: string): Array<{type: 'equal' | 'delete' | 'insert', text: string}> {
-  const oldWords = oldStr.split(/(\s+)/)
-  const newWords = newStr.split(/(\s+)/)
+  const hasCJK = /[\u4e00-\u9fff\u3400-\u4dbf]/.test(oldStr + newStr)
+  const tokenize = (s: string) => hasCJK ? s.split('') : s.split(/(\s+)/)
+  const oldWords = tokenize(oldStr)
+  const newWords = tokenize(newStr)
   const m = oldWords.length, n = newWords.length
   const dp: number[][] = Array.from({length: m + 1}, () => Array(n + 1).fill(0))
   for (let i = 1; i <= m; i++) {
@@ -282,15 +284,6 @@ export default function DocumentEditor() {
           <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#92400e' }} onClick={() => setShowHallucinationWarning(false)}>×</button>
         </div>
       )}
-      {showHallucinationWarning && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
-            <span style={{ fontSize: 13, color: '#92400e' }}>AI 可能编造不存在的法条和案例，提交法庭前请务必核实所有引用项</span>
-          </div>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#92400e' }} onClick={() => setShowHallucinationWarning(false)}>×</button>
-        </div>
-      )}
       <div className="breadcrumb mb-5">
         <a onClick={() => navigate('/cases')}>案件管理</a><span style={{ color:'var(--border)' }}>/</span>
         <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName || '案件'}</a><span style={{ color:'var(--border)' }}>/</span>
@@ -353,13 +346,6 @@ export default function DocumentEditor() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontSize: 15, fontWeight: 600 }}>AI 修改建议（红线对比）</span>
               <button className="btn btn-o btn-sm" onClick={handleReject}>关闭</button>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>排版预设</label>
-              <select className="select" value={exportOpts.preset} onChange={e => setExportOpts({ ...exportOpts, preset: e.target.value })}>
-                <option value="standard">标准排版</option>
-                <option value="court_strict">法院严格格式（方正小标宋/仿宋_GB2312/28磅行距）</option>
-              </select>
             </div>
             <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, maxHeight: 400, overflow: 'auto', lineHeight: 2, fontSize: 14 }}>
               {aiLoading ? (
@@ -531,6 +517,13 @@ export default function DocumentEditor() {
                   <option value="narrow">窄 (2cm)</option>
                   <option value="standard">标准 (法院格式)</option>
                   <option value="wide">宽 (4cm)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>排版预设</label>
+                <select className="select" value={exportOpts.preset} onChange={e => setExportOpts({ ...exportOpts, preset: e.target.value })}>
+                  <option value="standard">标准排版</option>
+                  <option value="court_strict">法院严格格式（方正小标宋/仿宋_GB2312/28磅行距）</option>
                 </select>
               </div>
             </div>
