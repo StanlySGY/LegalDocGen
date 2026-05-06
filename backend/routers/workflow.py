@@ -352,6 +352,7 @@ class ExportRequest(BaseModel):
     include_cover: bool = False
     font_size: int = 16
     margin: str = "standard"  # standard | narrow | wide
+    deanonymize: bool = True  # reverse anonymization on export when possible
 
 
 @router.post("/export/{case_id}")
@@ -363,6 +364,29 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
     import re
 
     content = req.content
+
+    # Optional: deanonymize content using stored mappings before export
+    if req.deanonymize:
+        try:
+            from backend.models.material import Material
+            anonymizer_path = __import__('backend.services.anonymizer.anonymizer', fromlist=['Anonymizer'])
+            Anonymizer = anonymizer_path.Anonymizer
+            import json as _json
+            all_materials = db.query(Material).filter(Material.case_id == case_id).all()
+            # Merge all mappings into a single mapping for de-anonymization
+            merged_mapping = {}
+            for m in all_materials:
+                if getattr(m, 'anonymize_mapping', None):
+                    try:
+                        merged_mapping.update(_json.loads(m.anonymize_mapping) or {})
+                    except Exception:
+                        pass
+            if merged_mapping:
+                anonymizer = Anonymizer()
+                content = anonymizer.deanonymize(content, merged_mapping)
+        except Exception:
+            # If anything goes wrong, fall back to original content
+            pass
     if not content:
         node = WorkflowEngine(db).get_stage_node(case_id, StageType.DRAFT_GENERATION)
         if not node or not node.output:

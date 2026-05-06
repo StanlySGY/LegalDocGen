@@ -73,3 +73,33 @@ def delete_material(material_id: str, db: Session = Depends(get_db)):
     db.delete(m)
     db.commit()
     return {"message": "已删除"}
+
+
+@router.post("/anonymize/{case_id}")
+async def anonymize_materials(case_id: str, db: Session = Depends(get_db)):
+    """Anonymize all materials for a case using party names from the case."""
+    from backend.services.anonymizer.anonymizer import Anonymizer
+    from backend.models.party import Party
+    from backend.models.material import Material
+    import json
+    
+    materials = db.query(Material).filter(Material.case_id == case_id).all()
+    if not materials:
+        raise HTTPException(400, "无材料可脱敏")
+    
+    # Get party names for replacement
+    parties = db.query(Party).filter(Party.case_id == case_id).all()
+    party_names = [p.name for p in parties if p.name]
+    
+    anonymizer = Anonymizer()
+    results = []
+    for m in materials:
+        if getattr(m, 'parsed_content', None):
+            anonymized, mapping = anonymizer.anonymize(m.parsed_content, party_names)
+            # Store anonymized content and mapping
+            m.parsed_content_masked = anonymized
+            m.anonymize_mapping = json.dumps(mapping, ensure_ascii=False)
+            results.append({"id": m.id, "filename": m.filename, "anonymized": True})
+    
+    db.commit()
+    return {"message": f"已脱敏 {len(results)} 份材料", "materials": results}

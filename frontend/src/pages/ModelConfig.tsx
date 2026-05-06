@@ -47,7 +47,7 @@ export default function ModelConfig() {
     setAiLoading(true)
     setAiResult('')
     try {
-      const res = await api.workflow.aiEdit?.({ text: editingPrompt.content, instruction: `作为Prompt工程专家，优化以下Prompt模板。用户需求：${userMsg}\n\n当前Prompt：\n${editingPrompt.content}\n\n请返回优化后的完整Prompt（保留变量占位符如{materials}和{previous_context}），不要添加任何解释。` })
+      const res = await api.workflow.aiEdit?.({ text: editingPrompt.content, instruction: `作为法律文书专家，优化以下办案模板。用户需求：${userMsg}\n\n当前Prompt：\n${editingPrompt.content}\n\n请返回优化后的完整Prompt（保留变量占位符如{materials}和{previous_context}），不要添加任何解释。` })
       // Fallback to dedicated endpoint
       let result = res?.result
       if (!result) {
@@ -72,12 +72,12 @@ export default function ModelConfig() {
   return (
     <div>
       <div className="mb-6">
-        <h2 style={{fontSize:20,fontWeight:700}}>Prompt 模板管理</h2>
-        <p style={{fontSize:13,color:'#86909c',marginTop:4}}>编辑和管理各阶段的Prompt模板，支持AI对话优化</p>
+        <h2 style={{fontSize:20,fontWeight:700}}>文书模板管理</h2>
+        <p style={{fontSize:13,color:'#86909c',marginTop:4}}>编辑和管理各阶段的办案模板，支持AI对话优化</p>
       </div>
 
       <div className="card">
-        <div className="card-title" style={{marginBottom:16}}>Prompt 模板</div>
+        <div className="card-title" style={{marginBottom:16}}>办案模板</div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {prompts.map(p=>(
             <div key={p.id} className="flex items-center justify-between" style={{border:'1px solid #e5e7eb',borderRadius:10,padding:'12px 16px',transition:'background .15s'}} onMouseEnter={e=>(e.currentTarget.style.background='#f7f8fa')} onMouseLeave={e=>(e.currentTarget.style.background='#fff')}>
@@ -96,11 +96,11 @@ export default function ModelConfig() {
       {editingPrompt && (
         <div className="modal-mask" onClick={()=>{setEditingPrompt(null);setShowAI(false);setAiHistory([])}}>
           <div className="modal-box" style={{maxWidth:800,maxHeight:'90vh',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
-            <h3 style={{marginBottom:16}}>编辑 Prompt 模板</h3>
+            <h3 style={{marginBottom:16}}>编辑办案模板</h3>
             <div style={{display:'flex',flexDirection:'column',gap:10,flex:1,minHeight:0}}>
               <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>模板名称</label><input className="input" value={editingPrompt.name} onChange={e=>setEditingPrompt({...editingPrompt,name:e.target.value})}/></div>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <label style={{fontSize:12,color:'#86909c'}}>Prompt 内容</label>
+                <label style={{fontSize:12,color:'#86909c'}}>模板内容</label>
                 <button className="btn btn-sm" style={{background:showAI?'#eef2ff':'#f3f4f6',color:'#4f46e5',fontSize:12}} onClick={()=>setShowAI(!showAI)}>
                   ✨ AI 对话优化
                 </button>

@@ -2,6 +2,18 @@
 
 # ⚖️ LegalDocGen
 
+## Mermaid 界面预览
+
+```mermaid
+graph LR
+    subgraph 文书编辑器
+        A["📋 参考面板<br/>当事人 · 材料<br/>法律分析 · 争议焦点"] --- B["✏️ 编辑区<br/>Markdown 编辑<br/>AI 辅助工具栏"] --- C["👁️ 实时预览<br/>文书渲染效果"]
+    end
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#fefce8,stroke:#eab308,color:#422006
+    style C fill:#dcfce7,stroke:#22c55e,color:#14532d
+```
+
 **AI 驱动的法律文书智能生成与审查系统**
 
 一套面向律师的全流程法律文书工作台——从案件材料解析、法律关系分析到文书生成、多模型审查，以「分阶段可控」为核心设计哲学。
@@ -19,6 +31,8 @@
 </div>
 
 ---
+
+## 👨‍⚖️ 给律师/终端用户
 
 ## 设计理念
 
@@ -158,6 +172,8 @@ graph TB
 
 ---
 
+## 👨‍💻 给开发者
+
 ## 系统架构
 
 ```mermaid
@@ -240,7 +256,18 @@ graph LR
 
 ---
 
+## 🐳 Docker 一键部署（推荐）
+
+```bash
+git clone https://github.com/StanlySGY/LegalDocGen.git
+cd LegalDocGen
+docker-compose up -d
+```
+
+访问 http://localhost:3000 即可使用。
+
 ## 快速开始
+> 💡 推荐使用 Docker 部署，无需安装 Python/Node 环境。见上方「Docker 一键部署」。
 
 ### 前置条件
 
@@ -376,6 +403,16 @@ LegalDocGen/
 ├── start.sh                    # 一键启动脚本
 └── README.md
 ```
+
+---
+
+## 🔒 安全与隐私
+
+- **本地部署**：系统完全开源，所有数据存储在您本地的 SQLite 数据库中
+- **不收集数据**：本系统不收集、不上传任何用户数据
+- **API 数据流向**：调用 AI 模型时，案件内容会直接发送至您配置的大模型服务商（如 OpenAI、Claude），不经过任何中间服务器
+- **一键脱敏**：支持自动替换身份证号、手机号、姓名等敏感信息
+- **建议**：处理涉密案件时，请使用自建的大模型服务或本地模型
 
 ---
 

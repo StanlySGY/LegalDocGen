@@ -121,36 +121,36 @@ export default function ChannelManage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700 }}>渠道管理</h2>
-          <p style={{ fontSize: 13, color: '#86909c', marginTop: 4 }}>管理API渠道，自动发现可用模型</p>
+        <h2 style={{ fontSize: 20, fontWeight: 700 }}>助手配置</h2>
+          <p style={{ fontSize: 13, color: '#86909c', marginTop: 4 }}>管理AI助手，自动发现可用模型</p>
         </div>
         <button className="btn btn-p" onClick={openAdd}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          添加渠道
+          添加AI助手
         </button>
       </div>
 
       <div className="card" style={{ padding: 0 }}>
         <table className="data-table">
-          <thead>
-            <tr>
-              <th>名称</th>
-              <th>类型</th>
-              <th>Base URL</th>
-              <th>状态</th>
-              <th>模型数</th>
-              <th>优先级</th>
-              <th style={{ textAlign: 'right' }}>操作</th>
-            </tr>
-          </thead>
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>类型</th>
+                  <th>服务地址</th>
+                  <th>状态</th>
+                  <th>可用模型</th>
+                  <th>优先级</th>
+                  <th style={{ textAlign: 'right' }}>操作</th>
+                </tr>
+              </thead>
           <tbody>
             {channels.map(ch => (
               <tr key={ch.id}>
                 <td><span style={{ fontWeight: 600 }}>{ch.name}</span></td>
                 <td><span className="tag t-blue">{ch.type}</span></td>
-                <td><span style={{ fontSize: 12, color: '#86909c', fontFamily: 'monospace' }}>{ch.base_url}</span></td>
+                    <td><span style={{ fontSize: 12, color: '#86909c', fontFamily: 'monospace' }}>{ch.base_url}</span></td>
                 <td>
                   <span className={`tag ${ch.status === 1 ? 't-green' : 't-gray'}`}>
                     {ch.status === 1 ? '启用' : '禁用'}
@@ -166,7 +166,7 @@ export default function ChannelManage() {
                       {loading === 'test-' + ch.id ? '测试中...' : '测试'}
                     </button>
                     <button className="btn btn-o btn-sm" onClick={() => openFetchModels(ch)} disabled={loading === 'fetch'}>
-                      获取模型
+                      发现AI助手
                     </button>
                     <button className="btn btn-o btn-sm" onClick={() => openEdit(ch)}>编辑</button>
                     <button className="btn btn-d btn-sm" onClick={() => setConfirmDelete(ch.id)}>删除</button>
@@ -177,7 +177,7 @@ export default function ChannelManage() {
             {channels.length === 0 && (
               <tr><td colSpan={7}>
                 <div className="empty" style={{ padding: '50px 0' }}>
-                  <p>暂无渠道，点击「添加渠道」开始</p>
+                  <p>暂无AI助手</p>
                 </div>
               </td></tr>
             )}
@@ -185,17 +185,17 @@ export default function ChannelManage() {
         </table>
       </div>
 
-      {showDrawer && (
+        {showDrawer && (
         <div className="modal-mask" onClick={() => setShowDrawer(false)}>
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
             <h3>{editingChannel ? '编辑渠道' : '添加渠道'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>渠道名称 *</label>
+                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手名称 *</label>
                 <input className="input" placeholder="如：OpenAI主渠道" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>渠道类型</label>
+                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手类型</label>
                 <select className="select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                   <option value="openai">OpenAI 兼容</option>
                   <option value="claude">Claude</option>

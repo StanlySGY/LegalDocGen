@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  legaldocgen:
+    build: .
+    ports:
+      - "3000:80"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=sqlite:///./data/legaldocgen.db
+    restart: unless-stopped

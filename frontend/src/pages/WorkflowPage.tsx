@@ -55,7 +55,7 @@ export default function WorkflowPage() {
 
   const handleGenerate = async () => {
     if(!caseId)return
-    if(!selChannelId){showToast('请先在「渠道管理」中添加API渠道','err');return}
+  if(!selChannelId){showToast('请先在「助手配置」中添加AI助手','err');return}
     setGenerating(true); setStreamingText(''); setOutput('')
     try {
       let full = ''
@@ -175,23 +175,23 @@ export default function WorkflowPage() {
           {showAdvanced && (
             <div className="collapse-panel">
               <div style={{marginBottom:8}}>
-                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>AI 模型</label>
+                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>AI 助手</label>
                 <select className="select" style={{width:'100%',fontSize:12,padding:'5px 10px'}} value={`${selChannelId}|${selModel}`} onChange={e=>{
                   const [cid,mid] = e.target.value.split('|');
                   setSelChannelId(cid); setSelModel(mid);
                 }}>
-                  {models.length===0 && <option>未配置模型（联系管理员）</option>}
+                  {models.length===0 && <option>未配置AI助手</option>}
                   {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
                 </select>
               </div>
-              <div style={{marginBottom:4}}>
-                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>Prompt 模板</label>
-                <textarea className="textarea" style={{height:200}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt 模板..."/>
+                <div style={{marginBottom:4}}>
+                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>办案模板</label>
+                <textarea className="textarea" style={{height:200}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑办案思路..."/>
               </div>
             </div>
           )}
 
-          {activeStage === 'review_optimization' && (
+              {activeStage === 'review_optimization' && (
             <div style={{marginTop:12,marginBottom:12}}>
               <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6,fontWeight:600}}>审查模式</div>
               <div className="flex gap-2">
@@ -204,7 +204,7 @@ export default function WorkflowPage() {
 
               {reviewMode === 'chain' && (
                 <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
-                  {['生成模型','审查模型','优化模型'].map((label,i) => (
+              {['文书起草','质量审查','最终优化'].map((label,i) => (
                     <div key={i} className="flex items-center gap-2">
                       <span style={{fontSize:12,color:'var(--text-secondary)',minWidth:65}}>{label}</span>
                       <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
@@ -218,7 +218,7 @@ export default function WorkflowPage() {
 
               {reviewMode === 'compare' && (
                 <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:4}}>勾选参与对比的模型（至少2个）：</div>
+                  <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:4}}>勾选参与对比的AI助手（至少2个）：</div>
                   {models.map((m,i) => {
                     const key = `${m.channel_id}|${m.model}`
                     const checked = compareModels.some(c => c.channel_id===m.channel_id && c.model===m.model)

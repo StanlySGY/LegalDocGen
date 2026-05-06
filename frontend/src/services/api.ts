@@ -65,6 +65,7 @@ export const api = {
       return res.json()
     },
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
+    anonymize: (caseId: string) => request<any>(`/materials/anonymize/${caseId}`, { method: 'POST' }),
   },
   workflow: {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),

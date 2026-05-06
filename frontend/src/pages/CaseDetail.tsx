@@ -13,6 +13,7 @@ export default function CaseDetail() {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [uploading, setUploading] = useState(false)
+  const [anonymizing, setAnonymizing] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -49,6 +50,17 @@ export default function CaseDetail() {
   }
 
   const del = async (id: string) => { await api.materials.delete(id); load(); showToast('已删除') }
+
+  const handleAnonymize = async () => {
+    if (!caseId) return
+    setAnonymizing(true)
+    try {
+      const r = await api.materials.anonymize(caseId)
+      showToast(`已脱敏 ${r.materials?.length || 0} 份材料`)
+      load()
+    } catch (e: any) { showToast(e.message || '脱敏失败', 'err') }
+    setAnonymizing(false)
+  }
 
   const handleQuickGenerate = async () => {
     if (!caseId || !selectedDocType) return
@@ -365,10 +377,15 @@ export default function CaseDetail() {
       <div className="card">
         <div className="card-hd">
           <span className="card-title">案件材料</span>
-          <label className={`btn ${uploading?'btn-o':'btn-p'} btn-sm`} style={{cursor:'pointer'}}>
-            {uploading ? '上传中...' : '+ 上传材料'}
-            <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hidden onChange={handleUpload} disabled={uploading}/>
-          </label>
+          <div style={{display:'flex',gap:8}}>
+            <label className={`btn ${uploading?'btn-o':'btn-p'} btn-sm`} style={{cursor:'pointer'}}>
+              {uploading ? '上传中...' : '+ 上传材料'}
+              <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hidden onChange={handleUpload} disabled={uploading}/>
+            </label>
+            <button className="btn btn-o btn-sm" onClick={handleAnonymize} disabled={anonymizing || materials.length === 0}>
+              {anonymizing ? '脱敏中...' : '🔒 一键脱敏'}
+            </button>
+          </div>
         </div>
         <p style={{fontSize:12,color:'var(--text-secondary)',marginBottom:12}}>支持 PDF、Word、图片格式，上传后系统自动解析内容</p>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
