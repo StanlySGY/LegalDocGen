@@ -7,16 +7,44 @@ import type { Party, Material } from '../types'
 type AIAction = { label: string; instruction: string }
 const AI_ACTIONS: AIAction[] = [
   { label: '润色', instruction: '润色以下法律文书文本，使其更加专业、严谨、符合法律文书的行文规范，保持原意不变：' },
+  { label: '核查法条', instruction: '请检查以下文本中引用的法律条文是否准确，是否存在虚构或过时的法条。逐条核实并给出修正建议：' },
   { label: '补充法律依据', instruction: '为以下法律文书段落补充相关的法律依据（法律条文、司法解释等），在适当位置插入引用，保持原文结构：' },
   { label: '改写', instruction: '用不同的表述方式重新撰写以下法律文书段落，保持法律含义不变，但改善表达和逻辑：' },
   { label: '精简', instruction: '精简以下法律文书段落，删除冗余表述，保留核心法律论点，使文字更加简洁有力：' },
   { label: '展开论述', instruction: '展开以下法律文书段落，增加详细的事实分析、法律论证和逻辑推理，使论述更加充分：' },
+  { label: '对方律师挑刺', instruction: '假设你是对方代理律师，尝试找出以下法律文书段落中的逻辑漏洞、事实错误、法律适用不当之处，并提出质疑意见：' },
+  { label: '法官风险评估', instruction: '假设你是主审法官，从裁判者的角度审视以下法律文书段落，指出可能被驳回或不利于我方的风险点，并给出改进建议：' },
 ]
 
 type RefTab = 'parties' | 'materials' | 'analysis' | 'dispute'
 
+function diffWords(oldStr: string, newStr: string): Array<{type: 'equal' | 'delete' | 'insert', text: string}> {
+  const oldWords = oldStr.split(/(\s+)/)
+  const newWords = newStr.split(/(\s+)/)
+  const m = oldWords.length, n = newWords.length
+  const dp: number[][] = Array.from({length: m + 1}, () => Array(n + 1).fill(0))
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = oldWords[i-1] === newWords[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1])
+    }
+  }
+  const ops: Array<{type: 'equal' | 'delete' | 'insert', text: string}> = []
+  let i = m, j = n
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldWords[i-1] === newWords[j-1]) {
+      ops.unshift({type: 'equal', text: oldWords[i-1]}); i--; j--
+    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+      ops.unshift({type: 'insert', text: newWords[j-1]}); j--
+    } else {
+      ops.unshift({type: 'delete', text: oldWords[i-1]}); i--
+    }
+  }
+  return ops
+}
+
 export default function DocumentEditor() {
   const { id: caseId } = useParams<{ id: string }>()
+  const [showHallucinationWarning, setShowHallucinationWarning] = useState(true)
   const navigate = useNavigate()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [caseName, setCaseName] = useState('')
@@ -51,7 +79,7 @@ export default function DocumentEditor() {
   const [showLoadTpl, setShowLoadTpl] = useState(false)
   const [savedTpls, setSavedTpls] = useState<any[]>([])
   const [showExportOpts, setShowExportOpts] = useState(false)
-  const [exportOpts, setExportOpts] = useState({ fontSize: 16, margin: 'standard' })
+  const [exportOpts, setExportOpts] = useState({ fontSize: 16, margin: 'standard', preset: 'standard' })
 
   // Ref panel state
   const [refTab, setRefTab] = useState<RefTab>('parties')
@@ -187,7 +215,7 @@ export default function DocumentEditor() {
       const res = await fetch(`/api/workflow/export/${caseId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, font_size: exportOpts.fontSize, margin: exportOpts.margin }),
+        body: JSON.stringify({ content, font_size: exportOpts.fontSize, margin: exportOpts.margin, preset: exportOpts.preset }),
       })
       if (!res.ok) throw new Error('导出失败')
       const blob = await res.blob()
@@ -245,6 +273,24 @@ export default function DocumentEditor() {
 
   return (
     <div>
+      {showHallucinationWarning && (
+        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <span style={{ fontSize: 13, color: '#92400e' }}>AI 可能编造不存在的法条和案例，提交法庭前请务必核实所有引用项</span>
+          </div>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#92400e' }} onClick={() => setShowHallucinationWarning(false)}>×</button>
+        </div>
+      )}
+      {showHallucinationWarning && (
+        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <span style={{ fontSize: 13, color: '#92400e' }}>AI 可能编造不存在的法条和案例，提交法庭前请务必核实所有引用项</span>
+          </div>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#92400e' }} onClick={() => setShowHallucinationWarning(false)}>×</button>
+        </div>
+      )}
       <div className="breadcrumb mb-5">
         <a onClick={() => navigate('/cases')}>案件管理</a><span style={{ color:'var(--border)' }}>/</span>
         <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName || '案件'}</a><span style={{ color:'var(--border)' }}>/</span>
@@ -295,46 +341,48 @@ export default function DocumentEditor() {
         </div>
       )}
 
-      {/* AI Compare Panel */}
       {showCompare && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
         }}>
           <div style={{
-            background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '90%', maxWidth: 900, maxHeight: '80vh',
+            background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '90%', maxWidth: 800, maxHeight: '80vh',
             overflow: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>AI 修改建议</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>AI 修改建议（红线对比）</span>
               <button className="btn btn-o btn-sm" onClick={handleReject}>关闭</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>原文</div>
-                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, fontFamily: 'inherit', margin: 0 }}>{selectedText}</pre>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>排版预设</label>
+              <select className="select" value={exportOpts.preset} onChange={e => setExportOpts({ ...exportOpts, preset: e.target.value })}>
+                <option value="standard">标准排版</option>
+                <option value="court_strict">法院严格格式（方正小标宋/仿宋_GB2312/28磅行距）</option>
+              </select>
+            </div>
+            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, maxHeight: 400, overflow: 'auto', lineHeight: 2, fontSize: 14 }}>
+              {aiLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
+                  <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25" /><path d="M12 2a10 10 0 0110 10" /></svg>
+                  AI 正在处理...
                 </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 8, fontWeight: 600 }}>AI 修改后</div>
-                <div style={{ background: '#f5f3ff', border: '1px solid var(--accent)', borderRadius: 8, padding: 16, maxHeight: 400, overflow: 'auto' }}>
-                  {aiLoading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
-                      <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25" /><path d="M12 2a10 10 0 0110 10" /></svg>
-                      AI 正在处理...
-                    </div>
-                  ) : (
-                    <div className="md"><ReactMarkdown>{aiResult}</ReactMarkdown></div>
-                  )}
+              ) : aiResult ? (
+                <div>
+                  {diffWords(selectedText, aiResult).map((op, i) => {
+                    if (op.type === 'equal') return <span key={i}>{op.text}</span>
+                    if (op.type === 'delete') return <span key={i} style={{color: '#ef4444', textDecoration: 'line-through', background: '#fef2f2', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
+                    return <span key={i} style={{color: '#059669', textDecoration: 'underline', background: '#ecfdf5', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
+                  })}
                 </div>
-              </div>
+              ) : null}
             </div>
             {aiResult && !aiLoading && (
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
                 <button className="btn btn-o" onClick={handleReject}>放弃修改</button>
                 <button className="btn btn-p" onClick={handleAccept}>采纳修改</button>
               </div>
+              
             )}
           </div>
         </div>

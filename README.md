@@ -2,21 +2,33 @@
 
 # ⚖️ LegalDocGen
 
-## Mermaid 界面预览
-
-```mermaid
-graph LR
-    subgraph 文书编辑器
-        A["📋 参考面板<br/>当事人 · 材料<br/>法律分析 · 争议焦点"] --- B["✏️ 编辑区<br/>Markdown 编辑<br/>AI 辅助工具栏"] --- C["👁️ 实时预览<br/>文书渲染效果"]
-    end
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style B fill:#fefce8,stroke:#eab308,color:#422006
-    style C fill:#dcfce7,stroke:#22c55e,color:#14532d
-```
-
 **AI 驱动的法律文书智能生成与审查系统**
 
 一套面向律师的全流程法律文书工作台——从案件材料解析、法律关系分析到文书生成、多模型审查，以「分阶段可控」为核心设计哲学。
+
+<!-- 🎬 录制 GIF 演示：上传 PDF → 一键生成 → 红线对比 → 导出 Word -->
+<!-- 推荐工具：https://www.cockos.com/licecap/ 或 macOS 自带录屏 -->
+
+```mermaid
+graph LR
+    subgraph 核心工作流
+        A["📂 上传材料<br/>PDF/Word/图片"] --> B["🪜 五阶段生成<br/>梳理→分析→归纳→起草→审查"]
+        B --> C["✏️ 红线对比<br/>类Word修订模式"]
+        C --> D["📄 导出Word<br/>法院标准排版"]
+    end
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    style C fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style D fill:#dcfce7,stroke:#22c55e,color:#14532d
+```
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+</div>
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -150,11 +162,12 @@ graph TB
 ### 📝 文书编辑器
 
 - 三栏布局：参考面板 · 编辑区 · 实时预览
-- AI 辅助编辑：选中文字后浮动工具栏（润色 / 补充法律依据 / 改写 / 精简 / 展开论述 / 自定义指令）
-- 左右对比面板：原文 vs AI 修改，一键采纳或放弃
+- AI 辅助编辑：选中文字后浮动工具栏（润色 / 补充法律依据 / 改写 / 精简 / 展开论述 / 对方律师挑刺 / 法官风险评估 / 自定义指令）
+- **红线对比**：类 Word 修订模式，红色删除线 + 绿色下划线，律师一目了然
+- 防幻觉警告：提醒用户核实 AI 引用的法条和案例
 - 撤销栈：Ctrl+Z 多级撤销
 - 模板保存/加载：复用常用文书格式
-- 导出 Word：可选字号、页边距，符合法院格式规范
+- 导出 Word：标准排版 / **法院标准排版**（方正小标宋 + 仿宋_GB2312 + 28磅行距）
 
 ### 📊 案件画像
 

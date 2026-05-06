@@ -99,7 +99,10 @@ class ChannelDispatcher:
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(url, headers=headers, json=body)
             if resp.status_code != 200:
-                raise ValueError(f"API调用失败 ({resp.status_code}): {resp.text[:300]}")
+                error_text = resp.text[:500]
+                if "context" in error_text.lower() and ("length" in error_text.lower() or "exceed" in error_text.lower()):
+                    raise ValueError("案件材料过长，超出了当前AI引擎的单次阅读上限。请尝试：1) 拆分材料分批上传；2) 在「助手配置」中更换支持长文本的模型")
+                raise ValueError(f"API调用失败 ({resp.status_code}): {error_text[:300]}")
             data = resp.json()
             return data["choices"][0]["message"]["content"]
 
@@ -118,6 +121,8 @@ class ChannelDispatcher:
                     text = ""
                     async for chunk in resp.aiter_text():
                         text += chunk
+                    if "context" in text.lower() and ("length" in text.lower() or "exceed" in text.lower()):
+                        raise ValueError("案件材料过长，超出了当前AI引擎的单次阅读上限。请尝试：1) 拆分材料分批上传；2) 在「助手配置」中更换支持长文本的模型")
                     raise ValueError(f"API调用失败 ({resp.status_code}): {text[:300]}")
                 buffer = ""
                 async for chunk in resp.aiter_text():

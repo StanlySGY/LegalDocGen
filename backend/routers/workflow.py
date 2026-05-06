@@ -347,11 +347,37 @@ async def quick_generate(case_id: str, req: QuickGenerateRequest, db: Session = 
     return StreamingResponse(run(), media_type="text/event-stream")
 
 
+class VerifyCitationRequest(BaseModel):
+    citation: str
+    provider: str = ""
+    model: str = ""
+
+
+@router.post("/verify-citation")
+async def verify_citation(req: VerifyCitationRequest):
+    prompt = f"""请核查以下法律条文引用是否准确、是否现行有效：
+
+"{req.citation}"
+
+请回答：
+1. 该法条是否存在？（是/否/不确定）
+2. 条文内容是否准确？（是/否/部分准确）
+3. 该法条是否已被修订或废止？
+4. 如有错误，请给出正确的引用。
+
+仅返回核查结果，不要添加额外解释。"""
+    try:
+        result = await dispatcher.generate(prompt, req.provider, req.model)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(500, f"核查失败: {e}")
+
 class ExportRequest(BaseModel):
     content: str = ""
     include_cover: bool = False
     font_size: int = 16
     margin: str = "standard"  # standard | narrow | wide
+    preset: str = "standard"  # standard | court_strict
     deanonymize: bool = True  # reverse anonymization on export when possible
 
 
@@ -364,6 +390,7 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
     import re
 
     content = req.content
+    court_preset = getattr(req, 'preset', 'standard') == 'court_strict'
 
     # Optional: deanonymize content using stored mappings before export
     if req.deanonymize:
@@ -397,7 +424,10 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
 
     # Page margins based on margin option
     margins = {"narrow": (2.0, 2.0, 2.0, 2.0), "wide": (4.0, 4.0, 3.5, 3.5)}
-    mt, mb, ml, mr = margins.get(req.margin, (3.7, 3.5, 2.8, 2.6))
+    if court_preset:
+        mt, mb, ml, mr = (3.7, 3.5, 2.8, 2.6)
+    else:
+        mt, mb, ml, mr = margins.get(req.margin, (3.7, 3.5, 2.8, 2.6))
     for section in doc.sections:
         section.top_margin = Cm(mt)
         section.bottom_margin = Cm(mb)
@@ -440,48 +470,69 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
         if line.startswith('# '):
             p = doc.add_paragraph()
             run = p.add_run(line[2:])
-            set_font(run, 'Times New Roman', '黑体', Pt(req.font_size + 6), bold=True)
+            if court_preset:
+                set_font(run, 'Times New Roman', '方正小标宋简体', Pt(22), bold=True)
+            else:
+                set_font(run, 'Times New Roman', '黑体', Pt(req.font_size + 6), bold=True)
             set_paragraph(p, alignment=WD_ALIGN_PARAGRAPH.CENTER, line_spacing=Pt(28), space_before=Pt(10), space_after=Pt(10))
 
         # H2: section title - 黑体, bold
         elif line.startswith('## '):
             p = doc.add_paragraph()
             run = p.add_run(line[3:])
-            set_font(run, 'Times New Roman', '黑体', fs, bold=True)
+            if court_preset:
+                set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            else:
+                set_font(run, 'Times New Roman', '黑体', fs, bold=True)
             set_paragraph(p, line_spacing=Pt(28), space_before=Pt(6), space_after=Pt(3))
 
         # H3: subsection - 楷体, bold
         elif line.startswith('### '):
             p = doc.add_paragraph()
             run = p.add_run(line[4:])
-            set_font(run, 'Times New Roman', '楷体_GB2312', fs, bold=True)
+            if court_preset:
+                set_font(run, 'Times New Roman', '楷体_GB2312', Pt(16), bold=True)
+            else:
+                set_font(run, 'Times New Roman', '楷体_GB2312', fs, bold=True)
             set_paragraph(p, line_spacing=Pt(28))
 
         # List items
         elif line.startswith('- ') or line.startswith('* '):
             p = doc.add_paragraph()
             run = p.add_run(line[2:])
-            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
+            if court_preset:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            else:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
         elif re.match(r'^\d+\.\s', line):
             p = doc.add_paragraph()
             run = p.add_run(re.sub(r'^\d+\.\s', '', line))
-            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
+            if court_preset:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            else:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
         # Bold line
         elif line.startswith('**') and line.endswith('**'):
             p = doc.add_paragraph()
             run = p.add_run(line[2:-2])
-            set_font(run, 'Times New Roman', '黑体', fs, bold=True)
+            if court_preset:
+                set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
+            else:
+                set_font(run, 'Times New Roman', '黑体', fs, bold=True)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
         # Normal text
         else:
             p = doc.add_paragraph()
             run = p.add_run(line)
-            set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
+            if court_preset:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
+            else:
+                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
             set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
 
     import io

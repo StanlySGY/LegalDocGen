@@ -68,7 +68,16 @@ export default function CaseDetail() {
     setQuickGenerating(true); setQuickProgress(0); setQuickStage('准备中...'); setQuickDone(false)
     try {
       for await (const event of api.workflow.quickGenerate(caseId, { document_type: selectedDocType })) {
-        if (event.error) { showToast(event.error, 'err'); setQuickGenerating(false); return }
+        if (event.error) { 
+          const friendlyMsg = event.error.includes('context') || event.error.includes('length') 
+            ? '案件材料过长，超出了当前 AI 引擎的单次阅读上限，请尝试拆分上传或更换长文本大模型'
+            : event.error.includes('401') || event.error.includes('403')
+            ? 'AI 助手认证失败，请检查服务密钥是否正确'
+            : event.error.includes('timeout')
+            ? 'AI 处理超时，请稍后重试或减少材料内容'
+            : `生成失败：${event.error}`
+          showToast(friendlyMsg, 'err'); setQuickGenerating(false); return
+        }
         if (event.status === 'running') { setQuickStage(event.name || STAGE_NAMES_LAWYER[event.stage] || event.stage); setQuickProgress(event.progress) }
         if (event.status === 'done') { setQuickProgress(event.progress) }
         if (event.done) { setQuickProgress(100); setQuickDone(true); showToast('文书生成完成') }

@@ -77,6 +77,8 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
+    verifyCitation: (data: { citation: string; provider?: string; model?: string }) =>
+      request<{ result: string }>('/workflow/verify-citation', { method: 'POST', body: JSON.stringify(data) }),
     reviewChain: (caseId: string, data: any) => streamSSE(`/workflow/review-chain/${caseId}`, data),
     multiCompare: (caseId: string, data: any) => streamSSE(`/workflow/multi-compare/${caseId}`, data),
     reviewSelect: (caseId: string, data: any) =>

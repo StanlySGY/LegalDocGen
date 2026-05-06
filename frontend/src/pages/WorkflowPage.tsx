@@ -195,9 +195,9 @@ export default function WorkflowPage() {
             <div style={{marginTop:12,marginBottom:12}}>
               <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6,fontWeight:600}}>审查模式</div>
               <div className="flex gap-2">
-                {(['single','chain','compare'] as ReviewMode[]).map(m => (
+              {(['single','chain','compare'] as ReviewMode[]).map(m => (
                   <button key={m} className={`btn btn-sm ${reviewMode===m?'btn-p':'btn-o'}`} onClick={()=>setReviewMode(m)}>
-                    {m==='single'?'单模型':m==='chain'?'链式审查':'多版本对比'}
+                    {m==='single'?'独立生成':m==='chain'?'AI 交叉验证':'多版本对比'}
                   </button>
                 ))}
               </div>
@@ -319,16 +319,27 @@ export default function WorkflowPage() {
               <div className="md"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
               <span className="cursor-blink"/>
             </div>
-          ) : output ? (
-            <div style={{height:500,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
-              <div className="md"><ReactMarkdown>{output}</ReactMarkdown></div>
-            </div>
           ) : (
-            <div className="empty" style={{height:500}}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{width:48,height:48}}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-              <p>点击「开始生成」获取结果</p>
-            </div>
-          )}
+            // Anti-hallucination banner and output rendering
+            <>
+              {output && !generating && (
+                <div style={{background:'#fef3c7',border:'1px solid #fbbf24',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#92400e',display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:16}}>⚠️</span>
+                  <span>AI 可能编造不存在的法条和案例，提交法庭前请务必核实所有引用项</span>
+                </div>
+              )}
+              {output ? (
+                <div style={{height:500,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
+                  <div className="md"><ReactMarkdown>{output}</ReactMarkdown></div>
+                </div>
+              ) : (
+                <div className="empty" style={{height:500}}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{width:48,height:48}}><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <p>点击「开始生成」获取结果</p>
+                </div>
+              )}
+            </>
+            )}
         </div>
       </div>
 
