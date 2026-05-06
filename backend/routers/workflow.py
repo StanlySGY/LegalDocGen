@@ -372,6 +372,61 @@ async def verify_citation(req: VerifyCitationRequest):
     except Exception as e:
         raise HTTPException(500, f"核查失败: {e}")
 
+
+class ExtractEvidenceRequest(BaseModel):
+    provider: str = ""
+    model: str = ""
+
+
+@router.post("/extract-evidence/{case_id}")
+async def extract_evidence(case_id: str, req: ExtractEvidenceRequest, db: Session = Depends(get_db)):
+    engine = WorkflowEngine(db)
+    context = engine.get_case_context(case_id)
+    materials_text = context.get("materials", "")
+
+    if not materials_text.strip():
+        raise HTTPException(400, "无案件材料可供分析")
+
+    dispute_node = engine.get_stage_node(case_id, StageType.DISPUTE_FOCUS)
+    dispute_text = dispute_node.output if dispute_node else ""
+
+    prompt = f"""你是一名资深诉讼律师，请从以下案件材料中逐项识别所有可用证据。
+
+对每份证据，请分析：
+1. 证据名称（简明扼要）
+2. 证据类型：合同/票据/电子数据/视听资料/证人证言/鉴定意见/公证书/其他
+3. 证据形式：原件/复印件/电子数据
+4. 证明目的：这份证据能证明什么事实？结合争议焦点分析其法律价值
+5. 证明力评估：强/中/弱
+
+请以JSON数组格式返回，每个证据包含：
+- name: 证据名称
+- type: 证据类型
+- form: 证据形式（原件/复印件/电子数据）
+- purpose: 证明目的（详细说明）
+- strength: 证明力（强/中/弱）
+- source: 来源于哪份材料
+
+只返回JSON数组，不要其他内容。
+
+案件材料：
+{materials_text}
+
+{"争议焦点：" + dispute_text if dispute_text else ""}"""
+
+    try:
+        result = await dispatcher.generate(prompt, req.provider, req.model)
+        text = result.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        import json as _json
+        evidence_list = _json.loads(text)
+        return {"evidence": evidence_list, "count": len(evidence_list)}
+    except _json.JSONDecodeError:
+        return {"evidence": [], "raw": result, "count": 0}
+    except Exception as e:
+        raise HTTPException(500, f"提取失败: {e}")
+
 class ExportRequest(BaseModel):
     content: str = ""
     include_cover: bool = False
@@ -543,4 +598,84 @@ def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db))
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f"attachment; filename=document.docx"},
+    )
+
+
+class EvidenceCoverRequest(BaseModel):
+    case_name: str = ""
+    submitter: str = ""
+    case_number: str = ""
+    court: str = ""
+
+
+@router.post("/export-evidence-cover/{case_id}")
+def export_evidence_cover(case_id: str, req: EvidenceCoverRequest, db: Session = Depends(get_db)):
+    from docx import Document
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from backend.models.case import Case
+    from backend.models.party import Party
+
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(404, "案件不存在")
+
+    case_name = req.case_name or case.name
+    case_number = req.case_number or case.case_number or "（    ）"
+    court = req.court or case.court or "______人民法院"
+
+    parties = db.query(Party).filter(Party.case_id == case_id).all()
+    submitter = req.submitter
+    if not submitter:
+        plaintiff = next((p for p in parties if "原告" in p.role or "申请人" in p.role), None)
+        submitter = plaintiff.name if plaintiff else "______"
+
+    doc = Document()
+    for section in doc.sections:
+        section.top_margin = Cm(3.7)
+        section.bottom_margin = Cm(3.5)
+        section.left_margin = Cm(2.8)
+        section.right_margin = Cm(2.6)
+
+    def add_line(text, font_name='仿宋_GB2312', size=Pt(16), bold=False, align=None, spacing=Pt(28)):
+        p = doc.add_paragraph()
+        run = p.add_run(text)
+        run.font.name = 'Times New Roman'
+        run.font.size = size
+        run.bold = bold
+        run._element.rPr.rFonts.set(qn('w:eastAsia'), font_name)
+        pf = p.paragraph_format
+        pf.line_spacing = spacing
+        if align:
+            p.alignment = align
+        return p
+
+    for _ in range(4):
+        add_line('', size=Pt(16))
+
+    add_line('证 据 目 录', font_name='方正小标宋简体', size=Pt(22), bold=True,
+             align=WD_ALIGN_PARAGRAPH.CENTER, spacing=Pt(28))
+
+    add_line('', size=Pt(16))
+
+    add_line(f'案　　件：{case_name}', font_name='仿宋_GB2312', size=Pt(16))
+    add_line(f'案　　号：{case_number}', font_name='仿宋_GB2312', size=Pt(16))
+    add_line(f'提 交 人：{submitter}', font_name='仿宋_GB2312', size=Pt(16))
+    add_line(f'管辖法院：{court}', font_name='仿宋_GB2312', size=Pt(16))
+
+    for _ in range(6):
+        add_line('', size=Pt(16))
+
+    add_line('（证据目录附后）', font_name='仿宋_GB2312', size=Pt(16),
+             align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    import io
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename=evidence_cover.docx"},
     )

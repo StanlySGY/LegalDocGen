@@ -77,8 +77,6 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
-    verifyCitation: (data: { citation: string; provider?: string; model?: string }) =>
-      request<{ result: string }>('/workflow/verify-citation', { method: 'POST', body: JSON.stringify(data) }),
     reviewChain: (caseId: string, data: any) => streamSSE(`/workflow/review-chain/${caseId}`, data),
     multiCompare: (caseId: string, data: any) => streamSSE(`/workflow/multi-compare/${caseId}`, data),
     reviewSelect: (caseId: string, data: any) =>
@@ -86,6 +84,19 @@ export const api = {
     aiEdit: (data: { text: string; instruction?: string; provider?: string; model?: string }) =>
       request<{ result: string }>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
     quickGenerate: (caseId: string, data: any) => streamSSE(`/workflow/quick-generate/${caseId}`, data),
+    verifyCitation: (data: { citation: string; provider?: string; model?: string }) =>
+      request<{ result: string }>('/workflow/verify-citation', { method: 'POST', body: JSON.stringify(data) }),
+    extractEvidence: (caseId: string, data?: { provider?: string; model?: string }) =>
+      request<{ evidence: any[]; count: number }>(`/workflow/extract-evidence/${caseId}`, { method: 'POST', body: JSON.stringify(data || {}) }),
+    exportEvidenceCover: async (caseId: string, data?: { case_name?: string; submitter?: string; case_number?: string; court?: string }) => {
+      const res = await fetch(`${BASE}/workflow/export-evidence-cover/${caseId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data || {}),
+      })
+      if (!res.ok) throw new Error('导出失败')
+      return res.blob()
+    },
   },
   config: {
     getModels: () => request<any>('/config/models'),
