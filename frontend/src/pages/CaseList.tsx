@@ -26,12 +26,20 @@ export default function CaseList() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterType, setFilterType] = useState('')
 
+  // Debounced search to minimize API calls
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
   // Batch state
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = () => api.cases.list({status:filterStatus, search, case_type:filterType}).then(setCases)
-  useEffect(() => { load() }, [search, filterStatus, filterType])
+  const load = () => api.cases.list({status:filterStatus, search:debouncedSearch, case_type:filterType}).then(setCases)
+  useEffect(() => { load() }, [debouncedSearch, filterStatus, filterType])
+  // Debounce the search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   const create = async () => {
     if (!form.name.trim()) { showToast('请填写案件名称','err'); return }

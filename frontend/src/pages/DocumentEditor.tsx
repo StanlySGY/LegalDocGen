@@ -98,7 +98,7 @@ export default function DocumentEditor() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  })
+  }, [content, original, showCompare, undo])
 
   const handleSelectionChange = useCallback(() => {
     const ta = textareaRef.current

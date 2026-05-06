@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+function escapeHtml(text: string): string {
+  return text.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Case, Material, DocumentTypeOption, Party, StageProgress } from '../types'
@@ -388,9 +391,9 @@ export default function CaseDetail() {
                   let html = `<style>body{font-family:sans-serif;padding:20px;max-width:720px}h2{color:#4e5969;border-bottom:1px solid #e5e7eb;padding-bottom:6px}pre{white-space:pre-wrap;font-size:13px}</style>`
                   const sd = m.structured_data ? (() => { try { return JSON.parse(m.structured_data) } catch { return null } })() : null
                   if (sd && (sd.parties || sd.case_facts || sd.timeline || sd.evidence)) {
-                    html += `<h2>当事人信息</h2><pre>${sd.parties||'无'}</pre><h2>关键事实</h2><pre>${sd.case_facts||'无'}</pre><h2>时间线</h2><pre>${sd.timeline||'无'}</pre><h2>证据清单</h2><pre>${sd.evidence||'无'}</pre>`
+                    html += `<h2>当事人信息</h2><pre>${escapeHtml(String(sd.parties ?? '无'))}</pre><h2>关键事实</h2><pre>${escapeHtml(String(sd.case_facts ?? '无'))}</pre><h2>时间线</h2><pre>${escapeHtml(String(sd.timeline ?? '无'))}</pre><h2>证据清单</h2><pre>${escapeHtml(String(sd.evidence ?? '无'))}</pre>`
                   } else {
-                    html += `<pre style="padding:20px;font-size:13px;white-space:pre-wrap">${m.parsed_content||'暂无内容'}</pre>`
+                    html += `<pre style="padding:20px;font-size:13px;white-space:pre-wrap">${escapeHtml(String(m.parsed_content ?? '暂无内容'))}</pre>`
                   }
                   w.document.write(html)
                 }}>查看</button>

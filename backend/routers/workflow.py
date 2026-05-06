@@ -24,6 +24,41 @@ class GenerateRequest(BaseModel):
     template_id: str = ""
     document_type: str = ""
 
+def _prepare_generation(case_id: str, req: GenerateRequest, db: Session):
+    """Common preparation for generation endpoints.
+    Returns (engine, pm, stage, final_prompt).
+    Validates lock status and builds the final prompt with materials/previous context.
+    """
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+    stage = StageType(req.stage)
+
+    progress = engine.get_stage_progress(case_id)
+    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
+    if stage_info and stage_info.get("locked"):
+        raise HTTPException(400, stage_info.get("locked_reason"))
+
+    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
+    materials_context = engine.get_case_context(case_id)
+    previous_context = engine.get_previous_stages_output(case_id, stage)
+
+    final_prompt = prompt_template.format(
+        materials=materials_context["materials"],
+        previous_context=previous_context,
+    )
+    return engine, pm, stage, final_prompt
+
+
+def _structure_and_save(case_id: str, stage: StageType, output: str, db: Session):
+    """Structure extracted facts and save into Materials if needed."""
+    if stage == StageType.FACT_EXTRACTION:
+        from backend.services.structurer.structurer import structure_facts
+        structured = structure_facts(output)
+        for m in db.query(Material).filter(Material.case_id == case_id).all():
+            m.structured_data = json.dumps(structured, ensure_ascii=False)
+        db.commit()
+
+
 
 class RollbackRequest(BaseModel):
     node_id: str
@@ -55,62 +90,25 @@ def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 @router.post("/generate/{case_id}")
 async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
-    engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    stage = StageType(req.stage)
-
-    progress = engine.get_stage_progress(case_id)
-    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
-    if stage_info and stage_info["locked"]:
-        raise HTTPException(400, stage_info["locked_reason"])
-
-    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
-    materials_context = engine.get_case_context(case_id)
-    previous_context = engine.get_previous_stages_output(case_id, stage)
-
-    final_prompt = prompt_template.format(
-        materials=materials_context["materials"],
-        previous_context=previous_context,
-    )
+    engine, pm, stage, final_prompt = _prepare_generation(case_id, req, db)
     try:
         output = await dispatcher.generate(final_prompt, req.provider, req.model)
     except Exception as e:
         raise HTTPException(500, f"生成失败: {e}")
 
     node = engine.create_or_update_node(
-        case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
+        case_id=case_id, stage=stage, prompt=req.prompt or final_prompt,
         output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
     )
 
-    if stage == StageType.FACT_EXTRACTION:
-        from backend.services.structurer.structurer import structure_facts
-        structured = structure_facts(output)
-        for m in db.query(Material).filter(Material.case_id == case_id).all():
-            m.structured_data = json.dumps(structured, ensure_ascii=False)
-        db.commit()
+    _structure_and_save(case_id, stage, output, db)
 
     return {"node_id": node.id, "output": output, "version": node.version}
 
 
 @router.post("/generate-stream/{case_id}")
 async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
-    engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    stage = StageType(req.stage)
-
-    progress = engine.get_stage_progress(case_id)
-    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
-    if stage_info and stage_info["locked"]:
-        raise HTTPException(400, stage_info["locked_reason"])
-
-    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
-    materials_context = engine.get_case_context(case_id)
-    previous_context = engine.get_previous_stages_output(case_id, stage)
-
-    final_prompt = prompt_template.format(
-        materials=materials_context["materials"],
-        previous_context=previous_context,
-    )
+    engine, pm, stage, final_prompt = _prepare_generation(case_id, req, db)
     async def stream_generator():
         try:
             full_output = []
@@ -119,15 +117,10 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
             output = "".join(full_output)
             engine.create_or_update_node(
-                case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
+                case_id=case_id, stage=stage, prompt=req.prompt or final_prompt,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
             )
-            if stage == StageType.FACT_EXTRACTION:
-                from backend.services.structurer.structurer import structure_facts
-                structured = structure_facts(output)
-                for m in db.query(Material).filter(Material.case_id == case_id).all():
-                    m.structured_data = json.dumps(structured, ensure_ascii=False)
-                db.commit()
+            _structure_and_save(case_id, stage, output, db)
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -344,12 +337,8 @@ async def quick_generate(case_id: str, req: QuickGenerateRequest, db: Session = 
                 case_id=case_id, stage=stage, prompt=prompt_template,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "auto",
             )
-            if stage == StageType.FACT_EXTRACTION:
-                from backend.services.structurer.structurer import structure_facts
-                structured = structure_facts(output)
-                for m in db.query(Material).filter(Material.case_id == case_id).all():
-                    m.structured_data = json.dumps(structured, ensure_ascii=False)
-                db.commit()
+            # Common post-processing for FACT_EXTRACTION
+            _structure_and_save(case_id, stage, output, db)
             yield f"data: {json.dumps({'stage': stage.value, 'name': STAGE_NAMES[stage], 'status': 'done', 'progress': int((i + 1) / total * 100)}, ensure_ascii=False)}\n\n"
         final_node = engine.get_stage_node(case_id, StageType.REVIEW_OPTIMIZATION)
         final_output = final_node.output if final_node else ""
@@ -363,7 +352,6 @@ class ExportRequest(BaseModel):
     include_cover: bool = False
     font_size: int = 16
     margin: str = "standard"  # standard | narrow | wide
-    content: str = ""
 
 
 @router.post("/export/{case_id}")
