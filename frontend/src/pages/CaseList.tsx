@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
-import type { Case } from '../types'
+import type { Case, DocumentTypeOption } from '../types'
+import { STAGE_NAMES_LAWYER } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 const CASE_TYPES = ['合同纠纷', '劳动争议', '婚姻家庭', '侵权责任', '知识产权', '公司事务', '房产纠纷', '债权债务', '刑事辩护', '行政纠纷', '其他']
@@ -31,15 +32,43 @@ export default function CaseList() {
 
   // Batch state
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showQuick, setShowQuick] = useState(false)
+  const [quickText, setQuickText] = useState('')
+  const [quickDocType, setQuickDocType] = useState('')
+  const [docTypes, setDocTypes] = useState<DocumentTypeOption[]>([])
+  const [quickGenerating, setQuickGenerating] = useState(false)
+  const [quickProgress, setQuickProgress] = useState(0)
+  const [quickStage, setQuickStage] = useState('')
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = () => api.cases.list({status:filterStatus, search:debouncedSearch, case_type:filterType}).then(setCases)
   useEffect(() => { load() }, [debouncedSearch, filterStatus, filterType])
-  // Debounce the search input
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(t)
   }, [search])
+  useEffect(() => { api.config.getDocumentTypes().then(d => { setDocTypes(d.types); if(d.types.length) setQuickDocType(d.types[0].key) }) }, [])
+
+  const handleQuickGenerate = async () => {
+    if (!quickText.trim()) { showToast('请粘贴案情描述', 'err'); return }
+    if (!quickDocType) { showToast('请选择文书类型', 'err'); return }
+    setQuickGenerating(true); setQuickProgress(0); setQuickStage('创建案件...')
+    try {
+      const c = await api.cases.create({ name: quickText.slice(0, 30).replace(/\n/g, ' ') || '极速生成案件', description: quickText })
+      setQuickStage('上传材料...')
+      const blob = new Blob([quickText], { type: 'text/plain' })
+      const file = new File([blob], '案情描述.txt', { type: 'text/plain' })
+      await api.materials.upload(c.id, file)
+      setQuickStage('开始生成文书...')
+      for await (const event of api.workflow.quickGenerate(c.id, { document_type: quickDocType })) {
+        if (event.error) { showToast(event.error, 'err'); setQuickGenerating(false); return }
+        if (event.status === 'running') { setQuickStage(event.name || STAGE_NAMES_LAWYER[event.stage] || event.stage); setQuickProgress(event.progress) }
+        if (event.status === 'done') { setQuickProgress(event.progress) }
+        if (event.done) { setQuickProgress(100); showToast('文书生成完成'); setShowQuick(false); navigate(`/cases/${c.id}`) }
+      }
+    } catch (e: any) { showToast(e.message || '生成失败', 'err') }
+    setQuickGenerating(false)
+  }
 
   const create = async () => {
     if (!form.name.trim()) { showToast('请填写案件名称','err'); return }
@@ -72,10 +101,15 @@ export default function CaseList() {
           <h2 style={{fontSize:20,fontWeight:700,color:'var(--text-primary)'}}>案件管理</h2>
           <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:4}}>管理和组织您的法律案件</p>
         </div>
-        <button className="btn btn-p" onClick={() => setShowCreate(true)}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          新建案件
-        </button>
+        <div className="flex gap-2">
+          <button className="btn btn-o" onClick={() => setShowQuick(true)}>
+            ⚡ 极速生成
+          </button>
+          <button className="btn btn-p" onClick={() => setShowCreate(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新建案件
+          </button>
+        </div>
       </div>
 
       <div className="stat-row">
@@ -127,6 +161,45 @@ export default function CaseList() {
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
                 <button className="btn btn-o" onClick={()=>setShowCreate(false)}>取消</button>
                 <button className="btn btn-p" onClick={create}>创建</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQuick && (
+        <div className="modal-mask" onClick={() => !quickGenerating && setShowQuick(false)}>
+          <div className="modal-box" style={{maxWidth:600}} onClick={e => e.stopPropagation()}>
+            <h3>⚡ 极速生成文书</h3>
+            <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:-12,marginBottom:16}}>粘贴案情描述，选择文书类型，一键生成</p>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div>
+                <label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>案情描述 *</label>
+                <textarea className="textarea" style={{height:160}} placeholder="粘贴案件材料、案情经过、当事人信息等..." value={quickText} onChange={e => setQuickText(e.target.value)} disabled={quickGenerating} />
+              </div>
+              <div>
+                <label style={{fontSize:12,color:'var(--text-secondary)',marginBottom:4,display:'block'}}>文书类型 *</label>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:6}}>
+                  {docTypes.map(dt => (
+                    <div key={dt.key} className={`doc-type-card ${quickDocType === dt.key ? 'selected' : ''}`} onClick={() => !quickGenerating && setQuickDocType(dt.key)} style={{padding:'8px 10px',fontSize:12}}>
+                      {dt.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {quickGenerating && (
+                <div>
+                  <div style={{fontSize:12,color:'var(--accent)',marginBottom:4}}>{quickStage}</div>
+                  <div style={{height:6,background:'var(--border)',borderRadius:3,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${quickProgress}%`,background:'linear-gradient(90deg,#6366f1,#a78bfa)',borderRadius:3,transition:'width 0.3s'}} />
+                  </div>
+                </div>
+              )}
+              <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
+                <button className="btn btn-o" onClick={() => setShowQuick(false)} disabled={quickGenerating}>取消</button>
+                <button className="btn btn-p" onClick={handleQuickGenerate} disabled={quickGenerating || !quickText.trim() || !quickDocType}>
+                  {quickGenerating ? '生成中...' : '开始生成'}
+                </button>
               </div>
             </div>
           </div>

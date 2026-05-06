@@ -124,7 +124,7 @@ export default function ChannelManage() {
         <div className="flex items-center justify-between mb-6">
         <div>
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>助手配置</h2>
-          <p style={{ fontSize: 13, color: '#86909c', marginTop: 4 }}>管理AI助手，自动发现可用模型</p>
+          <p style={{ fontSize: 13, color: '#86909c', marginTop: 4 }}>管理AI助手，自动发现可用AI助手</p>
         </div>
         <button className="btn btn-p" onClick={openAdd}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -140,7 +140,7 @@ export default function ChannelManage() {
                   <th>类型</th>
                   <th>服务地址</th>
                   <th>状态</th>
-                  <th>可用模型</th>
+                  <th>可用AI助手</th>
                   <th>优先级</th>
                   <th style={{ textAlign: 'right' }}>操作</th>
                 </tr>
@@ -188,11 +188,11 @@ export default function ChannelManage() {
         {showDrawer && (
         <div className="modal-mask" onClick={() => setShowDrawer(false)}>
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <h3>{editingChannel ? '编辑渠道' : '添加渠道'}</h3>
+            <h3>{editingChannel ? '编辑助手' : '添加助手'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手名称 *</label>
-                <input className="input" placeholder="如：OpenAI主渠道" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                <input className="input" placeholder="如：OpenAI主助手" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手类型</label>
@@ -207,7 +207,7 @@ export default function ChannelManage() {
                 <input className="input" placeholder="https://api.openai.com/v1" value={form.base_url} onChange={e => setForm({ ...form, base_url: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>API Key {editingChannel ? '(留空不修改)' : ''}</label>
+                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>服务密钥 {editingChannel ? '(留空不修改)' : ''} <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" style={{color:'#6366f1',fontSize:11}}>如何获取？</a></label>
                 <input type="password" className="input" placeholder="sk-..." value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} />
               </div>
               <div>
@@ -227,16 +227,16 @@ export default function ChannelManage() {
         <div className="modal-mask" onClick={() => setShowModelsDialog(null)}>
           <div className="modal-box" style={{ maxWidth: 640, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0 }}>可用模型</h3>
+              <h3 style={{ margin: 0 }}>可用AI助手</h3>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-o btn-sm" onClick={selectAll}>全选</button>
                 <button className="btn btn-o btn-sm" onClick={deselectAll}>全不选</button>
               </div>
             </div>
             {loading === 'fetch' ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>正在获取模型列表...</div>
+              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>正在获取AI助手列表...</div>
             ) : discoveredModels.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>未发现模型，请检查URL和Key</div>
+              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>未发现AI助手，请检查URL和Key</div>
             ) : (
               <div style={{ maxHeight: 400, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                 {discoveredModels.map(m => (
@@ -254,13 +254,13 @@ export default function ChannelManage() {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12 }}>
               <button className="btn btn-o" onClick={() => setShowModelsDialog(null)}>取消</button>
-              <button className="btn btn-p" onClick={saveModels} disabled={selectedModels.length === 0}>保存所选模型</button>
+              <button className="btn btn-p" onClick={saveModels} disabled={selectedModels.length === 0}>保存所选AI助手</button>
             </div>
           </div>
         </div>
       )}
 
-      {confirmDelete && <ConfirmDialog message="确定删除该渠道？" onConfirm={() => deleteChannel(confirmDelete)} onCancel={() => setConfirmDelete(null)} />}
+      {confirmDelete && <ConfirmDialog message="确定删除该AI助手？" onConfirm={() => deleteChannel(confirmDelete)} onCancel={() => setConfirmDelete(null)} />}
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>
   )
