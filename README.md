@@ -48,28 +48,84 @@ LegalDocGen 的核心设计原则：
 
 ### 🪜 五阶段工作流
 
-```
-┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐
-│  案件梳理  │──▶│  法律分析  │──▶│  争议归纳  │──▶│  文书生成  │──▶│  审查优化  │
-│            │   │            │   │            │   │            │   │            │
-│ · 当事人   │   │ · 法律关系 │   │ · 核心焦点 │   │ · 起诉状   │   │ · 形式审查 │
-│ · 事实经过 │   │ · 适用法律 │   │ · 各方主张 │   │ · 答辩状   │   │ · 实体审查 │
-│ · 时间线   │   │ · 风险评估 │   │ · 胜诉评估 │   │ · 代理词   │   │ · 链式审查 │
-│ · 证据清单 │   │ · 有利/不利│   │            │   │ · 律师函   │   │ · 多版本对比│
-└────────────┘   └────────────┘   └────────────┘   └────────────┘   └────────────┘
-     ✏️ 可编辑        ✏️ 可编辑        ✏️ 可编辑        ✏️ 可编辑        ✏️ 可编辑
-     🔄 可重生成      🔄 可重生成      🔄 可重生成      🔄 可重生成      🔄 可重生成
-     📜 版本历史      📜 版本历史      📜 版本历史      📜 版本历史      📜 版本历史
+```mermaid
+graph LR
+    A["📋 案件梳理"] --> B["⚖️ 法律分析"]
+    B --> C["🎯 争议归纳"]
+    C --> D["📝 文书生成"]
+    D --> E["🔍 审查优化"]
+
+    A -.- A1["当事人 · 事实经过\n时间线 · 证据清单"]
+    B -.- B1["法律关系 · 适用法律\n风险评估 · 有利/不利"]
+    C -.- C1["核心焦点 · 各方主张\n胜诉评估"]
+    D -.- D1["起诉状 · 答辩状\n代理词 · 律师函"]
+    E -.- E1["形式审查 · 实体审查\n链式审查 · 多版本对比"]
+
+    style A fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b
+    style B fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b
+    style C fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b
+    style D fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b
+    style E fill:#eef2ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b
+    style A1 fill:#f8fafc,stroke:#cbd5e1,color:#475569
+    style B1 fill:#f8fafc,stroke:#cbd5e1,color:#475569
+    style C1 fill:#f8fafc,stroke:#cbd5e1,color:#475569
+    style D1 fill:#f8fafc,stroke:#cbd5e1,color:#475569
+    style E1 fill:#f8fafc,stroke:#cbd5e1,color:#475569
 ```
 
-**每阶段均支持：**
-- ✏️ 编辑 Prompt 模板后重新生成
-- 📝 直接编辑输出内容
-- 📜 查看历史版本并回滚
-- ⚡ 流式输出（SSE）
-- 🔒 阶段锁定（前置未完成则不可跳步）
+```mermaid
+graph LR
+    subgraph 每阶段能力
+        direction LR
+        E["✏️ 编辑 Prompt"] --> R["🔄 重新生成"]
+        R --> V["📜 版本回滚"]
+        V --> S["⚡ 流式输出"]
+        S --> L["🔒 阶段锁定"]
+    end
+
+    style E fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style R fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style V fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style S fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style L fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+```
 
 ### 🤖 多模型审查
+
+```mermaid
+graph TB
+    subgraph 单模型
+        A1["Prompt"] --> A2["模型 A"] --> A3["输出"]
+    end
+
+    subgraph 链式审查
+        B1["Prompt"] --> B2["模型 A<br/>生成初稿"]
+        B2 --> B3["模型 B<br/>审查问题"]
+        B3 --> B4["模型 C<br/>优化定稿"]
+    end
+
+    subgraph 多版本对比
+        C1["Prompt"] --> C2["模型 A"]
+        C1 --> C3["模型 B"]
+        C1 --> C4["模型 C"]
+        C2 --> C5["对比面板<br/>择优采纳"]
+        C3 --> C5
+        C4 --> C5
+    end
+
+    style A1 fill:#f8fafc,stroke:#94a3b8,color:#475569
+    style A2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style A3 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style B1 fill:#f8fafc,stroke:#94a3b8,color:#475569
+    style B2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B3 fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style B4 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style C1 fill:#f8fafc,stroke:#94a3b8,color:#475569
+    style C2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C3 fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style C4 fill:#ede9fe,stroke:#8b5cf6,color:#4c1d95
+    style C5 fill:#dcfce7,stroke:#22c55e,color:#14532d
+```
 
 | 模式 | 说明 |
 |------|------|
@@ -104,44 +160,82 @@ LegalDocGen 的核心设计原则：
 
 ## 系统架构
 
+```mermaid
+graph TB
+    subgraph Frontend["🖥️ 前端 · React 18 + TypeScript + Tailwind CSS"]
+        direction LR
+        P1["📂 案件管理"] --- P2["🪜 工作流"]
+        P3["📝 文书编辑"] --- P4["🌐 渠道管理"]
+        P5["👥 当事人"] --- P6["📋 Prompt 模板"]
+    end
+
+    subgraph Backend["⚙️ 后端 · FastAPI + Uvicorn"]
+        direction LR
+        S1["🔄 工作流引擎<br/>阶段编排 · 版本管理 · 锁定控制"]
+        S2["🤖 模型调度器<br/>多渠道路由 · 流式输出 · 连接池"]
+        S3["📄 文件解析器<br/>PDF · Word · OCR"]
+        S4["🔍 审查编排器<br/>链式审查 · 多版本对比"]
+        S5["📝 Prompt 管理<br/>模板 CRUD · 文书类型"]
+        S6["🏗️ 结构化器<br/>要素提取 · 时间线解析"]
+    end
+
+    subgraph Database["💾 数据层 · SQLAlchemy + SQLite / PostgreSQL"]
+        direction LR
+        DB[("数据库")]
+        T1["cases"] --> DB
+        T2["materials"] --> DB
+        T3["workflow_nodes"] --> DB
+        T4["channels"] --> DB
+        T5["parties"] --> DB
+        T6["review_results"] --> DB
+    end
+
+    Frontend -->|"REST API + SSE 流式"| Backend
+    Backend --> Database
+
+    style Frontend fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a5f
+    style Backend fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#14532d
+    style Database fill:#fefce8,stroke:#eab308,stroke-width:2px,color:#422006
+    style P1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style P2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style P3 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style P4 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style P5 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style P6 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style S1 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S2 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S3 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S4 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S5 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style S6 fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style DB fill:#fef9c3,stroke:#eab308,color:#422006
+    style T1 fill:#fef9c3,stroke:#eab308,color:#422006
+    style T2 fill:#fef9c3,stroke:#eab308,color:#422006
+    style T3 fill:#fef9c3,stroke:#eab308,color:#422006
+    style T4 fill:#fef9c3,stroke:#eab308,color:#422006
+    style T5 fill:#fef9c3,stroke:#eab308,color:#422006
+    style T6 fill:#fef9c3,stroke:#eab308,color:#422006
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        React 18 + TypeScript + Tailwind CSS         │
-│                                                                     │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│   │ 案件管理 │  │ 材料上传 │  │ 工作流   │  │ 文书编辑 │          │
-│   └──────────┘  └──────────┘  └──────────┘  └──────────┘          │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐                         │
-│   │ 渠道管理 │  │ Prompt   │  │ 当事人   │                         │
-│   │          │  │ 模板管理 │  │ 管理     │                         │
-│   └──────────┘  └──────────┘  └──────────┘                         │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │ REST API + SSE (流式)
-┌───────────────────────────────┴─────────────────────────────────────┐
-│                           FastAPI + Uvicorn                         │
-│                                                                     │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
-│   │  工作流引擎  │  │  模型调度器  │  │  文件解析器  │             │
-│   │              │  │              │  │              │             │
-│   │ · 阶段编排   │  │ · 多渠道路由 │  │ · PDF 解析   │             │
-│   │ · 版本管理   │  │ · 流式输出   │  │ · Word 解析  │             │
-│   │ · 锁定控制   │  │ · 连接池     │  │ · OCR 识别   │             │
-│   └──────────────┘  └──────────────┘  └──────────────┘             │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
-│   │  Prompt 管理 │  │  审查编排器  │  │  结构化器   │             │
-│   │              │  │              │  │              │             │
-│   │ · 模板 CRUD  │  │ · 链式审查   │  │ · 要素提取   │             │
-│   │ · 文书类型   │  │ · 多版本对比 │  │ · 时间线解析 │             │
-│   └──────────────┘  └──────────────┘  └──────────────┘             │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │
-┌───────────────────────────────┴─────────────────────────────────────┐
-│                    SQLAlchemy ORM + SQLite / PostgreSQL              │
-│                                                                     │
-│   cases ──┬── materials    workflow_nodes    parties                 │
-│           ├── channels     prompt_templates  review_results          │
-│           └── templates                                             │
-└─────────────────────────────────────────────────────────────────────┘
+
+```mermaid
+graph LR
+    subgraph 数据流
+        direction LR
+        A["📂 上传材料"] -->|"PDF/Word/图片"| B["📄 解析提取"]
+        B -->|"结构化文本"| C["🪜 工作流引擎"]
+        C -->|"Prompt + 上下文"| D["🤖 模型调用"]
+        D -->|"流式输出"| E["📝 人工审核"]
+        E -->|"确认/修改"| F["💾 保存版本"]
+        F -->|"导出"| G["📄 Word 文档"]
+    end
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    style D fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    style E fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style F fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style G fill:#dcfce7,stroke:#22c55e,color:#14532d
 ```
 
 ---
