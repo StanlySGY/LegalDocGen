@@ -16,5 +16,5 @@ def get_db():
 
 
 def init_db():
-    from backend.models import case, material, workflow, prompt, channel, review, party, template  # noqa
+    from backend.models import case, material, workflow, prompt, channel, review, party, template, reference_doc  # noqa
     Base.metadata.create_all(bind=engine)

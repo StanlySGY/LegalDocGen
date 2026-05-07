@@ -135,4 +135,18 @@ export const api = {
     get: (id: string) => request<any>(`/templates/${id}`),
     delete: (id: string) => request<any>(`/templates/${id}`, { method: 'DELETE' }),
   },
+  referenceDocs: {
+    list: () => request<any[]>('/reference-docs'),
+    create: (data: { name: string; doc_type: string; content: string }) =>
+      request<any>('/reference-docs', { method: 'POST', body: JSON.stringify(data) }),
+    get: (id: string) => request<any>(`/reference-docs/${id}`),
+    upload: async (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`${BASE}/reference-docs/upload`, { method: 'POST', body: form })
+      if (!res.ok) throw new Error('Upload failed')
+      return res.json()
+    },
+    delete: (id: string) => request<any>(`/reference-docs/${id}`, { method: 'DELETE' }),
+  },
 }

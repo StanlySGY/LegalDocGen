@@ -72,6 +72,7 @@ export default function DocumentEditor() {
   const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState('')
+  const [annotations, setAnnotations] = useState<Record<string, string>>({})
   const [customInstruction, setCustomInstruction] = useState('')
   const [showCompare, setShowCompare] = useState(false)
 
@@ -163,10 +164,17 @@ export default function DocumentEditor() {
     pushUndo()
     setAiLoading(true)
     setAiResult('')
+    setAnnotations({})
     setShowCompare(true)
     try {
       const res = await api.workflow.aiEdit({ text: selectedText, instruction })
       setAiResult(res.result)
+      try {
+        const annPrompt = `对比以下两段文本，对于每一处修改，用简短中文说明"为什么改"。原文：${selectedText} 修改后：${res.result} 以JSON格式返回，key是修改后的文字片段(20字以内)，value是修改原因(10字以内)。只返回JSON。`
+        const annRes = await api.workflow.aiEdit({ text: annPrompt, instruction: '直接返回JSON，无任何解释' })
+        const parsed = JSON.parse(annRes.result.replace(/```json?\n?/g, '').replace(/```/g, '').trim())
+        if (typeof parsed === 'object') setAnnotations(parsed)
+      } catch { setAnnotations({}) }
     } catch (e: any) {
       showToast(e.message || 'AI编辑失败', 'err')
       setShowCompare(false)
@@ -358,7 +366,17 @@ export default function DocumentEditor() {
                   {diffWords(selectedText, aiResult).map((op, i) => {
                     if (op.type === 'equal') return <span key={i}>{op.text}</span>
                     if (op.type === 'delete') return <span key={i} style={{color: '#ef4444', textDecoration: 'line-through', background: '#fef2f2', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
-                    return <span key={i} style={{color: '#059669', textDecoration: 'underline', background: '#ecfdf5', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
+                    const annMatch = Object.entries(annotations).find(([key]) => op.text.includes(key))
+                    return (
+                      <span key={i} style={{position: 'relative', display: 'inline'}}>
+                        <span style={{color: '#059669', textDecoration: 'underline', background: '#ecfdf5', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
+                        {annMatch && (
+                          <span style={{fontSize: 10, color: '#6366f1', background: '#eef2ff', padding: '1px 6px', borderRadius: 4, marginLeft: 4, border: '1px solid #c7d2fe', whiteSpace: 'nowrap'}}>
+                            💡 {annMatch[1]}
+                          </span>
+                        )}
+                      </span>
+                    )
                   })}
                 </div>
               ) : null}

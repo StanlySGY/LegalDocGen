@@ -21,6 +21,10 @@ export default function ModelConfig() {
   const [editingPrompt, setEditingPrompt] = useState<any>(null)
   const [stages, setStages] = useState<any[]>([])
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const [tab, setTab] = useState<'prompts'|'reference'>('prompts')
+
+  const [refDocs, setRefDocs] = useState<any[]>([])
+  const [refUploading, setRefUploading] = useState(false)
 
   // AI optimize state
   const [showAI, setShowAI] = useState(false)
@@ -30,7 +34,7 @@ export default function ModelConfig() {
   const [aiHistory, setAiHistory] = useState<{role:string;content:string}[]>([])
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  useEffect(() => { api.config.getPrompts().then(setPrompts); api.config.getStages().then(setStages) }, [])
+  useEffect(() => { api.config.getPrompts().then(setPrompts); api.config.getStages().then(setStages); api.referenceDocs.list().then(setRefDocs) }, [])
   const savePrompt = async () => {
     if(!editingPrompt) return
     if(editingPrompt.id) await api.config.updatePrompt(editingPrompt.id, editingPrompt)
@@ -69,29 +73,81 @@ export default function ModelConfig() {
     showToast('已采纳AI建议')
   }
 
+  const handleRefUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    setRefUploading(true)
+    for (const f of files) {
+      try { await api.referenceDocs.upload(f) } catch (err: any) { showToast(err.message, 'err') }
+    }
+    setRefUploading(false)
+    api.referenceDocs.list().then(setRefDocs)
+  }
+
+  const handleRefDelete = async (id: string) => {
+    if (!confirm('确定删除？')) return
+    await api.referenceDocs.delete(id)
+    api.referenceDocs.list().then(setRefDocs)
+    showToast('已删除')
+  }
+
   return (
     <div>
       <div className="mb-6">
-        <h2 style={{fontSize:20,fontWeight:700}}>文书模板管理</h2>
-        <p style={{fontSize:13,color:'#86909c',marginTop:4}}>编辑和管理各阶段的办案模板，支持AI对话优化</p>
+        <h2 style={{fontSize:20,fontWeight:700}}>系统配置</h2>
+        <p style={{fontSize:13,color:'#86909c',marginTop:4}}>管理办案模板和过往文书</p>
       </div>
 
-      <div className="card">
-        <div className="card-title" style={{marginBottom:16}}>办案模板</div>
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {prompts.map(p=>(
-            <div key={p.id} className="flex items-center justify-between" style={{border:'1px solid #e5e7eb',borderRadius:10,padding:'12px 16px',transition:'background .15s'}} onMouseEnter={e=>(e.currentTarget.style.background='#f7f8fa')} onMouseLeave={e=>(e.currentTarget.style.background='#fff')}>
-              <div className="flex items-center gap-3">
-                <span className="tag t-purple">{stages.find(s=>s.value===p.stage)?.name||p.stage}</span>
-                <span style={{fontSize:13,fontWeight:500}}>{p.name}</span>
-                {p.is_default && <span className="tag t-gray">默认</span>}
-              </div>
-              <button className="btn btn-o btn-sm" onClick={()=>{setEditingPrompt(p);setShowAI(false);setAiHistory([]);setAiResult('')}}>编辑</button>
-            </div>
-          ))}
-          {prompts.length===0 && <div style={{textAlign:'center',padding:40,color:'#c9cdd4'}}>暂无自定义模板</div>}
-        </div>
+      <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:10,padding:4}}>
+        <button className="btn" style={{flex:1,background:tab==='prompts'?'#fff':'transparent',color:tab==='prompts'?'#6366f1':'#86909c',boxShadow:tab==='prompts'?'0 1px 3px rgba(0,0,0,.08)':'none',borderRadius:8,padding:'8px 0',fontWeight:600}} onClick={()=>setTab('prompts')}>办案模板</button>
+        <button className="btn" style={{flex:1,background:tab==='reference'?'#fff':'transparent',color:tab==='reference'?'#6366f1':'#86909c',boxShadow:tab==='reference'?'0 1px 3px rgba(0,0,0,.08)':'none',borderRadius:8,padding:'8px 0',fontWeight:600}} onClick={()=>setTab('reference')}>过往文书库</button>
       </div>
+
+      {tab === 'reference' && (
+        <div className="card">
+          <div className="card-hd">
+            <span className="card-title">过往文书库</span>
+            <label className={`btn ${refUploading?'btn-o':'btn-p'} btn-sm`} style={{cursor:'pointer'}}>
+              {refUploading ? '上传中...' : '+ 上传文书'}
+              <input type="file" multiple accept=".pdf,.doc,.docx,.txt" hidden onChange={handleRefUpload} disabled={refUploading}/>
+            </label>
+          </div>
+          <p style={{fontSize:12,color:'var(--text-secondary)',marginBottom:16}}>
+            上传您过去撰写的得意文书，AI 将学习其语气和格式，在生成时模仿您的写作风格。建议上传 3-5 份有代表性的文书。
+          </p>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {refDocs.map(d => (
+              <div key={d.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px'}}>
+                <div>
+                  <span style={{fontSize:13,fontWeight:500}}>{d.name}</span>
+                  <span style={{fontSize:11,color:'var(--text-muted)',marginLeft:8}}>{(d.content_length/1024).toFixed(1)}KB</span>
+                </div>
+                <button className="btn btn-d btn-sm" onClick={()=>handleRefDelete(d.id)}>删除</button>
+              </div>
+            ))}
+            {refDocs.length===0 && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}>暂无过往文书，点击上方按钮上传</div>}
+          </div>
+        </div>
+      )}
+
+      {tab === 'prompts' && (
+        <div className="card">
+          <div className="card-title" style={{marginBottom:16}}>办案模板</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {prompts.map(p=>(
+              <div key={p.id} className="flex items-center justify-between" style={{border:'1px solid #e5e7eb',borderRadius:10,padding:'12px 16px',transition:'background .15s'}} onMouseEnter={e=>(e.currentTarget.style.background='#f7f8fa')} onMouseLeave={e=>(e.currentTarget.style.background='#fff')}>
+                <div className="flex items-center gap-3">
+                  <span className="tag t-purple">{stages.find(s=>s.value===p.stage)?.name||p.stage}</span>
+                  <span style={{fontSize:13,fontWeight:500}}>{p.name}</span>
+                  {p.is_default && <span className="tag t-gray">默认</span>}
+                </div>
+                <button className="btn btn-o btn-sm" onClick={()=>{setEditingPrompt(p);setShowAI(false);setAiHistory([]);setAiResult('')}}>编辑</button>
+              </div>
+            ))}
+            {prompts.length===0 && <div style={{textAlign:'center',padding:40,color:'#c9cdd4'}}>暂无自定义模板</div>}
+          </div>
+        </div>
+      )}
 
       {editingPrompt && (
         <div className="modal-mask" onClick={()=>{setEditingPrompt(null);setShowAI(false);setAiHistory([])}}>
