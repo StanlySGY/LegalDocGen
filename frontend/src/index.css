@@ -510,6 +510,23 @@ body {
 .toast-ok { background: var(--toast-ok-bg); color: var(--toast-ok-text); border: 1px solid var(--toast-ok-border); }
 .toast-err { background: var(--toast-err-bg); color: var(--toast-err-text); border: 1px solid var(--toast-err-border); }
 
+.toast::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.3;
+  animation: toast-progress 2.5s linear forwards;
+  border-radius: 0 0 10px 10px;
+}
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
 @keyframes slideIn {
   from { transform: translateX(120%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -580,6 +597,35 @@ body {
 }
 
 /* ===== Responsive ===== */
+@media (max-width: 1200px) {
+  .editor-layout {
+    grid-template-columns: 200px 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .editor-layout {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .editor-layout > div:first-child {
+    display: none !important;
+  }
+  .stat-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .stepper-bar {
+    padding: 12px 16px !important;
+    overflow-x: auto;
+  }
+  .step {
+    padding: 6px 12px !important;
+  }
+  .step-name {
+    font-size: 10px !important;
+    max-width: 60px !important;
+  }
+}
+
 @media (max-width: 768px) {
   #root { grid-template-columns: 1fr !important; }
   .sidebar { position: fixed; left: -240px; transition: left 0.3s; z-index: 100; }
@@ -588,10 +634,15 @@ body {
   .page-body { padding: 16px !important; }
   .editor-layout { grid-template-columns: 1fr !important; }
   .editor-layout > div:first-child { display: none !important; }
-  .editor-layout > div:nth-child(3) { border-left: none !important; }
+  .editor-layout > div:last-child { border-left: none !important; }
   .data-table th, .data-table td { padding: 8px !important; font-size: 11px !important; }
-  .stat-row { grid-template-columns: 1fr 1fr !important; }
+  .stat-row { grid-template-columns: 1fr !important; }
   .quick-gen-section { padding: 12px !important; }
+  .step-name { font-size: 9px !important; }
+  .step-dot { width: 28px !important; height: 28px !important; font-size: 12px !important; }
+  .step-line { width: 20px !important; }
+  .card { padding: 14px !important; }
+  .card-title { font-size: 14px !important; }
 }
 
 .mobile-toggle {

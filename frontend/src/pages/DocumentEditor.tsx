@@ -343,26 +343,31 @@ export default function DocumentEditor() {
       )}
 
       {showCompare && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-        }}>
+        <>
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.1)',zIndex:49}} onClick={handleReject}/>
           <div style={{
-            background: 'var(--bg-card)', borderRadius: 16, padding: 24, width: '90%', maxWidth: 800, maxHeight: '80vh',
-            overflow: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 420,
+            background: 'var(--bg-card)', zIndex: 50,
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+            display: 'flex', flexDirection: 'column',
+            borderLeft: '1px solid var(--border)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>AI 修改建议（红线对比）</span>
-              <button className="btn btn-o btn-sm" onClick={handleReject}>关闭</button>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>AI 修改建议</span>
+              <button className="btn btn-o btn-sm" onClick={handleReject}>×</button>
             </div>
-            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, maxHeight: 400, overflow: 'auto', lineHeight: 2, fontSize: 14 }}>
+
+            <div style={{ flex: 1, overflow: 'auto', padding: 20, lineHeight: 2, fontSize: 13 }}>
               {aiLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', padding: 40, justifyContent: 'center' }}>
                   <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25" /><path d="M12 2a10 10 0 0110 10" /></svg>
                   AI 正在处理...
                 </div>
               ) : aiResult ? (
                 <div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12,padding:'6px 10px',background:'var(--bg-secondary)',borderRadius:6}}>
+                    🔴 删除 &nbsp; 🟢 新增
+                  </div>
                   {diffWords(selectedText, aiResult).map((op, i) => {
                     if (op.type === 'equal') return <span key={i}>{op.text}</span>
                     if (op.type === 'delete') return <span key={i} style={{color: '#ef4444', textDecoration: 'line-through', background: '#fef2f2', padding: '0 2px', borderRadius: 2}}>{op.text}</span>
@@ -381,15 +386,15 @@ export default function DocumentEditor() {
                 </div>
               ) : null}
             </div>
+
             {aiResult && !aiLoading && (
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-                <button className="btn btn-o" onClick={handleReject}>放弃修改</button>
-                <button className="btn btn-p" onClick={handleAccept}>采纳修改</button>
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button className="btn btn-o" style={{flex:1}} onClick={handleReject}>放弃</button>
+                <button className="btn btn-p" style={{flex:1}} onClick={handleAccept}>采纳修改</button>
               </div>
-              
             )}
           </div>
-        </div>
+        </>
       )}
 
       {/* Three-column layout */}

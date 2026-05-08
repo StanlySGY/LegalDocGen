@@ -5,6 +5,18 @@ import { api } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType, ReviewMode } from '../types'
 import { STAGE_NAMES, STAGE_ORDER, STAGE_NAMES_LAWYER } from '../types'
 
+function diffWords(a: string, b: string): Array<{type:'equal'|'delete'|'insert',text:string}> {
+  const hasCJK = /[\u4e00-\u9fff]/.test(a + b)
+  const tok = (s: string) => hasCJK ? s.split('') : s.split(/(\s+)/)
+  const A = tok(a), B = tok(b)
+  const m=A.length, n=B.length
+  const dp=Array.from({length:m+1},()=>Array(n+1).fill(0))
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) dp[i][j]=A[i-1]===B[j-1]?dp[i-1][j-1]+1:Math.max(dp[i-1][j],dp[i][j-1])
+  const ops:Array<{type:'equal'|'delete'|'insert',text:string}>=[];let i=m,j=n
+  while(i>0||j>0){if(i>0&&j>0&&A[i-1]===B[j-1]){ops.unshift({type:'equal',text:A[i-1]});i--;j--}else if(j>0&&(i===0||dp[i][j-1]>=dp[i-1][j])){ops.unshift({type:'insert',text:B[j-1]});j--}else{ops.unshift({type:'delete',text:A[i-1]});i--}}
+  return ops
+}
+
 export default function WorkflowPage() {
   const { id: caseId } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -35,6 +47,8 @@ export default function WorkflowPage() {
   const [activeChainStep, setActiveChainStep] = useState<string>('generate')
   const [reviewId, setReviewId] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showDrawer, setShowDrawer] = useState(false)
+  const [diffModal, setDiffModal] = useState<{current:string,target:string,targetId:string}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const loadProgress = useCallback(async () => { if(!caseId)return; const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
@@ -165,75 +179,101 @@ export default function WorkflowPage() {
           <div className="card-hd">
             <span className="card-title">{STAGE_NAMES_LAWYER[activeStage] || STAGE_NAMES[activeStage]}</span>
             <div className="flex gap-2">
+              <button className="btn btn-o btn-sm" onClick={()=>setShowDrawer(true)} title="生成配置">⚙️ 配置</button>
               <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭历史':'历史记录'}</button>
             </div>
           </div>
-          <div className="collapse-toggle" onClick={()=>setShowAdvanced(!showAdvanced)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:14,height:14,transform:showAdvanced?'rotate(90deg)':'',transition:'transform 0.2s'}}><path d="M9 18l6-6-6-6"/></svg>
-            高级设置
-          </div>
-          {showAdvanced && (
-            <div className="collapse-panel">
-              <div style={{marginBottom:8}}>
-                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>AI 助手</label>
-                <select className="select" style={{width:'100%',fontSize:12,padding:'5px 10px'}} value={`${selChannelId}|${selModel}`} onChange={e=>{
-                  const [cid,mid] = e.target.value.split('|');
-                  setSelChannelId(cid); setSelModel(mid);
-                }}>
-                  {models.length===0 && <option>未配置AI助手</option>}
-                  {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
-                </select>
-              </div>
-                <div style={{marginBottom:4}}>
-                <label style={{fontSize:11,color:'var(--text-secondary)',display:'block',marginBottom:4}}>办案模板</label>
-                <textarea className="textarea" style={{height:200}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑办案思路..."/>
-              </div>
-            </div>
-          )}
 
-              {activeStage === 'review_optimization' && (
-            <div style={{marginTop:12,marginBottom:12}}>
-              <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6,fontWeight:600}}>审查模式</div>
-              <div className="flex gap-2">
-              {(['single','chain','compare'] as ReviewMode[]).map(m => (
-                  <button key={m} className={`btn btn-sm ${reviewMode===m?'btn-p':'btn-o'}`} onClick={()=>setReviewMode(m)}>
-                    {m==='single'?'独立生成':m==='chain'?'AI 交叉验证':'多版本对比'}
-                  </button>
-                ))}
-              </div>
+          {showDrawer && (
+            <>
+              <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',zIndex:49}} onClick={()=>setShowDrawer(false)}/>
+              <div style={{position:'fixed',top:0,right:0,bottom:0,width:380,background:'var(--bg-card)',zIndex:50,boxShadow:'-4px 0 20px rgba(0,0,0,0.1)',display:'flex',flexDirection:'column'}}>
+                <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:15,fontWeight:600}}>生成配置</span>
+                  <button className="btn btn-o btn-sm" onClick={()=>setShowDrawer(false)}>×</button>
+                </div>
+                <div style={{flex:1,overflow:'auto',padding:20}}>
+                  <div style={{marginBottom:16}}>
+                    <label style={{fontSize:12,color:'var(--text-secondary)',display:'block',marginBottom:6,fontWeight:600}}>AI 助手</label>
+                    <select className="select" style={{width:'100%',fontSize:12,padding:'8px 10px'}} value={`${selChannelId}|${selModel}`} onChange={e=>{
+                      const [cid,mid] = e.target.value.split('|'); setSelChannelId(cid); setSelModel(mid);
+                    }}>
+                      {models.length===0 && <option>未配置AI助手</option>}
+                      {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
+                    </select>
+                  </div>
 
-              {reviewMode === 'chain' && (
-                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
-              {['文书起草','质量审查','最终优化'].map((label,i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span style={{fontSize:12,color:'var(--text-secondary)',minWidth:65}}>{label}</span>
-                      <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
-                        onChange={e=>{const[cid,mid]=e.target.value.split('|');const nm=[...chainModels];nm[i]={channel_id:cid,model:mid};setChainModels(nm)}}>
-                        {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
-                      </select>
+                  <div style={{marginBottom:16}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                      <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600}}>办案模板</label>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div style={{display:'flex',gap:4,marginBottom:8,flexWrap:'wrap'}}>
+                      {[
+                        {label:'B',title:'加粗',insert:'**'},
+                        {label:'H',title:'标题',insert:'## '},
+                        {label:'•',title:'列表',insert:'- '},
+                        {label:'1.',title:'有序列表',insert:'1. '},
+                        {label:'>',title:'引用',insert:'> '},
+                        {label:'—',title:'分割线',insert:'---\n'},
+                      ].map(b => (
+                        <button key={b.label} className="btn btn-o btn-sm" style={{padding:'2px 8px',fontSize:12,fontWeight:b.label==='B'?700:400,minWidth:28}}
+                          title={b.title} onClick={() => {
+                            const ta = document.querySelector('.prompt-textarea') as HTMLTextAreaElement
+                            if (ta) {
+                              const s = ta.selectionStart, e = ta.selectionEnd
+                              setPrompt(prompt.substring(0,s) + b.insert + prompt.substring(e))
+                            }
+                          }}>{b.label}</button>
+                      ))}
+                    </div>
+                    <textarea className="textarea prompt-textarea" style={{height:200,fontSize:12}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑办案思路..."/>
+                  </div>
 
-              {reviewMode === 'compare' && (
-                <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:4}}>勾选参与对比的AI助手（至少2个）：</div>
-                  {models.map((m,i) => {
-                    const key = `${m.channel_id}|${m.model}`
-                    const checked = compareModels.some(c => c.channel_id===m.channel_id && c.model===m.model)
-                    return (
-                      <label key={i} className="flex items-center gap-2" style={{padding:'3px 0',fontSize:12,cursor:'pointer'}}>
-                        <input type="checkbox" checked={checked} onChange={() => {
-                          setCompareModels(prev => checked ? prev.filter(c=>!(c.channel_id===m.channel_id&&c.model===m.model)) : [...prev, {channel_id:m.channel_id,model:m.model,channel_name:m.channel_name}])
-                        }}/>
-                        {m.model}
-                      </label>
-                    )
-                  })}
+                  {activeStage === 'review_optimization' && (
+                    <div>
+                      <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:8,fontWeight:600}}>审查模式</div>
+                      <div className="flex gap-2" style={{marginBottom:12}}>
+                        {(['single','chain','compare'] as ReviewMode[]).map(m => (
+                          <button key={m} className={`btn btn-sm ${reviewMode===m?'btn-p':'btn-o'}`} onClick={()=>setReviewMode(m)}>
+                            {m==='single'?'独立生成':m==='chain'?'AI 交叉验证':'多版本对比'}
+                          </button>
+                        ))}
+                      </div>
+                      {reviewMode === 'chain' && (
+                        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                          {['文书起草','质量审查','最终优化'].map((label,i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <span style={{fontSize:12,color:'var(--text-secondary)',minWidth:65}}>{label}</span>
+                              <select className="select" style={{flex:1,fontSize:12,padding:'4px 8px'}} value={`${chainModels[i]?.channel_id||''}|${chainModels[i]?.model||''}`}
+                                onChange={e=>{const[cid,mid]=e.target.value.split('|');const nm=[...chainModels];nm[i]={channel_id:cid,model:mid};setChainModels(nm)}}>
+                                {models.map((m,j)=><option key={j} value={`${m.channel_id}|${m.model}`}>{m.model}</option>)}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {reviewMode === 'compare' && (
+                        <div>
+                          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>勾选参与对比的AI助手（至少2个）：</div>
+                          {models.map((m,i) => {
+                            const key = `${m.channel_id}|${m.model}`
+                            const checked = compareModels.some(c => c.channel_id===m.channel_id && c.model===m.model)
+                            return (
+                              <label key={i} className="flex items-center gap-2" style={{padding:'3px 0',fontSize:12,cursor:'pointer'}}>
+                                <input type="checkbox" checked={checked} onChange={() => {
+                                  setCompareModels(prev => checked ? prev.filter(c=>!(c.channel_id===m.channel_id&&c.model===m.model)) : [...prev, {channel_id:m.channel_id,model:m.model,channel_name:m.channel_name}])
+                                }}/>
+                                {m.model}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            </>
           )}
 
           {activeStage === 'review_optimization' && reviewMode !== 'single' ? (
@@ -242,7 +282,7 @@ export default function WorkflowPage() {
             </button>
           ) : (
           <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:12}} onClick={handleGenerate} disabled={generating}>
-            {generating ? <span className="flex items-center justify-center gap-2"><svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>生成中...</span> : node?.output?'重新生成':'开始生成'}
+            {generating ? <span className="flex items-center justify-center gap-2"><svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>AI 正在分析案情并生成文书...</span> : node?.output?'重新生成':'开始生成'}
           </button>
           )}
           {showHistory && history.length>0 && (
@@ -253,9 +293,12 @@ export default function WorkflowPage() {
                   <div key={h.id} className="flex items-center justify-between" style={{background:'var(--bg-secondary)',borderRadius:8,padding:'8px 12px'}}>
                     <div className="flex items-center gap-2">
                       <span className="tag t-purple">{new Date(h.created_at).toLocaleString('zh-CN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-                      <span style={{fontSize:11,color:'var(--text-secondary)'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
+                      <span style={{fontSize:11,color:'var(--text-secondary)'}}>v{h.version}</span>
                     </div>
-                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>恢复此版本</button>
+                    <div className="flex gap-2">
+                      <button className="btn btn-o btn-sm" onClick={()=>setDiffModal({current:output,target:h.output,targetId:h.id})}>对比</button>
+                      <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>恢复</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -316,6 +359,10 @@ export default function WorkflowPage() {
             </div>
           ) : generating && streamingText ? (
             <div style={{height:500,overflow:'auto',border:'1px solid var(--border)',borderRadius:8,padding:20}}>
+              <div style={{fontSize:11,color:'var(--accent)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+                <svg className="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>
+                AI 正在生成中...
+              </div>
               <div className="md"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
               <span className="cursor-blink"/>
             </div>
@@ -347,6 +394,32 @@ export default function WorkflowPage() {
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>← 上一阶段</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段 →</button>
       </div>
+
+      {diffModal && (
+        <div className="modal-mask" onClick={() => setDiffModal(null)}>
+          <div className="modal-box" style={{maxWidth:800,maxHeight:'80vh'}} onClick={e => e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <span style={{fontSize:15,fontWeight:600}}>版本差异对比</span>
+              <button className="btn btn-o btn-sm" onClick={() => setDiffModal(null)}>×</button>
+            </div>
+            <div style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:8,padding:20,maxHeight:400,overflow:'auto',lineHeight:2,fontSize:13}}>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6}}>
+                🔴 当前版本删除的内容 &nbsp; 🟢 历史版本新增的内容
+              </div>
+              {diffWords(diffModal.current, diffModal.target).map((op, i) => {
+                if (op.type === 'equal') return <span key={i}>{op.text}</span>
+                if (op.type === 'delete') return <span key={i} style={{color:'#ef4444',textDecoration:'line-through',background:'#fef2f2',padding:'0 2px',borderRadius:2}}>{op.text}</span>
+                return <span key={i} style={{color:'#059669',textDecoration:'underline',background:'#ecfdf5',padding:'0 2px',borderRadius:2}}>{op.text}</span>
+              })}
+            </div>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+              <button className="btn btn-o" onClick={() => setDiffModal(null)}>取消</button>
+              <button className="btn btn-p" onClick={async () => { await handleRollback(diffModal.targetId); setDiffModal(null) }}>确认回滚</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>
   )

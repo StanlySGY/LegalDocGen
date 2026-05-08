@@ -264,7 +264,11 @@ export default function CaseDetail() {
           </button>
           {quickGenerating && (
             <div style={{flex:1}}>
-              <div style={{fontSize:12,color:'var(--accent)',marginBottom:4}}>{quickStage} <span style={{color:'var(--text-secondary)',marginLeft:6}}>AI正在处理，请稍候...</span></div>
+              <div style={{fontSize:12,color:'var(--accent)',marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
+                <svg className="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>
+                <span>{quickStage}</span>
+                <span style={{color:'var(--text-muted)'}}>{quickProgress}%</span>
+              </div>
               <div style={{height:6,background:'var(--border)',borderRadius:3,overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${quickProgress}%`,background:'linear-gradient(90deg,#6366f1,#a78bfa)',borderRadius:3,transition:'width 0.3s'}}/>
               </div>
