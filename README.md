@@ -4,7 +4,9 @@
 
 ## 🔗 在线预览
 
-[📱 点击这里查看在线演示](https://legaldocgen-demo.vercel.app) | [📖 查看详细文档](https://github.com/StanlySGY/LegalDocGen/wiki)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/import?framework=other&hasTrialAvailable=1&id=1225314281&name=LegalDocGen&owner=StanlySGY&project-name=legal-doc-gen&provider=github&remainingProjects=1&s=https%3A%2F%2Fgithub.com%2FStanlySGY%2FLegalDocGen&teamSlug=stanlysgys-projects&totalProjects=1)
+
+> **注意**: 本项目是全栈应用（React 前端 + FastAPI 后端）。Vercel 可以部署前端，后端需要单独部署到支持 Python 的平台（如 Railway、Render、Heroku 等）。
 
 ## ✨ 核心特性
 
@@ -68,13 +70,15 @@
 - Node.js 16+
 - 至少一个AI模型API Key（OpenAI、Claude等）
 
-### 1. 克隆项目
+### 方式一：本地运行（推荐用于开发）
+
+#### 1. 克隆项目
 ```bash
 git clone https://github.com/yourusername/LegalDocGen.git
 cd LegalDocGen
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 ```bash
 cp backend/.env.example backend/.env
 ```
@@ -102,7 +106,7 @@ UPLOAD_DIR=./uploads
 MAX_FILE_SIZE=52428800  # 50MB
 ```
 
-### 3. 安装依赖
+#### 3. 安装依赖
 
 **后端：**
 ```bash
@@ -116,7 +120,7 @@ cd frontend
 npm install
 ```
 
-### 4. 启动应用
+#### 4. 启动应用
 
 **方式一：使用启动脚本（推荐）**
 ```bash
@@ -142,6 +146,40 @@ npm run dev
 - **前端UI**: http://localhost:5173
 - **后端API**: http://localhost:8000
 - **API文档**: http://localhost:8000/docs (Swagger UI)
+
+### 方式二：云部署（Vercel + Railway/Render）
+
+#### 前端部署到 Vercel
+
+1. 点击下方按钮一键部署：
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/import?framework=other&hasTrialAvailable=1&id=1225314281&name=LegalDocGen&owner=StanlySGY&project-name=legal-doc-gen&provider=github&remainingProjects=1&s=https%3A%2F%2Fgithub.com%2FStanlySGY%2FLegalDocGen&teamSlug=stanlysgys-projects&totalProjects=1)
+
+2. 或手动部署：
+   - 连接你的 GitHub 账户
+   - 选择 LegalDocGen 仓库
+   - 设置环境变量（如需要）
+   - 点击 Deploy
+
+#### 后端部署到 Railway/Render
+
+后端需要部署到支持 Python 的平台。推荐使用 Railway 或 Render：
+
+**Railway 部署步骤：**
+1. 访问 https://railway.app
+2. 连接 GitHub 账户
+3. 创建新项目，选择 LegalDocGen 仓库
+4. 配置环境变量（OPENAI_API_KEY 等）
+5. 自动部署
+
+**Render 部署步骤：**
+1. 访问 https://render.com
+2. 连接 GitHub 账户
+3. 创建新的 Web Service
+4. 选择 LegalDocGen 仓库
+5. 设置启动命令：`cd backend && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000`
+6. 配置环境变量
+7. 部署
 
 ## 📖 使用指南
 
