@@ -50,6 +50,13 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
     setGenerating(false)
   }
 
+  const handleExport = async () => {
+    try {
+      await api.workflow.export(caseId)
+      showToast('导出成功')
+    } catch(e:any){showToast(e.message||'导出失败','err')}
+  }
+
   const handleSave = async () => { await api.workflow.saveOutput(caseId,activeStage,outputDraft); setOutput(outputDraft); setEditingOutput(false); showToast('已保存') }
   const handleRollback = async (id:string) => { const r=await api.workflow.rollback(caseId,id); setOutput(r.output); setNode({...node!,output:r.output,version:r.version}); await loadProgress(); await loadHistory(activeStage); showToast('已回滚') }
 
@@ -158,6 +165,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
 
       <div className="flex justify-between" style={{marginTop:20}}>
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>← 上一阶段</button>
+        <button className="btn btn-p" onClick={handleExport}>📥 导出为 Word</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段 →</button>
       </div>
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
+import MaterialChecklist from './MaterialChecklist'
 import type { Case, Material } from '../types'
 
 interface Props { caseId: string; nav: { cases: () => void; workflow: (id: string) => void } }
@@ -8,6 +9,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [uploading, setUploading] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -48,6 +50,8 @@ export default function CaseDetail({ caseId, nav }: Props) {
         <div className="stat-card s-green"><div className="s-label">已解析</div><div className="s-value">{materials.filter(m=>m.parse_status==='completed').length}</div></div>
         <div className="stat-card s-orange"><div className="s-label">解析失败</div><div className="s-value">{materials.filter(m=>m.parse_status!=='completed').length}</div></div>
       </div>
+
+      {selectedTemplate && <MaterialChecklist caseId={caseId} templateId={selectedTemplate} />}
 
       <div className="card">
         <div className="card-hd">

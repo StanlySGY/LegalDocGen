@@ -6,8 +6,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'Request failed')
+    let errorMsg = '请求失败'
+    try {
+      const err = await res.json()
+      errorMsg = err.detail || err.message || res.statusText
+    } catch {
+      errorMsg = res.statusText || '请求失败'
+    }
+    throw new Error(errorMsg)
   }
   return res.json()
 }
@@ -64,6 +70,19 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
+    export: async (caseId: string) => {
+      const res = await fetch(`${BASE}/workflow/export/${caseId}`)
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `case_${caseId}.docx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    },
   },
   config: {
     getModels: () => request<any>('/config/models'),
@@ -83,5 +102,13 @@ export const api = {
     fetchModels: (id: string) => request<any>(`/channel/fetch_models/${id}`),
     fetchModelsDirect: (data: any) => request<any>('/channel/fetch_models', { method: 'POST', body: JSON.stringify(data) }),
     getAllModels: () => request<any[]>('/channel/models/all'),
+  },
+  templates: {
+    list: () => request<any[]>('/templates/list'),
+    get: (id: string) => request<any>(`/templates/${id}`),
+    getCategories: () => request<any>('/templates/categories'),
+    create: (data: any) => request<any>('/templates/create', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request<any>(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<any>(`/templates/${id}`, { method: 'DELETE' }),
   },
 }

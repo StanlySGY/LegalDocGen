@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
+import TemplateSelector from './TemplateSelector'
 import type { Case } from '../types'
 
 interface Props { nav: { detail: (id: string) => void; workflow: (id: string) => void } }
@@ -7,7 +8,9 @@ interface Props { nav: { detail: (id: string) => void; workflow: (id: string) =>
 export default function CaseList({ nav }: Props) {
   const [cases, setCases] = useState<Case[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', case_type: '' })
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; name: string } | null>(null)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
@@ -19,7 +22,17 @@ export default function CaseList({ nav }: Props) {
     const c = await api.cases.create(form)
     setForm({ name: '', description: '', case_type: '' })
     setShowCreate(false)
+    setSelectedTemplate(null)
     nav.detail(c.id)
+  }
+
+  const handleTemplateSelect = (templateId: string, templateName: string) => {
+    setSelectedTemplate({ id: templateId, name: templateName })
+    setShowTemplateSelector(false)
+  }
+
+  if (showTemplateSelector) {
+    return <TemplateSelector onSelectTemplate={handleTemplateSelect} onBack={() => setShowTemplateSelector(false)} />
   }
 
   return (
@@ -58,7 +71,13 @@ export default function CaseList({ nav }: Props) {
                 <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件描述</label>
                 <textarea className="textarea" style={{height:80}} placeholder="简要描述" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
               </div>
+              {selectedTemplate && (
+                <div style={{padding:10,background:'#f0fdf4',borderRadius:8,border:'1px solid #d1fae5',fontSize:12,color:'#10b981'}}>
+                  ✓ 已选择模板：{selectedTemplate.name}
+                </div>
+              )}
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
+                <button className="btn btn-o" onClick={()=>setShowTemplateSelector(true)}>选择模板</button>
                 <button className="btn btn-o" onClick={()=>setShowCreate(false)}>取消</button>
                 <button className="btn btn-p" onClick={create}>创建</button>
               </div>

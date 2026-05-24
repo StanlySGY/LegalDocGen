@@ -77,7 +77,7 @@ export default function App() {
           {page.type === 'detail' && <CaseDetail caseId={page.caseId} nav={nav} />}
           {page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
           {page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
-          {page.type === 'config' && <ModelConfig />}
+          {page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
         </div>
       </div>
     </>
