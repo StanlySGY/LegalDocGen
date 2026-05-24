@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
+import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
 import type { Case, Material } from '../types'
 
 interface Props { caseId: string; nav: { cases: () => void; workflow: (id: string) => void } }
@@ -8,12 +9,19 @@ interface Props { caseId: string; nav: { cases: () => void; workflow: (id: strin
 export default function CaseDetail({ caseId, nav }: Props) {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = async () => { const [c,m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)]); setCaseData(c); setMaterials(m) }
+  const load = async () => {
+    const [c, m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)])
+    const tpl = c.template_id ? await api.templates.get(c.template_id) : null
+    setChecklist(tpl?.materials_checklist || [])
+    setCaseData(c)
+    setMaterials(m)
+  }
   useEffect(() => { load() }, [caseId])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,6 +42,15 @@ export default function CaseDetail({ caseId, nav }: Props) {
   }
 
   const del = async (id: string) => { await api.materials.delete(id); load(); showToast('已删除') }
+  const materialCompletion = getMaterialCompletion(checklist, materials)
+  const handleEnterWorkflow = () => {
+    if (caseData?.template_id && materialCompletion.missingRequired > 0) {
+      const missingNames = materialCompletion.missingRequiredItems.slice(0, 3).map(({ item }) => item.name).join('、')
+      showToast(`仍缺少 ${materialCompletion.missingRequired} 项必需材料：${missingNames}`, 'err')
+      return
+    }
+    nav.workflow(caseId)
+  }
 
   if (!caseData) return <div style={{textAlign:'center',padding:80,color:'#86909c'}}>加载中...</div>
 
@@ -50,7 +67,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
           </div>
           {caseData.description && <p style={{fontSize:13,color:'#86909c',marginTop:6}}>{caseData.description}</p>}
         </div>
-        <button className="btn btn-p" onClick={()=>nav.workflow(caseId)}>进入工作流 →</button>
+        <button className="btn btn-p" onClick={handleEnterWorkflow}>进入工作流 →</button>
       </div>
 
       <div className="stat-row">
@@ -58,6 +75,20 @@ export default function CaseDetail({ caseId, nav }: Props) {
         <div className="stat-card s-green"><div className="s-label">已解析</div><div className="s-value">{materials.filter(m=>m.parse_status==='completed').length}</div></div>
         <div className="stat-card s-orange"><div className="s-label">解析失败</div><div className="s-value">{materials.filter(m=>m.parse_status!=='completed').length}</div></div>
       </div>
+
+      {caseData.template_id && checklist.length > 0 && (
+        <div className="card" style={{marginBottom:20,border:`1px solid ${materialCompletion.missingRequired > 0 ? '#fde68a' : '#d1fae5'}`,background:materialCompletion.missingRequired > 0 ? '#fffbeb' : '#f0fdf4'}}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div style={{fontWeight:600,fontSize:13,color:'#1d2129'}}>材料齐备度：{materialCompletion.completedRequired}/{materialCompletion.requiredItems.length}</div>
+              <div style={{fontSize:12,color:materialCompletion.missingRequired > 0 ? '#c97706' : '#10b981',marginTop:4}}>
+                {materialCompletion.missingRequired > 0 ? `进入工作流前建议补齐 ${materialCompletion.missingRequired} 项必需材料` : '必需材料已齐备，可以进入工作流'}
+              </div>
+            </div>
+            <span className={`tag ${materialCompletion.missingRequired > 0 ? 't-orange' : 't-green'}`}>{materialCompletion.completionPercent}%</span>
+          </div>
+        </div>
+      )}
 
       {caseData.template_id && <MaterialChecklist caseId={caseId} templateId={caseData.template_id} />}
 
