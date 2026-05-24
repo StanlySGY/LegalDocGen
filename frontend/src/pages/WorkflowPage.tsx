@@ -29,9 +29,13 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const loadNode = useCallback(async (s: StageType) => { const n = await api.workflow.getNode(caseId, s); setNode(n); setPrompt(n.prompt||''); setOutput(n.output||''); setEditingOutput(false); setStreamingText('') }, [caseId])
   const loadHistory = useCallback(async (s: StageType) => { setHistory(await api.workflow.history(caseId, s)) }, [caseId])
 
-  useEffect(() => { loadProgress() }, [loadProgress])
-  useEffect(() => { loadNode(activeStage) }, [activeStage, loadNode])
-  useEffect(() => { api.config.getModels().then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} }) }, [])
+  useEffect(() => { loadProgress().catch((e: any) => showToast(e.message || '工作流加载失败', 'err')) }, [loadProgress])
+  useEffect(() => { loadNode(activeStage).catch((e: any) => showToast(e.message || '阶段加载失败', 'err')) }, [activeStage, loadNode])
+  useEffect(() => {
+    api.config.getModels()
+      .then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} })
+      .catch((e: any) => showToast(e.message || '模型加载失败', 'err'))
+  }, [])
 
   const handleGenerate = async () => {
     if(!selChannelId){showToast('请先在「渠道管理」中添加API渠道','err');return}
@@ -39,7 +43,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
     try {
       let full = ''
       for await (const chunk of api.workflow.generateStream(caseId,{stage:activeStage,prompt,provider:selChannelId,model:selModel})) {
-        if(chunk.error){showToast(chunk.error,'err');setGenerating(false);setStreamingText('');return}
+        if(chunk.error) throw new Error(chunk.error)
         if(chunk.chunk){full+=chunk.chunk;setStreamingText(full)}
         if(chunk.done) break
       }
@@ -47,7 +51,18 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       await loadProgress(); await loadNode(activeStage); await loadHistory(activeStage)
       showToast('生成完成')
     } catch(e:any){showToast(e.message||'生成失败','err')}
-    setGenerating(false)
+    finally { setGenerating(false); setStreamingText('') }
+  }
+
+  const toggleHistory = async () => {
+    const next = !showHistory
+    setShowHistory(next)
+    if (!next) return
+    try {
+      await loadHistory(activeStage)
+    } catch (e: any) {
+      showToast(e.message || '历史加载失败', 'err')
+    }
   }
 
   const handleExport = async () => {
@@ -57,8 +72,28 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
     } catch(e:any){showToast(e.message||'导出失败','err')}
   }
 
-  const handleSave = async () => { await api.workflow.saveOutput(caseId,activeStage,outputDraft); setOutput(outputDraft); setEditingOutput(false); showToast('已保存') }
-  const handleRollback = async (id:string) => { const r=await api.workflow.rollback(caseId,id); setOutput(r.output); setNode({...node!,output:r.output,version:r.version}); await loadProgress(); await loadHistory(activeStage); showToast('已回滚') }
+  const handleSave = async () => {
+    try {
+      await api.workflow.saveOutput(caseId, activeStage, outputDraft)
+      setOutput(outputDraft)
+      setEditingOutput(false)
+      showToast('已保存')
+    } catch (e: any) {
+      showToast(e.message || '保存失败', 'err')
+    }
+  }
+  const handleRollback = async (id:string) => {
+    try {
+      const r = await api.workflow.rollback(caseId, id)
+      setOutput(r.output)
+      setNode({...node!, output: r.output, version: r.version})
+      await loadProgress()
+      await loadHistory(activeStage)
+      showToast('已回滚')
+    } catch (e: any) {
+      showToast(e.message || '回滚失败', 'err')
+    }
+  }
 
   const idx = STAGE_ORDER.indexOf(activeStage)
   const icons:Record<StageType,string> = {fact_extraction:'📋',legal_analysis:'⚖️',dispute_focus:'🎯',draft_generation:'📝',review_optimization:'🔍'}
@@ -101,7 +136,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
                 {models.length===0 && <option>未配置渠道</option>}
                 {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.channel_name} / {m.model}</option>)}
               </select>
-              <button className="btn btn-o btn-sm" onClick={()=>{loadHistory(activeStage);setShowHistory(!showHistory)}}>{showHistory?'关闭':'历史'}</button>
+              <button className="btn btn-o btn-sm" onClick={toggleHistory}>{showHistory?'关闭':'历史'}</button>
             </div>
           </div>
           <textarea className="textarea" style={{height:260}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
@@ -133,7 +168,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             <div className="flex gap-2">
               {output&&!editingOutput && <>
                 <button className="btn btn-o btn-sm" onClick={()=>{setEditingOutput(true);setOutputDraft(output)}}>编辑</button>
-                <button className="btn btn-o btn-sm" onClick={()=>{navigator.clipboard.writeText(output);showToast('已复制')}}>复制</button>
+                <button className="btn btn-o btn-sm" onClick={async()=>{try{await navigator.clipboard.writeText(output);showToast('已复制')}catch{showToast('复制失败','err')}}}>复制</button>
               </>}
             </div>
           </div>

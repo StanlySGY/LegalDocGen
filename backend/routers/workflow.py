@@ -28,6 +28,10 @@ class RollbackRequest(BaseModel):
     node_id: str
 
 
+class SaveOutputRequest(BaseModel):
+    output: str = ""
+
+
 @router.get("/progress/{case_id}")
 def get_progress(case_id: str, db: Session = Depends(get_db)):
     engine = WorkflowEngine(db)
@@ -175,7 +179,7 @@ def get_history(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 
 @router.post("/save-output/{case_id}/{stage}")
-def save_output(case_id: str, stage: str, output: str = "", db: Session = Depends(get_db)):
+def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = Depends(get_db)):
     try:
         stage_type = StageType(stage)
     except ValueError:
@@ -184,8 +188,8 @@ def save_output(case_id: str, stage: str, output: str = "", db: Session = Depend
     engine = WorkflowEngine(db)
     node = engine.get_stage_node(case_id, stage_type)
     if not node:
-        raise NotFoundError(f"工作流节点不存在")
-    node.output = output
+        raise NotFoundError("工作流节点不存在")
+    node.output = req.output
     db.commit()
     return {"message": "已保存"}
 

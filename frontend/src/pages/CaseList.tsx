@@ -14,16 +14,20 @@ export default function CaseList({ nav }: Props) {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = () => api.cases.list().then(setCases)
+  const load = () => api.cases.list().then(setCases).catch((e: any) => showToast(e.message || '案件加载失败', 'err'))
   useEffect(() => { load() }, [])
 
   const create = async () => {
     if (!form.name.trim()) return
-    const c = await api.cases.create({ ...form, template_id: selectedTemplate?.id || '' })
-    setForm({ name: '', description: '', case_type: '' })
-    setShowCreate(false)
-    setSelectedTemplate(null)
-    nav.detail(c.id)
+    try {
+      const c = await api.cases.create({ ...form, template_id: selectedTemplate?.id || '' })
+      setForm({ name: '', description: '', case_type: '' })
+      setShowCreate(false)
+      setSelectedTemplate(null)
+      nav.detail(c.id)
+    } catch (e: any) {
+      showToast(e.message || '创建失败', 'err')
+    }
   }
 
   const handleTemplateSelect = (templateId: string, templateName: string) => {

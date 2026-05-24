@@ -47,7 +47,9 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      const reader = res.body!.getReader()
+      if (!res.ok) throw new Error(await parseError(res, '生成失败'))
+      if (!res.body) throw new Error('生成响应为空')
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
       while (true) {

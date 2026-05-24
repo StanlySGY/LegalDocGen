@@ -1,7 +1,6 @@
-import json
-import shutil
+import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -20,7 +19,11 @@ async def upload_material(case_id: str, file: UploadFile = File(...), db: Sessio
     if not case:
         raise NotFoundError(f"案件 {case_id} 不存在")
 
-    suffix = Path(file.filename).suffix.lower()
+    safe_name = Path(file.filename or "").name
+    if not safe_name:
+        raise ValidationError("文件名不能为空")
+
+    suffix = Path(safe_name).suffix.lower()
     if suffix not in settings.ALLOWED_EXTENSIONS:
         raise ValidationError(f"不支持的文件格式: {suffix}。支持的格式: {', '.join(settings.ALLOWED_EXTENSIONS)}")
 
@@ -29,7 +32,7 @@ async def upload_material(case_id: str, file: UploadFile = File(...), db: Sessio
 
     case_dir = settings.UPLOAD_DIR / case_id
     case_dir.mkdir(parents=True, exist_ok=True)
-    file_path = case_dir / file.filename
+    file_path = case_dir / f"{uuid.uuid4().hex}{suffix}"
 
     try:
         with open(file_path, "wb") as f:
@@ -40,7 +43,7 @@ async def upload_material(case_id: str, file: UploadFile = File(...), db: Sessio
 
         material = Material(
             case_id=case_id,
-            filename=file.filename,
+            filename=safe_name,
             file_path=str(file_path),
             file_type=suffix,
             file_size=len(content),

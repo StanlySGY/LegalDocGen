@@ -41,7 +41,31 @@ export default function CaseDetail({ caseId, nav }: Props) {
     }
   }
 
-  const del = async (id: string) => { await api.materials.delete(id); load(); showToast('已删除') }
+  const del = async (id: string) => {
+    try {
+      await api.materials.delete(id)
+      await load()
+      showToast('已删除')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '删除失败', 'err')
+    }
+  }
+  const previewMaterial = (content: string) => {
+    const w = window.open('', '', 'width=700,height=600')
+    if (!w) {
+      showToast('浏览器阻止了预览窗口', 'err')
+      return
+    }
+    w.document.title = '材料内容预览'
+    w.document.body.style.margin = '0'
+    const pre = w.document.createElement('pre')
+    pre.textContent = content || '暂无内容'
+    pre.style.padding = '20px'
+    pre.style.fontSize = '13px'
+    pre.style.whiteSpace = 'pre-wrap'
+    pre.style.fontFamily = 'sans-serif'
+    w.document.body.appendChild(pre)
+  }
   const materialCompletion = getMaterialCompletion(checklist, materials)
   const handleEnterWorkflow = () => {
     if (caseData?.template_id && materialCompletion.missingRequired > 0) {
@@ -114,10 +138,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="btn btn-o btn-sm" onClick={()=>{
-                  const w = window.open('','','width=700,height=600')
-                  if(w) { w.document.write(`<pre style="padding:20px;font-size:13px;white-space:pre-wrap;font-family:sans-serif">${m.parsed_content||'暂无内容'}</pre>`) }
-                }}>查看</button>
+                <button className="btn btn-o btn-sm" onClick={()=>previewMaterial(m.parsed_content)}>查看</button>
                 <button className="btn btn-d btn-sm" onClick={()=>del(m.id)}>删除</button>
               </div>
             </div>
