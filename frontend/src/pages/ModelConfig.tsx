@@ -45,6 +45,8 @@ export default function ModelConfig({ onNavChannels }: Props) {
             ))}
             {prompts.length===0 && <div style={{textAlign:'center',padding:40,color:'#c9cdd4'}}>暂无自定义模板</div>}
           </div>
+      </div>
+
       {editingPrompt && (
         <div className="modal-mask" onClick={()=>setEditingPrompt(null)}>
           <div className="modal-box" style={{maxWidth:700}} onClick={e=>e.stopPropagation()}>
