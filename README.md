@@ -2,6 +2,10 @@
 
 一个为法律专业人士设计的AI驱动的法律文书生成和审查平台。支持多模型协同、版本管理、材料检查清单等功能。
 
+## 🔗 在线预览
+
+[📱 点击这里查看在线演示](https://legaldocgen-demo.vercel.app) | [📖 查看详细文档](https://github.com/StanlySGY/LegalDocGen/wiki)
+
 ## ✨ 核心特性
 
 ### 🎯 分阶段工作流
