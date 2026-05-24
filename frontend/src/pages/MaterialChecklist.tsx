@@ -6,14 +6,50 @@ interface Props {
   templateId?: string
 }
 
+type ChecklistItem = {
+  name: string
+  description?: string
+  required?: boolean
+}
+
+type MaterialRecord = {
+  filename: string
+  parsed_content?: string
+}
+
+const GENERIC_TERMS = ['原件', '复印件', '证明', '材料', '文件', '记录', '凭证', '报告', '相关', '其他', '完整', '双方', '签署', '文本', '员工', '公司', '当事人', '的']
+
+const normalize = (value: string) => value.toLowerCase().replace(/[^一-龥a-z0-9]/g, '')
+
+const removeGenericTerms = (value: string) => GENERIC_TERMS.reduce((text, term) => text.split(term).join(''), value)
+
+const getKeywords = (item: ChecklistItem) => {
+  const source = `${item.name} ${item.description || ''}`
+  const parts = source.split(/[、，,。；;：:\s/（）()【】\[\]-]+|或|和|及|与|等/g)
+  const keywords = parts.flatMap(part => {
+    const normalized = normalize(part)
+    const simplified = removeGenericTerms(normalized)
+    return [normalized, simplified, simplified.length >= 4 ? simplified.slice(0, 2) : '']
+  })
+  return Array.from(new Set(keywords.filter(keyword => keyword.length >= 2 && !GENERIC_TERMS.includes(keyword)))).slice(0, 6)
+}
+
+const findMatchedMaterial = (materials: MaterialRecord[], keywords: string[]) => {
+  return materials.find(material => {
+    const target = normalize(`${material.filename} ${material.parsed_content || ''}`)
+    return keywords.some(keyword => target.includes(keyword))
+  })
+}
+
 export default function MaterialChecklist({ caseId, templateId }: Props) {
   const [template, setTemplate] = useState<any>(null)
-  const [materials, setMaterials] = useState<any[]>([])
-  const [checklist, setChecklist] = useState<any[]>([])
+  const [materials, setMaterials] = useState<MaterialRecord[]>([])
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true)
       try {
         if (templateId) {
           const tpl = await api.templates.get(templateId)
@@ -35,24 +71,21 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
     return null
   }
 
-  const getCompletionStatus = () => {
-    const required = checklist.filter(item => item.required)
-    const completed = required.filter(item => {
-      const keyword = item.name.toLowerCase()
-      return materials.some(m => m.filename.toLowerCase().includes(keyword))
-    })
-    return { completed: completed.length, total: required.length }
-  }
-
-  const status = getCompletionStatus()
-  const completionPercent = status.total > 0 ? Math.round((status.completed / status.total) * 100) : 0
+  const items = checklist.map(item => {
+    const keywords = getKeywords(item)
+    return { item, keywords, matchedMaterial: findMatchedMaterial(materials, keywords) }
+  })
+  const requiredItems = items.filter(({ item }) => item.required !== false)
+  const completedRequired = requiredItems.filter(({ matchedMaterial }) => matchedMaterial).length
+  const completionPercent = requiredItems.length > 0 ? Math.round((completedRequired / requiredItems.length) * 100) : 0
+  const missingRequired = requiredItems.length - completedRequired
 
   return (
     <div className="card" style={{ marginBottom: 20, borderLeft: '3px solid #6366f1' }}>
       <div className="card-hd">
         <span className="card-title">材料检查清单</span>
         <span style={{ fontSize: 12, color: '#86909c' }}>
-          {status.completed}/{status.total} 必需材料已上传
+          {completedRequired}/{requiredItems.length} 必需材料已识别
         </span>
       </div>
 
@@ -71,16 +104,16 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
             transition: 'width 0.3s'
           }} />
         </div>
-        <div style={{ fontSize: 12, color: '#86909c', textAlign: 'right' }}>
-          {completionPercent}% 完成
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#86909c' }}>
+          <span>{missingRequired > 0 ? `仍缺少 ${missingRequired} 项必需材料` : '必需材料已齐备'}</span>
+          <span>{completionPercent}% 完成</span>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {checklist.map((item, i) => {
-          const isUploaded = materials.some(m =>
-            m.filename.toLowerCase().includes(item.name.toLowerCase())
-          )
+        {items.map(({ item, keywords, matchedMaterial }, i) => {
+          const isUploaded = Boolean(matchedMaterial)
+          const isRequired = item.required !== false
           return (
             <div
               key={i}
@@ -89,30 +122,35 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
                 alignItems: 'flex-start',
                 gap: 12,
                 padding: '10px 12px',
-                background: isUploaded ? '#f0fdf4' : '#fafafa',
+                background: isUploaded ? '#f0fdf4' : isRequired ? '#fffbeb' : '#fafafa',
                 borderRadius: 8,
-                border: `1px solid ${isUploaded ? '#d1fae5' : '#e5e7eb'}`
+                border: `1px solid ${isUploaded ? '#d1fae5' : isRequired ? '#fde68a' : '#e5e7eb'}`
               }}
             >
               <div style={{
                 fontSize: 16,
                 marginTop: 2,
-                color: isUploaded ? '#10b981' : '#d1d5db'
+                color: isUploaded ? '#10b981' : isRequired ? '#f59e0b' : '#d1d5db'
               }}>
-                {isUploaded ? '✓' : item.required ? '●' : '○'}
+                {isUploaded ? '✓' : isRequired ? '●' : '○'}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: isUploaded ? '#10b981' : '#1d2129'
-                }}>
-                  {item.name}
-                  {item.required && <span style={{ color: '#ef4444' }}>*</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: isUploaded ? '#10b981' : '#1d2129' }}>
+                    {item.name}{isRequired && <span style={{ color: '#ef4444' }}>*</span>}
+                  </span>
+                  <span className={`tag ${isUploaded ? 't-green' : isRequired ? 't-orange' : 't-gray'}`}>
+                    {isUploaded ? '已匹配' : isRequired ? '待上传' : '选填'}
+                  </span>
                 </div>
                 <div style={{ fontSize: 12, color: '#86909c', marginTop: 2 }}>
-                  {item.description}
+                  {matchedMaterial ? `匹配文件：${matchedMaterial.filename}` : item.description}
                 </div>
+                {!matchedMaterial && keywords.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#c97706', marginTop: 4 }}>
+                    建议文件名或正文包含：{keywords.slice(0, 3).join('、')}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -130,7 +168,7 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
           fontSize: 12,
           textAlign: 'center'
         }}>
-          ✓ 所有必需材料已上传，可以开始工作流
+          所有必需材料已上传，可以开始工作流
         </div>
       )}
     </div>

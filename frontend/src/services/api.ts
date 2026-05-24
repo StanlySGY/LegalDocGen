@@ -1,20 +1,20 @@
 const BASE = '/api'
 
+async function parseError(res: Response, fallback: string): Promise<string> {
+  try {
+    const err = await res.json()
+    return err.detail || err.message || res.statusText || fallback
+  } catch {
+    return res.statusText || fallback
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   })
-  if (!res.ok) {
-    let errorMsg = '请求失败'
-    try {
-      const err = await res.json()
-      errorMsg = err.detail || err.message || res.statusText
-    } catch {
-      errorMsg = res.statusText || '请求失败'
-    }
-    throw new Error(errorMsg)
-  }
+  if (!res.ok) throw new Error(await parseError(res, '请求失败'))
   return res.json()
 }
 
@@ -32,7 +32,7 @@ export const api = {
       const form = new FormData()
       form.append('file', file)
       const res = await fetch(`${BASE}/materials/upload/${caseId}`, { method: 'POST', body: form })
-      if (!res.ok) throw new Error('Upload failed')
+      if (!res.ok) throw new Error(await parseError(res, '上传失败'))
       return res.json()
     },
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
@@ -72,7 +72,7 @@ export const api = {
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
     export: async (caseId: string) => {
       const res = await fetch(`${BASE}/workflow/export/${caseId}`)
-      if (!res.ok) throw new Error('Export failed')
+      if (!res.ok) throw new Error(await parseError(res, '导出失败'))
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')

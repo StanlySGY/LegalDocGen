@@ -17,11 +17,20 @@ export default function CaseDetail({ caseId, nav }: Props) {
   useEffect(() => { load() }, [caseId])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files; if (!files) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
     setUploading(true)
-    for (const f of files) await api.materials.upload(caseId, f)
-    setUploading(false); load(); showToast('上传成功')
-    if (fileRef.current) fileRef.current.value = ''
+    try {
+      for (const f of files) await api.materials.upload(caseId, f)
+      await load()
+      showToast(`已上传 ${files.length} 个文件`)
+    } catch (e) {
+      await load()
+      showToast(e instanceof Error ? e.message : '上传失败', 'err')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const del = async (id: string) => { await api.materials.delete(id); load(); showToast('已删除') }
