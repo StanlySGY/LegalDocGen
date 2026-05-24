@@ -1,9 +1,8 @@
 from sqlalchemy import Column, String, Text, Integer, DateTime, Boolean
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import json
 
-Base = declarative_base()
+from backend.database import Base
 
 class CaseTemplate(Base):
     __tablename__ = "case_templates"

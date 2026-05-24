@@ -1,6 +1,7 @@
 import json
 from sqlalchemy.orm import Session
 from backend.models.prompt import PromptTemplate
+from backend.models.case_template import CaseTemplate
 from backend.models.workflow import StageType, STAGE_NAMES
 from backend.services.workflow_engine.stages import STAGE_PROMPTS
 
@@ -29,6 +30,12 @@ class PromptManager:
 
     def get_prompt(self, stage: StageType, template_id: str = "") -> str:
         if template_id:
+            case_template = self.db.query(CaseTemplate).filter(CaseTemplate.id == template_id).first()
+            if case_template:
+                prompts = case_template.get_default_prompts()
+                template_prompt = prompts.get(stage.value)
+                if template_prompt:
+                    return template_prompt
             tpl = self.db.query(PromptTemplate).filter(PromptTemplate.id == template_id).first()
             if tpl:
                 return tpl.content

@@ -19,7 +19,7 @@ export default function CaseList({ nav }: Props) {
 
   const create = async () => {
     if (!form.name.trim()) return
-    const c = await api.cases.create(form)
+    const c = await api.cases.create({ ...form, template_id: selectedTemplate?.id || '' })
     setForm({ name: '', description: '', case_type: '' })
     setShowCreate(false)
     setSelectedTemplate(null)

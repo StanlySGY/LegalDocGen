@@ -3,6 +3,7 @@ export interface Case {
   name: string
   description: string
   case_type: string
+  template_id?: string | null
   status: string
   created_at: string
   updated_at: string

@@ -3,12 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
 
 from backend.database import get_db
-from backend.models.workflow import StageType, STAGE_NAMES
+from backend.models.case import Case
+from backend.models.workflow import StageType
 from backend.services.workflow_engine.engine import WorkflowEngine
-from backend.services.workflow_engine.stages import STAGE_PROMPTS
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.export_service import ExportService
@@ -35,12 +34,28 @@ def get_progress(case_id: str, db: Session = Depends(get_db)):
     return engine.get_stage_progress(case_id)
 
 
+def _get_case_template_id(case_id: str, request_template_id: str, db: Session) -> str:
+    if request_template_id:
+        return request_template_id
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise NotFoundError("案件不存在")
+    return case.template_id or ""
+
+
 @router.get("/node/{case_id}/{stage}")
 def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
+    try:
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
+
     engine = WorkflowEngine(db)
-    node = engine.get_stage_node(case_id, StageType(stage))
+    node = engine.get_stage_node(case_id, stage_type)
     if not node:
-        return {"stage": stage, "output": "", "prompt": STAGE_PROMPTS.get(StageType(stage), ""), "version": 0}
+        pm = PromptManager(db)
+        template_id = _get_case_template_id(case_id, "", db)
+        return {"stage": stage, "output": "", "prompt": pm.get_prompt(stage_type, template_id), "version": 0}
     return {
         "id": node.id,
         "stage": node.stage,
@@ -64,7 +79,8 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         raise ValidationError(f"无效的工作流阶段: {req.stage}")
 
     try:
-        prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
+        template_id = _get_case_template_id(case_id, req.template_id, db)
+        prompt_template = req.prompt or pm.get_prompt(stage, template_id)
         materials_context = engine.get_case_context(case_id)
         previous_context = engine.get_previous_stages_output(case_id, stage)
 
@@ -97,7 +113,8 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
         raise ValidationError(f"无效的工作流阶段: {req.stage}")
 
     try:
-        prompt_template = req.prompt or pm.get_prompt(stage, req.template_id)
+        template_id = _get_case_template_id(case_id, req.template_id, db)
+        prompt_template = req.prompt or pm.get_prompt(stage, template_id)
         materials_context = engine.get_case_context(case_id)
         previous_context = engine.get_previous_stages_output(case_id, stage)
 

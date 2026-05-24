@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Enum as SAEnum
+from sqlalchemy import Column, String, DateTime, Text, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -20,9 +20,11 @@ class Case(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, default="")
     case_type = Column(String(100), default="")
+    template_id = Column(String(36), ForeignKey("case_templates.id"), nullable=True)
     status = Column(SAEnum(CaseStatus), default=CaseStatus.DRAFT)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     materials = relationship("Material", back_populates="case", cascade="all, delete-orphan")
     workflow_nodes = relationship("WorkflowNode", back_populates="case", cascade="all, delete-orphan")
+    template = relationship("CaseTemplate")
