@@ -155,7 +155,12 @@ npm run dev
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/import?framework=other&hasTrialAvailable=1&id=1225314281&name=LegalDocGen&owner=StanlySGY&project-name=legal-doc-gen&provider=github&remainingProjects=1&s=https%3A%2F%2Fgithub.com%2FStanlySGY%2FLegalDocGen&teamSlug=stanlysgys-projects&totalProjects=1)
 
-2. 或手动部署：
+2. 部署后配置环境变量：
+   - 进入 Vercel 项目设置 → Environment Variables
+   - 添加 `VITE_API_BASE_URL`，值为你的后端 API 地址（如 `https://your-backend.railway.app`）
+   - 重新部署前端
+
+3. 或手动部署：
    - 连接你的 GitHub 账户
    - 选择 LegalDocGen 仓库
    - 设置环境变量（如需要）
