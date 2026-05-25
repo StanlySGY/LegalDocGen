@@ -129,6 +129,15 @@ export default function CaseList({ nav }: Props) {
         <div className="stat-card s-green"><div className="s-label">已完成</div><div className="s-value">{cases.filter(c=>c.status==='completed').length}</div></div>
       </div>
 
+      {cases.length === 0 && !toast && (
+        <div className="card" style={{marginBottom:16,border:'1px solid #dbeafe',background:'#eff6ff'}}>
+          <div style={{fontWeight:600,color:'#1d4ed8'}}>线上预览提示</div>
+          <div style={{fontSize:13,color:'#475569',marginTop:6,lineHeight:1.7}}>
+            如果你正在访问 Vercel 在线预览，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。未配置后端时，页面只展示前端界面能力。
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{marginBottom:16}}>
         <div className="filters-grid">
           <input className="input" placeholder="搜索名称、描述或类型" value={filters.keyword} onChange={e=>setFilters({...filters,keyword:e.target.value})}/>

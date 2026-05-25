@@ -1,5 +1,12 @@
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
+
+export class ApiConnectionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ApiConnectionError'
+  }
+}
 
 export const getAdminToken = () => localStorage.getItem(ADMIN_TOKEN_KEY) || ''
 export const setAdminToken = (token: string) => {
@@ -18,11 +25,24 @@ const jsonHeaders = (headers?: HeadersInit): HeadersInit => ({
   ...(headers as Record<string, string> | undefined),
 })
 
+async function parseJsonResponse<T>(res: Response, fallback: string): Promise<T> {
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    const text = await res.text().catch(() => '')
+    if (text.trim().startsWith('<')) {
+      throw new ApiConnectionError('后端 API 未连接或地址配置错误：当前请求返回了网页而不是 JSON。请配置 VITE_API_BASE_URL 指向真实 FastAPI 后端。')
+    }
+    throw new Error(res.statusText || fallback)
+  }
+  return res.json()
+}
+
 async function parseError(res: Response, fallback: string): Promise<string> {
   try {
-    const err = await res.json()
+    const err = await parseJsonResponse<any>(res, fallback)
     return err.detail || err.message || res.statusText || fallback
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiConnectionError) return e.message
     return res.statusText || fallback
   }
 }
@@ -33,7 +53,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   if (!res.ok) throw new Error(await parseError(res, '请求失败'))
-  return res.json()
+  return parseJsonResponse<T>(res, '请求失败')
 }
 
 export const api = {

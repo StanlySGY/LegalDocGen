@@ -167,7 +167,13 @@ npm run dev
 
 https://legal-doc-gen-wine.vercel.app/
 
-如需连接真实后端，请在前端部署平台配置后端 API 地址，并确保代理或环境变量与实际部署方式一致。
+如需连接真实后端，请在 Vercel 项目中配置 `VITE_API_BASE_URL`，值为后端 API 根地址，例如：
+
+```env
+VITE_API_BASE_URL=https://your-backend.example.com/api
+```
+
+如果没有配置真实后端，在线预览只展示前端界面；涉及 `/api` 的请求不会返回 JSON，旧版本会出现 `Unexpected token '<'`，当前版本会显示更明确的“后端 API 未连接或地址配置错误”提示。
 
 ### 后端
 后端需要部署到支持 Python Web 服务的平台，例如 Railway、Render、Fly.io 或自有服务器。
