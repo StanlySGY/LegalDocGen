@@ -91,6 +91,33 @@ export const api = {
     updateUser: (id: string, data: { role?: string; is_active?: boolean }) =>
       request<AuthUser>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
+  teams: {
+    list: () => request<any[]>('/teams'),
+    create: (data: { name: string }) => request<any>('/teams', { method: 'POST', body: JSON.stringify(data) }),
+    members: (teamId: string) => request<any[]>(`/teams/${teamId}/members`),
+    addMember: (teamId: string, data: { user_id: string; role: string }) =>
+      request<any>(`/teams/${teamId}/members`, { method: 'POST', body: JSON.stringify(data) }),
+    updateMember: (teamId: string, userId: string, data: { role: string }) =>
+      request<any>(`/teams/${teamId}/members/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    removeMember: (teamId: string, userId: string) => request<any>(`/teams/${teamId}/members/${userId}`, { method: 'DELETE' }),
+  },
+  tasks: {
+    list: (params?: { limit?: number; case_id?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.case_id) query.set('case_id', params.case_id)
+      const suffix = query.toString() ? `?${query}` : ''
+      return request<any[]>(`/tasks${suffix}`)
+    },
+    get: (id: string) => request<any>(`/tasks/${id}`),
+  },
+  legalArticles: {
+    list: (keyword?: string) => request<any[]>(`/legal-articles${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`),
+    create: (data: { law_name: string; article_no: string; title?: string; content?: string }) =>
+      request<any>('/legal-articles', { method: 'POST', body: JSON.stringify(data) }),
+    verify: (text: string) => request<any>('/legal-articles/verify', { method: 'POST', body: JSON.stringify({ text }) }),
+    delete: (id: string) => request<any>(`/legal-articles/${id}`, { method: 'DELETE' }),
+  },
   cases: {
     list: (params?: { status?: string; keyword?: string; case_type?: string; template_id?: string }) => {
       const query = new URLSearchParams()

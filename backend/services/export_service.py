@@ -84,9 +84,9 @@ class ExportService:
         if not catalog:
             return
         doc.add_heading("证据材料目录", level=2)
-        table = doc.add_table(rows=1, cols=5)
+        table = doc.add_table(rows=1, cols=6)
         table.style = "Light Grid Accent 1"
-        headers = ["序号", "材料名称", "类型", "解析状态", "内容摘要"]
+        headers = ["序号", "材料名称", "类型", "解析状态", "引用页码", "内容摘要"]
         for index, header in enumerate(headers):
             table.rows[0].cells[index].text = header
         for index, item in enumerate(catalog, start=1):
@@ -95,7 +95,8 @@ class ExportService:
             cells[1].text = item["filename"]
             cells[2].text = item["file_type"]
             cells[3].text = "已解析" if item["parse_status"] == "completed" else "失败"
-            cells[4].text = item["excerpt"][:120]
+            cells[4].text = item.get("citation", "页码未识别")
+            cells[5].text = item["excerpt"][:120]
 
     def _add_fact_timeline(self, doc: Document, case_id: str):
         timeline = self.engine.get_fact_timeline(case_id)

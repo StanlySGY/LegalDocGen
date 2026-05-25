@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.config import settings
@@ -9,6 +10,7 @@ from backend.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from backend.models.case import Case
 from backend.models.user import User, UserRole
 from backend.services.auth_service import decode_token
+from backend.services.team_service import ensure_default_team, get_user_team_ids
 
 
 def require_admin(
@@ -60,7 +62,11 @@ def require_admin_user(user: User = Depends(require_user)) -> User:
 def case_query_for_user(db: Session, user: Optional[User]):
     query = db.query(Case)
     if user and user.role != UserRole.ADMIN:
-        query = query.filter(Case.owner_id == user.id)
+        team_ids = get_user_team_ids(db, user)
+        filters = [Case.owner_id == user.id]
+        if team_ids:
+            filters.append(Case.team_id.in_(team_ids))
+        query = query.filter(or_(*filters))
     return query
 
 
@@ -71,9 +77,11 @@ def get_accessible_case(db: Session, case_id: str, user: Optional[User]) -> Case
     return case
 
 
-def assign_case_owner(case: Case, user: Optional[User]):
+def assign_case_owner(case: Case, user: Optional[User], db: Optional[Session] = None):
     if user and not case.owner_id:
         case.owner_id = user.id
+    if user and db and not case.team_id:
+        case.team_id = ensure_default_team(db, user).id
 
 
 def _user_from_authorization(authorization: str, db: Session) -> User:

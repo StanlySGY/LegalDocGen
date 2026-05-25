@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
-import type { Case, Material } from '../types'
+import type { Case, Material, MaterialCatalogItem } from '../types'
 
 interface Props { caseId: string; nav: { cases: () => void; workflow: (id: string) => void } }
 
 export default function CaseDetail({ caseId, nav }: Props) {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
-  const [materialInsights, setMaterialInsights] = useState<{catalog:any[];timeline:any[]}>({ catalog: [], timeline: [] })
+  const [materialInsights, setMaterialInsights] = useState<{catalog:MaterialCatalogItem[];timeline:any[]}>({ catalog: [], timeline: [] })
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
@@ -128,6 +128,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
                   <strong style={{fontSize:13}}>{index + 1}. {item.filename}</strong>
                   <span className={`tag ${item.parse_status==='completed'?'t-green':'t-red'}`}>{item.parse_status==='completed'?'已解析':'失败'}</span>
                 </div>
+                <div style={{fontSize:11,color:'#4f46e5',marginTop:6}}>{item.citation || '页码未识别'}</div>
                 <div style={{fontSize:12,color:'#86909c',marginTop:6,lineHeight:1.6}}>{item.excerpt || '暂无可解析内容'}</div>
               </div>
             ))}
@@ -167,6 +168,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
                   <div className="flex items-center gap-2" style={{marginTop:3}}>
                     <span style={{fontSize:11,color:'#86909c'}}>{(m.file_size/1024).toFixed(1)} KB</span>
                     <span className={`tag ${m.parse_status==='completed'?'t-green':'t-red'}`}>{m.parse_status==='completed'?'已解析':'失败'}</span>
+                    {m.parse_task_id && <span className="tag t-gray">任务 {m.parse_task_id.slice(0, 8)}</span>}
                   </div>
                 </div>
               </div>

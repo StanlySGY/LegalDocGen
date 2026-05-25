@@ -17,6 +17,7 @@ class Material(Base):
     file_size = Column(Integer, default=0)
     parsed_content = Column(Text, default="")
     structured_data = Column(Text, default="{}")
+    parse_task_id = Column(String(36), nullable=True)
     parse_status = Column(String(50), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
 

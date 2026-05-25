@@ -1,6 +1,6 @@
 # 法律文书智能生成与审查系统
 
-面向法律专业人士的 AI 辅助办案与法律文书生成平台。系统围绕“材料上传 → 证据整理 → 分阶段分析 → 文书生成 → 审查导出”的完整链路设计，支持案件模板、材料齐备度检查、多模型渠道、版本回滚、证据目录、事实时间线和 Word 批量导出。
+面向法律专业人士的 AI 辅助办案与法律文书生成平台。系统围绕“材料上传 → 证据整理 → 分阶段分析 → 文书生成 → 审查导出”的完整链路设计，支持登录权限、团队协作、案件模板、材料齐备度检查、多模型渠道、后台任务、页码级证据引用、法条核验、版本回滚、证据目录、事实时间线和 Word 批量导出。
 
 ## 在线预览
 
@@ -16,11 +16,12 @@
 - 多案件批量导出 Word 压缩包
 - 草稿、进行中、已完成状态自动同步
 
-### 认证与权限
+### 认证、权限与团队协作
 - 支持登录、注册、当前用户状态和管理员用户管理接口
 - `AUTH_REQUIRED=false` 时保持单用户兼容模式，在线预览和本地旧流程不受影响
 - `AUTH_REQUIRED=true` 时要求登录后访问业务接口
-- 普通成员仅能访问自己创建的案件，管理员可查看全部案件并管理渠道、模板和审计日志
+- 普通成员仅能访问自己创建或所属团队可访问的案件，管理员可查看全部案件并管理渠道、模板和审计日志
+- 支持团队创建、成员添加、角色调整和成员移除
 - 兼容旧版 `ADMIN_TOKEN`，用于保护渠道、模板、审计和 Prompt 写入等高风险接口
 
 ### 案件模板与材料齐备度
@@ -29,11 +30,12 @@
 - 上传材料后自动计算齐备度
 - 必需材料缺失时阻止进入工作流，降低空材料生成风险
 
-### 证据材料与事实时间线
+### 证据材料、后台任务与事实时间线
 - 自动解析 PDF、Word、图片材料
-- 生成证据材料目录，展示材料摘要和解析状态
+- 上传材料时记录解析任务，支持后台任务列表和失败原因查看
+- 生成证据材料目录，展示材料摘要、解析状态和页码级引用
 - 从材料正文识别日期事实，形成事实时间线
-- Word 导出中自动包含证据目录和事实时间线
+- Word 导出中自动包含证据目录、引用页码和事实时间线
 
 ### 五阶段工作流
 1. 案件要素提取：提取当事人、关键事实、时间线、证据清单
@@ -57,11 +59,12 @@
 - 多案批量导出 zip
 - 导出前校验全部阶段是否完成
 
-### 模型渠道管理
+### 模型渠道与法条核验
 - 支持 OpenAI 兼容接口
 - 支持多渠道配置、连通性测试和模型拉取
 - 工作流生成时可选择不同渠道和模型
 - 支持流式输出生成结果
+- 支持本地法条库维护和《法律名称》第X条引用核验
 
 ## 系统架构
 
@@ -85,9 +88,10 @@
 - Pillow
 
 ### 数据与存储
-- SQLite 默认数据库
-- 本地文件系统存储上传材料
-- 可扩展至 PostgreSQL 与对象存储
+- SQLite 默认数据库，支持 PostgreSQL 连接配置
+- Alembic 基线迁移脚本
+- 本地文件系统存储上传材料，已封装存储服务抽象
+- 健康检查返回数据库、渠道和存储状态
 
 ## 快速开始
 
@@ -117,6 +121,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL_NAME=gpt-4o
 DATABASE_URL=sqlite:///./legaldocgen.db
 UPLOAD_DIR=./uploads
+STORAGE_BACKEND=local
 MAX_FILE_SIZE=52428800
 CORS_ORIGINS=http://localhost:5173
 ADMIN_TOKEN=change-me-in-production
@@ -202,6 +207,16 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 - 配置 `ADMIN_TOKEN` 保护渠道、审计和高风险配置接口，也可使用管理员账号 Bearer Token
 - 配置 `API_KEY_SECRET`，用于本地加密保存模型渠道 API Key
 
+### 数据库迁移
+
+默认本地开发仍可直接使用自动建表；生产环境建议使用 Alembic 管理 PostgreSQL 迁移：
+
+```bash
+alembic upgrade head
+```
+
+如需切换 PostgreSQL，将 `DATABASE_URL` 配置为 `postgresql+psycopg://user:password@host:5432/dbname`。
+
 ## 使用流程
 
 ### 创建案件
@@ -213,9 +228,9 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 
 ### 上传和整理材料
 1. 在案件详情页上传 PDF、Word 或图片
-2. 查看材料解析状态
+2. 查看材料解析状态和解析任务编号
 3. 查看材料齐备度
-4. 查看证据材料目录和事实时间线
+4. 查看证据材料目录、引用页码和事实时间线
 
 ### 执行工作流
 1. 点击“进入工作流”
@@ -224,10 +239,15 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 4. 生成结果可编辑、复制、回滚
 5. 后续阶段会自动引用前序阶段输出
 
+### 团队、任务与法条
+1. 在“团队协作”中创建团队、添加成员并分配成员角色
+2. 在“后台任务”中查看材料解析任务状态和失败原因
+3. 在“法条核验”中维护本地法条库，并核验文书中的法条引用
+
 ### 导出文档
 1. 完成全部工作流阶段
 2. 点击“导出为 Word”
-3. 下载包含案件信息、证据目录、事实时间线、阶段输出和元数据的文档
+3. 下载包含案件信息、证据目录、引用页码、事实时间线、阶段输出和元数据的文档
 
 ## API 概览
 
@@ -237,6 +257,14 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 - `GET /api/auth/me`：当前登录用户与认证开关状态
 - `GET /api/auth/users`：管理员查看用户列表
 - `PUT /api/auth/users/{user_id}`：管理员更新用户角色或启停状态
+
+### 团队协作
+- `GET /api/teams`：当前用户可访问团队列表
+- `POST /api/teams`：创建团队
+- `GET /api/teams/{team_id}/members`：团队成员列表
+- `POST /api/teams/{team_id}/members`：添加团队成员
+- `PUT /api/teams/{team_id}/members/{user_id}`：更新成员角色
+- `DELETE /api/teams/{team_id}/members/{user_id}`：移除团队成员
 
 ### 案件管理
 - `GET /api/cases`：案件列表，支持状态、关键词、类型、模板筛选
@@ -249,7 +277,8 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 ### 材料管理
 - `POST /api/materials/upload/{case_id}`：上传材料
 - `GET /api/materials/case/{case_id}`：案件材料列表
-- `GET /api/materials/case/{case_id}/catalog`：证据目录与事实时间线
+- `GET /api/materials/case/{case_id}/catalog`：证据目录、页码引用与事实时间线
+- `GET /api/materials/tasks/{task_id}`：材料解析任务详情
 - `DELETE /api/materials/{material_id}`：删除材料
 
 ### 工作流
@@ -263,7 +292,14 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 - `GET /api/workflow/export/{case_id}`：导出单案 Word
 - `POST /api/workflow/export-batch`：批量导出 zip
 
+### 任务、审计与法条
+- `GET /api/tasks`：管理员查看后台任务列表
+- `GET /api/tasks/{task_id}`：查看任务详情
 - `GET /api/audit`：审计日志列表
+- `GET /api/legal-articles`：查询本地法条库
+- `POST /api/legal-articles`：管理员维护法条
+- `POST /api/legal-articles/verify`：核验文本中的法条引用
+- `DELETE /api/legal-articles/{article_id}`：管理员删除法条
 
 ### 模板与渠道
 - `GET /api/templates/list`：模板列表
@@ -279,6 +315,7 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 ```text
 LegalDocGen/
 ├── backend/
+│   ├── alembic/             # 数据库迁移
 │   ├── models/              # 数据模型
 │   ├── routers/             # API 路由
 │   ├── services/            # 业务服务
@@ -287,6 +324,7 @@ LegalDocGen/
 │   │   ├── prompt_manager/  # Prompt 管理
 │   │   ├── workflow_engine/ # 工作流引擎
 │   │   └── export_service.py
+│   ├── tests/               # 自动化测试
 │   ├── main.py
 │   ├── database.py
 │   └── config.py
@@ -300,6 +338,8 @@ LegalDocGen/
 │   └── package.json
 ├── docs/
 │   └── architecture.svg
+├── alembic.ini
+├── pytest.ini
 ├── start.sh
 ├── vercel.json
 └── README.md
@@ -313,7 +353,13 @@ LegalDocGen/
 - 工作流状态自动同步
 - 生成结果保存、复制、历史和回滚
 - Word 导出与批量 zip 导出
-- 证据目录和事实时间线
+- 证据目录、页码级引用和事实时间线
+- 团队协作、团队成员管理和团队案件访问
+- 后台任务记录与任务监控页面
+- 本地法条库维护和法条引用核验
+- PostgreSQL 兼容配置与 Alembic 基线迁移
+- 对象存储抽象和存储健康诊断
+- pytest 自动化测试骨架与新增核心能力测试
 - 基础审计日志和审计日志页面
 - API Key 本地加密存储与脱敏展示
 - CORS 环境化配置和可选管理 Token
@@ -325,15 +371,11 @@ LegalDocGen/
 ## 后续优化方向
 
 仍可继续推进的长期优化包括：
-- 用户登录、角色权限和团队协作
 - 更完整的操作审计日志检索与导出
-- API Key 加密存储
-- PostgreSQL 迁移与正式数据库迁移工具
-- 对象存储接入
-- 后台任务队列和长任务进度
+- S3、OSS 等远端对象存储实现
+- Celery、RQ 或云队列驱动的异步任务执行器
 - 文书模板库与法院/仲裁场景模板细分
-- 更严格的证据引用定位和页码级来源标注
-- 自动化测试覆盖率提升
+- 更高覆盖率的端到端测试和 CI 检查
 
 ## 安全建议
 

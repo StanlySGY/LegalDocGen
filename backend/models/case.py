@@ -22,6 +22,7 @@ class Case(Base):
     case_type = Column(String(100), default="")
     template_id = Column(String(36), ForeignKey("case_templates.id"), nullable=True)
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True)
     status = Column(SAEnum(CaseStatus), default=CaseStatus.DRAFT)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -30,3 +31,4 @@ class Case(Base):
     workflow_nodes = relationship("WorkflowNode", back_populates="case", cascade="all, delete-orphan")
     template = relationship("CaseTemplate")
     owner = relationship("User", back_populates="cases")
+    team = relationship("Team", back_populates="cases")

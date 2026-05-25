@@ -4,6 +4,8 @@ export interface Case {
   description: string
   case_type: string
   template_id?: string | null
+  owner_id?: string | null
+  team_id?: string | null
   status: string
   created_at: string
   updated_at: string
@@ -17,7 +19,61 @@ export interface Material {
   file_size: number
   parsed_content: string
   parse_status: string
+  parse_task_id?: string | null
   created_at: string
+}
+
+export interface MaterialCatalogItem {
+  id: string
+  filename: string
+  file_type: string
+  file_size: number
+  parse_status: string
+  excerpt: string
+  citation?: string
+  page_refs?: string[]
+  word_count: number
+}
+
+export interface Team {
+  id: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TeamMember {
+  id: string
+  team_id: string
+  user_id: string
+  username: string
+  display_name: string
+  role: 'owner' | 'admin' | 'member'
+  created_at?: string
+}
+
+export interface BackgroundTask {
+  id: string
+  case_id?: string | null
+  task_type: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  message: string
+  result: string
+  error: string
+  created_at?: string
+  started_at?: string
+  completed_at?: string
+}
+
+export interface LegalArticle {
+  id: string
+  law_name: string
+  article_no: string
+  title: string
+  content: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface WorkflowNode {

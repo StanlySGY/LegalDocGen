@@ -1,3 +1,4 @@
+import json
 import re
 import uuid
 from datetime import datetime
@@ -36,7 +37,7 @@ class WorkflowEngine:
         materials = self.db.query(Material).filter(Material.case_id == case_id).all()
         material_catalog = self.get_material_catalog(case_id)
         materials_text = "\n\n".join(
-            f"【材料{index}: {item['filename']}】\n{item['excerpt']}"
+            f"【材料{index}: {item['filename']}｜{item['citation']}】\n{item['excerpt']}"
             for index, item in enumerate(material_catalog, start=1)
             if item["excerpt"]
         )
@@ -65,9 +66,20 @@ class WorkflowEngine:
                     timeline.append({"date": date, "event": text[:160], "source": material.filename})
         return timeline[:80]
 
+    def _material_pages(self, material: Material) -> list[dict]:
+        try:
+            data = json.loads(material.structured_data or "{}")
+        except json.JSONDecodeError:
+            return []
+        pages = data.get("pages", [])
+        return pages if isinstance(pages, list) else []
+
     def _material_summary(self, material: Material) -> dict:
         content = material.parsed_content or ""
         compact = re.sub(r"\s+", " ", content).strip()
+        pages = [page for page in self._material_pages(material) if str(page.get("text", "")).strip()]
+        page_refs = [str(page.get("page")) for page in pages[:5] if page.get("page")]
+        citation = f"页码：{', '.join(page_refs)}" if page_refs else "页码未识别"
         return {
             "id": material.id,
             "filename": material.filename,
@@ -77,6 +89,8 @@ class WorkflowEngine:
             "created_at": material.created_at.isoformat() if material.created_at else None,
             "excerpt": compact[:500],
             "word_count": len(content),
+            "page_refs": page_refs,
+            "citation": citation,
         }
 
     def create_or_update_node(

@@ -25,3 +25,4 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     cases = relationship("Case", back_populates="owner")
+    team_members = relationship("TeamMember", back_populates="user", cascade="all, delete-orphan")

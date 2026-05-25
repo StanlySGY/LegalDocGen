@@ -5,6 +5,9 @@ import WorkflowPage from './pages/WorkflowPage'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
 import AuditLogPage from './pages/AuditLogPage'
+import TeamManagePage from './pages/TeamManagePage'
+import TaskMonitorPage from './pages/TaskMonitorPage'
+import LegalArticlePage from './pages/LegalArticlePage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 
 type Page =
@@ -14,6 +17,9 @@ type Page =
   | { type: 'channels' }
   | { type: 'config' }
   | { type: 'audit' }
+  | { type: 'teams' }
+  | { type: 'tasks' }
+  | { type: 'legalArticles' }
 
 type HealthState = {
   status: 'checking' | 'ok' | 'degraded' | 'offline'
@@ -107,12 +113,18 @@ export default function App() {
     channels: () => setPage({ type: 'channels' }),
     config: () => setPage({ type: 'config' }),
     audit: () => setPage({ type: 'audit' }),
+    teams: () => setPage({ type: 'teams' }),
+    tasks: () => setPage({ type: 'tasks' }),
+    legalArticles: () => setPage({ type: 'legalArticles' }),
   }
 
   const isCases = page.type === 'cases' || page.type === 'detail' || page.type === 'workflow'
   const isChannels = page.type === 'channels'
   const isConfig = page.type === 'config'
   const isAudit = page.type === 'audit'
+  const isTeams = page.type === 'teams'
+  const isTasks = page.type === 'tasks'
+  const isLegalArticles = page.type === 'legalArticles'
   const needsLogin = authRequired && !currentUser
 
   const breadcrumb = () => {
@@ -123,6 +135,9 @@ export default function App() {
       case 'channels': return null
       case 'config': return null
       case 'audit': return null
+      case 'teams': return null
+      case 'tasks': return null
+      case 'legalArticles': return null
     }
   }
 
@@ -162,6 +177,10 @@ export default function App() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
               案件管理
             </div>
+            <div className={`nav-item ${isTeams ? 'active' : ''}`} onClick={nav.teams}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              团队协作
+            </div>
           </div>
           <div className="nav-section">
             <div className="nav-section-title">系统</div>
@@ -176,6 +195,14 @@ export default function App() {
             <div className={`nav-item ${isAudit ? 'active' : ''}`} onClick={nav.audit}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
               审计日志
+            </div>
+            <div className={`nav-item ${isTasks ? 'active' : ''}`} onClick={nav.tasks}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6M8 17h4"/></svg>
+              后台任务
+            </div>
+            <div className={`nav-item ${isLegalArticles ? 'active' : ''}`} onClick={nav.legalArticles}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+              法条核验
             </div>
           </div>
         </nav>
@@ -230,6 +257,9 @@ export default function App() {
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'audit' && <AuditLogPage />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'teams' && <TeamManagePage />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'tasks' && <TaskMonitorPage />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'legalArticles' && <LegalArticlePage />}
         </div>
       </div>
     </>

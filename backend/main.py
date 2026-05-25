@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -14,10 +13,12 @@ from backend.exceptions import (
 )
 from backend.models.channel import Channel
 from backend.models.user import User, UserRole
-from backend.routers import audit, auth, cases, channel, config, materials, templates, workflow
+from backend.routers import audit, auth, cases, channel, config, legal_articles, materials, tasks, teams, templates, workflow
 from backend.services.auth_service import hash_password
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.secret_service import encrypt_secret
+from backend.services.storage_service import get_storage
+from backend.services.team_service import ensure_default_team
 from backend.services.template_manager import init_default_templates
 
 
@@ -58,6 +59,8 @@ def _seed_default_admin(db):
         role=UserRole.ADMIN,
     )
     db.add(user)
+    db.flush()
+    ensure_default_team(db, user)
     db.commit()
 
 
@@ -92,9 +95,12 @@ app.add_exception_handler(Exception, general_exception_handler)
 
 app.include_router(audit.router)
 app.include_router(auth.router)
+app.include_router(teams.router)
 app.include_router(cases.router)
 app.include_router(materials.router)
+app.include_router(tasks.router)
 app.include_router(workflow.router)
+app.include_router(legal_articles.router)
 app.include_router(config.router)
 app.include_router(channel.router)
 app.include_router(templates.router)
@@ -122,13 +128,7 @@ def _database_health() -> tuple[dict, dict]:
 
 
 def _storage_health() -> dict:
-    upload_dir = settings.UPLOAD_DIR
-    return {
-        "mode": "local",
-        "upload_dir": str(upload_dir),
-        "exists": upload_dir.exists(),
-        "writable": os.access(upload_dir, os.W_OK),
-    }
+    return get_storage().health()
 
 
 @app.get("/api/health")

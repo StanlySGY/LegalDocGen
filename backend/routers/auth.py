@@ -11,6 +11,7 @@ from backend.exceptions import ForbiddenError, UnauthorizedError, ValidationErro
 from backend.models.user import User, UserRole
 from backend.services.audit_service import record_audit
 from backend.services.auth_service import hash_password, issue_token, public_user, verify_password
+from backend.services.team_service import ensure_default_team
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -59,6 +60,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.flush()
+    ensure_default_team(db, user)
     record_audit(db, "auth.register", "user", user.id, f"注册用户：{user.username}")
     db.commit()
     db.refresh(user)

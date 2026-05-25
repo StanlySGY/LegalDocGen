@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "LegalDocGen"
     DATABASE_URL: str = "sqlite:///./legaldocgen.db"
     UPLOAD_DIR: Path = Path("uploads")
-    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50MB
+    STORAGE_BACKEND: str = "local"
+    MAX_FILE_SIZE: int = 50 * 1024 * 1024
     ALLOWED_EXTENSIONS: set = {".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"}
     CORS_ORIGINS: str = "*"
     ADMIN_TOKEN: str = ""

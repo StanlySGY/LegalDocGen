@@ -44,7 +44,7 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db), current_user: O
         case_type=data.case_type,
         template_id=template_id,
     )
-    assign_case_owner(case, current_user)
+    assign_case_owner(case, current_user, db)
     db.add(case)
     db.flush()
     record_audit(db, "case.create", "case", case.id, f"创建案件：{case.name}")
