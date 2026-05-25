@@ -1,7 +1,17 @@
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
+const AUTH_TOKEN_KEY = 'legaldocgen_auth_token'
 
 export const apiBaseUrl = BASE
+
+export type AuthUser = {
+  id: string
+  username: string
+  display_name: string
+  role: 'admin' | 'member'
+  is_active: boolean
+  created_at?: string
+}
 
 export class ApiConnectionError extends Error {
   constructor(message: string) {
@@ -16,9 +26,19 @@ export const setAdminToken = (token: string) => {
   else localStorage.removeItem(ADMIN_TOKEN_KEY)
 }
 
+export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || ''
+export const setAuthToken = (token: string) => {
+  if (token) localStorage.setItem(AUTH_TOKEN_KEY, token)
+  else localStorage.removeItem(AUTH_TOKEN_KEY)
+}
+
 const authHeaders = (): Record<string, string> => {
-  const token = getAdminToken()
-  return token ? { 'X-Admin-Token': token } : {}
+  const headers: Record<string, string> = {}
+  const adminToken = getAdminToken()
+  const authToken = getAuthToken()
+  if (adminToken) headers['X-Admin-Token'] = adminToken
+  if (authToken) headers.Authorization = `Bearer ${authToken}`
+  return headers
 }
 
 const jsonHeaders = (headers?: HeadersInit): HeadersInit => ({
@@ -50,9 +70,10 @@ async function parseError(res: Response, fallback: string): Promise<string> {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const { headers, ...rest } = options || {}
   const res = await fetch(`${BASE}${url}`, {
-    headers: jsonHeaders(options?.headers),
-    ...options,
+    ...rest,
+    headers: jsonHeaders(headers),
   })
   if (!res.ok) throw new Error(await parseError(res, '请求失败'))
   return parseJsonResponse<T>(res, '请求失败')
@@ -60,6 +81,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<any>('/health'),
+  auth: {
+    me: () => request<{ user: AuthUser | null; auth_required: boolean }>('/auth/me'),
+    login: (data: { username: string; password: string }) =>
+      request<{ token: string; user: AuthUser; auth_required: boolean }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    register: (data: { username: string; password: string; display_name?: string }) =>
+      request<{ token: string; user: AuthUser; auth_required: boolean }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    users: () => request<AuthUser[]>('/auth/users'),
+    updateUser: (id: string, data: { role?: string; is_active?: boolean }) =>
+      request<AuthUser>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
   cases: {
     list: (params?: { status?: string; keyword?: string; case_type?: string; template_id?: string }) => {
       const query = new URLSearchParams()

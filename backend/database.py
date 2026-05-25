@@ -15,6 +15,9 @@ def _ensure_existing_columns():
         if "template_id" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE cases ADD COLUMN template_id VARCHAR(36)"))
+        if "owner_id" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cases ADD COLUMN owner_id VARCHAR(36)"))
 
     if "channels" in table_names:
         from backend.models.channel import Channel
@@ -41,6 +44,6 @@ def get_db():
 
 
 def init_db():
-    from backend.models import case, material, workflow, prompt, channel, case_template, audit  # noqa
+    from backend.models import case, material, workflow, prompt, channel, case_template, audit, user  # noqa
     Base.metadata.create_all(bind=engine)
     _ensure_existing_columns()

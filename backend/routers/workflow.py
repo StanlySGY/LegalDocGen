@@ -2,21 +2,25 @@ import json
 import re
 import zipfile
 from io import BytesIO
+from typing import Optional
 from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, Response
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies import case_query_for_user, get_accessible_case, get_current_user
+from backend.exceptions import NotFoundError, ValidationError, InternalServerError
 from backend.models.case import Case
-from backend.models.workflow import StageType
-from backend.services.workflow_engine.engine import WorkflowEngine
+from backend.models.user import User
+from backend.models.workflow import StageType, WorkflowNode
+from backend.services.audit_service import record_audit
+from backend.services.export_service import ExportService
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
-from backend.services.export_service import ExportService
-from backend.services.audit_service import record_audit
-from backend.exceptions import NotFoundError, ValidationError, InternalServerError
+from backend.services.workflow_engine.engine import WorkflowEngine
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 
@@ -59,12 +63,6 @@ def _build_final_prompt(prompt_template: str, materials: str, previous_context: 
     ) + TRUSTED_OUTPUT_RULES
 
 
-@router.get("/progress/{case_id}")
-def get_progress(case_id: str, db: Session = Depends(get_db)):
-    engine = WorkflowEngine(db)
-    return engine.get_stage_progress(case_id)
-
-
 def _get_case_template_id(case_id: str, request_template_id: str, db: Session) -> str:
     if request_template_id:
         return request_template_id
@@ -99,8 +97,22 @@ def _ensure_export_ready(engine: WorkflowEngine, case_id: str):
         raise ValidationError(f"请先完成全部工作流阶段，仍缺少：{'、'.join(missing)}")
 
 
+def _ensure_node_belongs_to_case(db: Session, node_id: str, case_id: str):
+    node = db.query(WorkflowNode).filter(WorkflowNode.id == node_id).first()
+    if not node or node.case_id != case_id:
+        raise NotFoundError("工作流节点不存在")
+
+
+@router.get("/progress/{case_id}")
+def get_progress(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
+    engine = WorkflowEngine(db)
+    return engine.get_stage_progress(case_id)
+
+
 @router.get("/node/{case_id}/{stage}")
-def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
+def get_node(case_id: str, stage: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     try:
         stage_type = StageType(stage)
     except ValueError:
@@ -125,7 +137,8 @@ def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 
 @router.post("/generate/{case_id}")
-async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
+async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
 
@@ -161,7 +174,8 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
 
 
 @router.post("/generate-stream/{case_id}")
-async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
+async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
 
@@ -196,6 +210,8 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
                 case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
             )
+            record_audit(db, "workflow.generate_stream", "case", case_id, f"流式生成阶段：{stage.value}")
+            db.commit()
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': f'生成失败: {str(e)}'})}\n\n"
@@ -204,17 +220,22 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
 
 
 @router.post("/rollback/{case_id}")
-def rollback(case_id: str, req: RollbackRequest, db: Session = Depends(get_db)):
+def rollback(case_id: str, req: RollbackRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
+    _ensure_node_belongs_to_case(db, req.node_id, case_id)
     engine = WorkflowEngine(db)
     try:
         node = engine.rollback_to_version(req.node_id)
+        record_audit(db, "workflow.rollback", "case", case_id, f"回滚阶段：{node.stage}")
+        db.commit()
         return {"stage": node.stage, "version": node.version, "output": node.output}
     except Exception as e:
         raise InternalServerError(f"回滚失败: {str(e)}")
 
 
 @router.get("/history/{case_id}/{stage}")
-def get_history(case_id: str, stage: str, db: Session = Depends(get_db)):
+def get_history(case_id: str, stage: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     try:
         stage_type = StageType(stage)
     except ValueError:
@@ -233,7 +254,8 @@ def get_history(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 
 @router.post("/save-output/{case_id}/{stage}")
-def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = Depends(get_db)):
+def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     try:
         stage_type = StageType(stage)
     except ValueError:
@@ -251,13 +273,11 @@ def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = 
 
 
 @router.get("/export/{case_id}")
-def export_case(case_id: str, db: Session = Depends(get_db)):
+def export_case(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
     try:
         engine = WorkflowEngine(db)
         _ensure_export_ready(engine, case_id)
-        case = db.query(Case).filter(Case.id == case_id).first()
-        if not case:
-            raise NotFoundError("案件不存在")
         export_service = ExportService(db)
         content = export_service.export_to_word(case_id)
         record_audit(db, "workflow.export", "case", case_id, f"导出案件：{case.name}")
@@ -272,15 +292,15 @@ def export_case(case_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/export-batch")
-def export_batch(req: BatchExportRequest, db: Session = Depends(get_db)):
+def export_batch(req: BatchExportRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     if not req.case_ids:
         raise ValidationError("请选择要导出的案件")
 
-    cases = db.query(Case).filter(Case.id.in_(req.case_ids)).all()
+    cases = case_query_for_user(db, current_user).filter(Case.id.in_(req.case_ids)).all()
     case_map = {case.id: case for case in cases}
     missing_ids = [case_id for case_id in req.case_ids if case_id not in case_map]
     if missing_ids:
-        raise NotFoundError("部分案件不存在")
+        raise NotFoundError("部分案件不存在或无权访问")
 
     engine = WorkflowEngine(db)
     export_service = ExportService(db)

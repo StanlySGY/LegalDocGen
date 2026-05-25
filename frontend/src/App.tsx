@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
 import WorkflowPage from './pages/WorkflowPage'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
 import AuditLogPage from './pages/AuditLogPage'
-import { api, apiBaseUrl, getAdminToken, setAdminToken } from './services/api'
+import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 
 type Page =
   | { type: 'cases' }
@@ -20,10 +20,19 @@ type HealthState = {
   message: string
 }
 
+type AuthMode = 'login' | 'register'
+
 export default function App() {
   const [page, setPage] = useState<Page>({ type: 'cases' })
   const [adminToken, setAdminTokenState] = useState(getAdminToken())
   const [health, setHealth] = useState<HealthState>({ status: 'checking', message: '正在检测后端连接' })
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authRequired, setAuthRequired] = useState(false)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [showAuthPanel, setShowAuthPanel] = useState(false)
+  const [authForm, setAuthForm] = useState({ username: '', password: '', display_name: '' })
+  const [authError, setAuthError] = useState('')
 
   const checkHealth = async () => {
     setHealth(prev => prev.status === 'ok' ? prev : { status: 'checking', message: '正在检测后端连接' })
@@ -38,8 +47,23 @@ export default function App() {
     }
   }
 
+  const loadSession = async () => {
+    setAuthLoading(true)
+    try {
+      const data = await api.auth.me()
+      setAuthRequired(data.auth_required)
+      setCurrentUser(data.user)
+      if (!data.user && getAuthToken()) setAuthToken('')
+    } catch {
+      if (!getAuthToken()) setCurrentUser(null)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
   useEffect(() => {
     checkHealth()
+    loadSession()
     const timer = window.setInterval(checkHealth, 60000)
     return () => window.clearInterval(timer)
   }, [])
@@ -47,6 +71,33 @@ export default function App() {
   const saveAdminToken = (token: string) => {
     setAdminToken(token)
     setAdminTokenState(token)
+  }
+
+  const handleAuthSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setAuthError('')
+    try {
+      const username = authForm.username.trim()
+      if (!username || !authForm.password) throw new Error('请输入用户名和密码')
+      const data = authMode === 'login'
+        ? await api.auth.login({ username, password: authForm.password })
+        : await api.auth.register({ username, password: authForm.password, display_name: authForm.display_name.trim() })
+      setAuthToken(data.token)
+      setAuthRequired(data.auth_required)
+      setCurrentUser(data.user)
+      setShowAuthPanel(false)
+      setAuthForm({ username: '', password: '', display_name: '' })
+      setPage({ type: 'cases' })
+    } catch (err: any) {
+      setAuthError(err.message || '认证失败')
+    }
+  }
+
+  const logout = () => {
+    setAuthToken('')
+    setCurrentUser(null)
+    setShowAuthPanel(false)
+    setPage({ type: 'cases' })
   }
 
   const nav = {
@@ -62,6 +113,7 @@ export default function App() {
   const isChannels = page.type === 'channels'
   const isConfig = page.type === 'config'
   const isAudit = page.type === 'audit'
+  const needsLogin = authRequired && !currentUser
 
   const breadcrumb = () => {
     switch (page.type) {
@@ -73,6 +125,28 @@ export default function App() {
       case 'audit': return null
     }
   }
+
+  const authPanel = (
+    <div className="auth-panel card">
+      <div className="auth-copy">
+        <div className="tag t-purple">AUTH</div>
+        <h2>{authMode === 'login' ? '登录 LegalDocGen' : '创建团队账号'}</h2>
+        <p>启用认证后，普通成员仅能访问自己创建的案件，管理员可管理渠道、模板、审计与用户。</p>
+      </div>
+      <form className="auth-form" onSubmit={handleAuthSubmit}>
+        <input className="input" placeholder="用户名" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} />
+        {authMode === 'register' && (
+          <input className="input" placeholder="显示名称（可选）" value={authForm.display_name} onChange={e => setAuthForm({ ...authForm, display_name: e.target.value })} />
+        )}
+        <input className="input" type="password" placeholder="密码" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} />
+        {authError && <div className="auth-error">{authError}</div>}
+        <button className="btn btn-p" type="submit">{authMode === 'login' ? '登录' : '注册并登录'}</button>
+        <button className="btn btn-o" type="button" onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError('') }}>
+          {authMode === 'login' ? '没有账号，去注册' : '已有账号，去登录'}
+        </button>
+      </form>
+    </div>
+  )
 
   return (
     <>
@@ -120,6 +194,11 @@ export default function App() {
               <span className="health-dot" />
               {health.status === 'checking' ? '检测中' : health.status === 'offline' ? '后端未连接' : health.status === 'degraded' ? '诊断异常' : '后端已连接'}
             </button>
+            {currentUser && (
+              <span className="user-chip" title={currentUser.username}>
+                {currentUser.display_name || currentUser.username} · {currentUser.role === 'admin' ? '管理员' : '成员'}
+              </span>
+            )}
             <input
               className="input admin-token-input"
               type="password"
@@ -127,6 +206,11 @@ export default function App() {
               value={adminToken}
               onChange={e=>saveAdminToken(e.target.value)}
             />
+            {currentUser ? (
+              <button className="btn btn-o btn-sm" onClick={logout}>退出</button>
+            ) : !authLoading && !authRequired ? (
+              <button className="btn btn-o btn-sm" onClick={() => setShowAuthPanel(!showAuthPanel)}>{showAuthPanel ? '关闭登录' : '登录'}</button>
+            ) : null}
             <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书智能生成系统</span>
           </div>
         </div>
@@ -137,12 +221,15 @@ export default function App() {
               <span>当前 API：{apiBaseUrl}。如果部署在 Vercel，请配置 VITE_API_BASE_URL 指向独立 FastAPI 后端。</span>
             </div>
           )}
-          {page.type === 'cases' && <CaseList nav={nav} />}
-          {page.type === 'detail' && <CaseDetail caseId={page.caseId} nav={nav} />}
-          {page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
-          {page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
-          {page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
-          {page.type === 'audit' && <AuditLogPage />}
+          {authLoading && <div className="card auth-loading">正在检查登录状态...</div>}
+          {!authLoading && needsLogin && authPanel}
+          {!authLoading && !needsLogin && showAuthPanel && authPanel}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'cases' && <CaseList nav={nav} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'detail' && <CaseDetail caseId={page.caseId} nav={nav} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'audit' && <AuditLogPage />}
         </div>
       </div>
     </>

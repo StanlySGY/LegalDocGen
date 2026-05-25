@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 import json
 import uuid
-from datetime import datetime
 
 from backend.database import get_db
+from backend.dependencies import require_admin
 from backend.models.case_template import CaseTemplate
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
@@ -44,7 +44,6 @@ class CaseTemplateResponse(BaseModel):
 
 @router.get("/categories")
 def get_categories():
-    """获取所有案例分类"""
     return {
         "categories": [
             {"value": "contract", "label": "合同纠纷", "icon": "📋"},
@@ -61,7 +60,6 @@ def get_categories():
 
 @router.get("/list")
 def list_templates(db: Session = Depends(get_db)):
-    """获取所有案例模板"""
     templates = db.query(CaseTemplate).all()
     return [
         {
@@ -80,7 +78,6 @@ def list_templates(db: Session = Depends(get_db)):
 
 @router.get("/{template_id}")
 def get_template(template_id: str, db: Session = Depends(get_db)):
-    """获取单个模板详情"""
     template = db.query(CaseTemplate).filter(CaseTemplate.id == template_id).first()
     if not template:
         raise HTTPException(404, "模板不存在")
@@ -96,9 +93,8 @@ def get_template(template_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/create")
+@router.post("/create", dependencies=[Depends(require_admin)])
 def create_template(req: CaseTemplateCreate, db: Session = Depends(get_db)):
-    """创建新模板"""
     template = CaseTemplate(
         id=str(uuid.uuid4()),
         name=req.name,
@@ -113,9 +109,8 @@ def create_template(req: CaseTemplateCreate, db: Session = Depends(get_db)):
     return {"id": template.id, "message": "模板已创建"}
 
 
-@router.put("/{template_id}")
+@router.put("/{template_id}", dependencies=[Depends(require_admin)])
 def update_template(template_id: str, req: CaseTemplateCreate, db: Session = Depends(get_db)):
-    """更新模板"""
     template = db.query(CaseTemplate).filter(CaseTemplate.id == template_id).first()
     if not template:
         raise HTTPException(404, "模板不存在")
@@ -129,12 +124,11 @@ def update_template(template_id: str, req: CaseTemplateCreate, db: Session = Dep
     return {"message": "模板已更新"}
 
 
-@router.delete("/{template_id}")
+@router.delete("/{template_id}", dependencies=[Depends(require_admin)])
 def delete_template(template_id: str, db: Session = Depends(get_db)):
-    """删除模板"""
     template = db.query(CaseTemplate).filter(CaseTemplate.id == template_id).first()
     if not template:
         raise HTTPException(404, "模板不存在")
     db.delete(template)
     db.commit()
-    return {"message": "模板已删除"}
+    return {"message": "已删除"}

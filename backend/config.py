@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     ADMIN_TOKEN: str = ""
     API_KEY_SECRET: str = ""
+    AUTH_REQUIRED: bool = False
+    AUTH_SECRET: str = ""
+    AUTH_TOKEN_EXPIRE_HOURS: int = 24
+    ALLOW_USER_REGISTRATION: bool = True
+    DEFAULT_ADMIN_USERNAME: str = "admin"
+    DEFAULT_ADMIN_PASSWORD: str = ""
 
     DEFAULT_MODEL: str = "openai"
     DEFAULT_MODEL_NAME: str = "mimo-v2.5-pro"

@@ -1,24 +1,30 @@
 import uuid
 from pathlib import Path
+from typing import Optional
+
 from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
-from backend.models.material import Material
-from backend.models.case import Case
 from backend.config import settings
-from backend.services.file_parser.parser import parse_file
-from backend.services.audit_service import record_audit
+from backend.database import get_db
+from backend.dependencies import get_accessible_case, get_current_user
 from backend.exceptions import NotFoundError, ValidationError, InternalServerError
+from backend.models.material import Material
+from backend.models.user import User
+from backend.services.audit_service import record_audit
+from backend.services.file_parser.parser import parse_file
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
 
 @router.post("/upload/{case_id}")
-async def upload_material(case_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    case = db.query(Case).filter(Case.id == case_id).first()
-    if not case:
-        raise NotFoundError(f"案件 {case_id} 不存在")
+async def upload_material(
+    case_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    get_accessible_case(db, case_id, current_user)
 
     safe_name = Path(file.filename or "").name
     if not safe_name:
@@ -64,15 +70,14 @@ async def upload_material(case_id: str, file: UploadFile = File(...), db: Sessio
 
 
 @router.get("/case/{case_id}")
-def list_materials(case_id: str, db: Session = Depends(get_db)):
+def list_materials(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     return db.query(Material).filter(Material.case_id == case_id).order_by(Material.created_at.desc()).all()
 
 
 @router.get("/case/{case_id}/catalog")
-def get_material_catalog(case_id: str, db: Session = Depends(get_db)):
-    case = db.query(Case).filter(Case.id == case_id).first()
-    if not case:
-        raise NotFoundError(f"案件 {case_id} 不存在")
+def get_material_catalog(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     from backend.services.workflow_engine.engine import WorkflowEngine
     engine = WorkflowEngine(db)
     return {
@@ -82,23 +87,25 @@ def get_material_catalog(case_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{material_id}")
-def get_material(material_id: str, db: Session = Depends(get_db)):
-    m = db.query(Material).filter(Material.id == material_id).first()
-    if not m:
+def get_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
         raise NotFoundError(f"材料 {material_id} 不存在")
-    return m
+    get_accessible_case(db, material.case_id, current_user)
+    return material
 
 
 @router.delete("/{material_id}")
-def delete_material(material_id: str, db: Session = Depends(get_db)):
-    m = db.query(Material).filter(Material.id == material_id).first()
-    if not m:
+def delete_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
         raise NotFoundError(f"材料 {material_id} 不存在")
+    get_accessible_case(db, material.case_id, current_user)
     try:
-        Path(m.file_path).unlink(missing_ok=True)
+        Path(material.file_path).unlink(missing_ok=True)
     except Exception:
         pass
-    record_audit(db, "material.delete", "case", m.case_id, f"删除材料：{m.filename}")
-    db.delete(m)
+    record_audit(db, "material.delete", "case", material.case_id, f"删除材料：{material.filename}")
+    db.delete(material)
     db.commit()
     return {"message": "已删除"}

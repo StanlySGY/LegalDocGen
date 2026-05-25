@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies import require_admin
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.models.prompt import PromptTemplate
 from backend.models.workflow import StageType, STAGE_NAMES
@@ -27,7 +28,7 @@ def list_prompts(stage: str = "", db: Session = Depends(get_db)):
     ]
 
 
-@router.post("/prompts")
+@router.post("/prompts", dependencies=[Depends(require_admin)])
 def create_prompt(data: dict, db: Session = Depends(get_db)):
     tpl = PromptTemplate(stage=data["stage"], name=data["name"], content=data["content"], is_default=False)
     db.add(tpl)
@@ -36,7 +37,7 @@ def create_prompt(data: dict, db: Session = Depends(get_db)):
     return {"id": tpl.id, "name": tpl.name}
 
 
-@router.put("/prompts/{template_id}")
+@router.put("/prompts/{template_id}", dependencies=[Depends(require_admin)])
 def update_prompt(template_id: str, data: dict, db: Session = Depends(get_db)):
     tpl = db.query(PromptTemplate).filter(PromptTemplate.id == template_id).first()
     if not tpl:

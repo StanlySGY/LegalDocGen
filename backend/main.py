@@ -13,7 +13,9 @@ from backend.exceptions import (
     AppException, app_exception_handler, validation_exception_handler, general_exception_handler
 )
 from backend.models.channel import Channel
-from backend.routers import audit, cases, channel, config, materials, templates, workflow
+from backend.models.user import User, UserRole
+from backend.routers import audit, auth, cases, channel, config, materials, templates, workflow
+from backend.services.auth_service import hash_password
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.secret_service import encrypt_secret
 from backend.services.template_manager import init_default_templates
@@ -42,6 +44,23 @@ def _seed_default_channel(db):
     db.commit()
 
 
+def _seed_default_admin(db):
+    password = settings.DEFAULT_ADMIN_PASSWORD
+    if not password:
+        return
+    username = settings.DEFAULT_ADMIN_USERNAME.strip() or "admin"
+    if db.query(User).filter(User.username == username).first():
+        return
+    user = User(
+        username=username,
+        display_name="系统管理员",
+        password_hash=hash_password(password),
+        role=UserRole.ADMIN,
+    )
+    db.add(user)
+    db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -50,6 +69,7 @@ async def lifespan(app: FastAPI):
         pm = PromptManager(db)
         pm.init_default_templates()
         init_default_templates(db)
+        _seed_default_admin(db)
         _seed_default_channel(db)
     finally:
         db.close()
@@ -71,6 +91,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 app.include_router(audit.router)
+app.include_router(auth.router)
 app.include_router(cases.router)
 app.include_router(materials.router)
 app.include_router(workflow.router)

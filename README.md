@@ -16,6 +16,13 @@
 - 多案件批量导出 Word 压缩包
 - 草稿、进行中、已完成状态自动同步
 
+### 认证与权限
+- 支持登录、注册、当前用户状态和管理员用户管理接口
+- `AUTH_REQUIRED=false` 时保持单用户兼容模式，在线预览和本地旧流程不受影响
+- `AUTH_REQUIRED=true` 时要求登录后访问业务接口
+- 普通成员仅能访问自己创建的案件，管理员可查看全部案件并管理渠道、模板和审计日志
+- 兼容旧版 `ADMIN_TOKEN`，用于保护渠道、模板、审计和 Prompt 写入等高风险接口
+
 ### 案件模板与材料齐备度
 - 内置合同纠纷、劳动争议、房产纠纷、侵权纠纷等案件模板
 - 每类模板包含必需/可选材料清单和阶段 Prompt
@@ -114,6 +121,11 @@ MAX_FILE_SIZE=52428800
 CORS_ORIGINS=http://localhost:5173
 ADMIN_TOKEN=change-me-in-production
 API_KEY_SECRET=replace-with-a-long-random-secret
+AUTH_REQUIRED=false
+AUTH_SECRET=replace-with-another-long-random-secret
+ALLOW_USER_REGISTRATION=true
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=
 ```
 
 ### 3. 安装依赖
@@ -185,7 +197,9 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 - 使用 HTTPS
 - 配置反向代理与 CORS 白名单
 - 对 API Key 进行加密存储
-- 配置 `ADMIN_TOKEN` 保护渠道、审计和高风险配置接口
+- 设置 `AUTH_REQUIRED=true` 启用登录访问控制，并配置高强度 `AUTH_SECRET`
+- 如需默认管理员，可配置 `DEFAULT_ADMIN_USERNAME` 与 `DEFAULT_ADMIN_PASSWORD`，首次启动后建议清空默认密码配置
+- 配置 `ADMIN_TOKEN` 保护渠道、审计和高风险配置接口，也可使用管理员账号 Bearer Token
 - 配置 `API_KEY_SECRET`，用于本地加密保存模型渠道 API Key
 
 ## 使用流程
@@ -216,6 +230,13 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 3. 下载包含案件信息、证据目录、事实时间线、阶段输出和元数据的文档
 
 ## API 概览
+
+### 认证与用户
+- `POST /api/auth/login`：用户登录，返回 Bearer Token
+- `POST /api/auth/register`：用户注册，首个注册用户自动成为管理员
+- `GET /api/auth/me`：当前登录用户与认证开关状态
+- `GET /api/auth/users`：管理员查看用户列表
+- `PUT /api/auth/users/{user_id}`：管理员更新用户角色或启停状态
 
 ### 案件管理
 - `GET /api/cases`：案件列表，支持状态、关键词、类型、模板筛选

@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies import require_admin
 from backend.models.audit import AuditLog
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_admin)])
 def list_audit_logs(limit: int = 100, resource_type: str = "", resource_id: str = "", db: Session = Depends(get_db)):
     query = db.query(AuditLog)
     if resource_type:
