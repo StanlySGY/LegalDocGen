@@ -111,6 +111,9 @@ OPENAI_MODEL_NAME=gpt-4o
 DATABASE_URL=sqlite:///./legaldocgen.db
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE=52428800
+CORS_ORIGINS=http://localhost:5173
+ADMIN_TOKEN=change-me-in-production
+API_KEY_SECRET=replace-with-a-long-random-secret
 ```
 
 ### 3. 安装依赖
@@ -175,6 +178,8 @@ https://legal-doc-gen-wine.vercel.app/
 - 使用 HTTPS
 - 配置反向代理与 CORS 白名单
 - 对 API Key 进行加密存储
+- 配置 `ADMIN_TOKEN` 保护渠道、审计和高风险配置接口
+- 配置 `API_KEY_SECRET`，用于本地加密保存模型渠道 API Key
 
 ## 使用流程
 
@@ -282,6 +287,8 @@ LegalDocGen/
 - Word 导出与批量 zip 导出
 - 证据目录和事实时间线
 - 基础审计日志和审计日志页面
+- API Key 本地加密存储与脱敏展示
+- CORS 环境化配置和可选管理 Token
 - 上传文件名安全处理
 - 材料预览 XSS 风险修复
 - 统一错误提示

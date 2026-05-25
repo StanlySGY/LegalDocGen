@@ -9,6 +9,7 @@ from backend.routers import audit, cases, materials, workflow, config, channel, 
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.template_manager import init_default_templates
 from backend.models.channel import Channel
+from backend.services.secret_service import encrypt_secret
 from backend.exceptions import (
     AppException, app_exception_handler, validation_exception_handler, general_exception_handler
 )
@@ -27,7 +28,7 @@ def _seed_default_channel(db):
         name="默认渠道",
         type="openai",
         base_url=base_url,
-        api_key=api_key,
+        api_key=encrypt_secret(api_key),
         models=f'["{model_name}"]',
         default_model=model_name,
         status=1,
@@ -55,7 +56,7 @@ app = FastAPI(title="LegalDocGen", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

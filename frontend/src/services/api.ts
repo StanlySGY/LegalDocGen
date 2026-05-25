@@ -1,4 +1,22 @@
 const BASE = '/api'
+const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
+
+export const getAdminToken = () => localStorage.getItem(ADMIN_TOKEN_KEY) || ''
+export const setAdminToken = (token: string) => {
+  if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token)
+  else localStorage.removeItem(ADMIN_TOKEN_KEY)
+}
+
+const authHeaders = (): Record<string, string> => {
+  const token = getAdminToken()
+  return token ? { 'X-Admin-Token': token } : {}
+}
+
+const jsonHeaders = (headers?: HeadersInit): HeadersInit => ({
+  'Content-Type': 'application/json',
+  ...authHeaders(),
+  ...(headers as Record<string, string> | undefined),
+})
 
 async function parseError(res: Response, fallback: string): Promise<string> {
   try {
@@ -11,7 +29,7 @@ async function parseError(res: Response, fallback: string): Promise<string> {
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: jsonHeaders(options?.headers),
     ...options,
   })
   if (!res.ok) throw new Error(await parseError(res, '请求失败'))
@@ -41,7 +59,7 @@ export const api = {
     upload: async (caseId: string, file: File) => {
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch(`${BASE}/materials/upload/${caseId}`, { method: 'POST', body: form })
+      const res = await fetch(`${BASE}/materials/upload/${caseId}`, { method: 'POST', headers: authHeaders(), body: form })
       if (!res.ok) throw new Error(await parseError(res, '上传失败'))
       return res.json()
     },
@@ -54,7 +72,7 @@ export const api = {
     generateStream: async function* (caseId: string, data: any) {
       const res = await fetch(`${BASE}/workflow/generate-stream/${caseId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error(await parseError(res, '生成失败'))
@@ -83,7 +101,7 @@ export const api = {
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
     export: async (caseId: string) => {
-      const res = await fetch(`${BASE}/workflow/export/${caseId}`)
+      const res = await fetch(`${BASE}/workflow/export/${caseId}`, { headers: authHeaders() })
       if (!res.ok) throw new Error(await parseError(res, '导出失败'))
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
@@ -98,7 +116,7 @@ export const api = {
     exportBatch: async (caseIds: string[]) => {
       const res = await fetch(`${BASE}/workflow/export-batch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({ case_ids: caseIds }),
       })
       if (!res.ok) throw new Error(await parseError(res, '批量导出失败'))

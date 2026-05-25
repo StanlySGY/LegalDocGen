@@ -5,6 +5,7 @@ import WorkflowPage from './pages/WorkflowPage'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
 import AuditLogPage from './pages/AuditLogPage'
+import { getAdminToken, setAdminToken } from './services/api'
 
 type Page =
   | { type: 'cases' }
@@ -16,6 +17,12 @@ type Page =
 
 export default function App() {
   const [page, setPage] = useState<Page>({ type: 'cases' })
+  const [adminToken, setAdminTokenState] = useState(getAdminToken())
+
+  const saveAdminToken = (token: string) => {
+    setAdminToken(token)
+    setAdminTokenState(token)
+  }
 
   const nav = {
     cases: () => setPage({ type: 'cases' }),
@@ -79,7 +86,17 @@ export default function App() {
       <div className="main-wrap">
         <div className="top-bar">
           <div className="breadcrumb">{breadcrumb()}</div>
-          <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书智能生成系统</span>
+          <div className="flex items-center gap-2">
+            <input
+              className="input"
+              style={{width:180,height:32,fontSize:12}}
+              type="password"
+              placeholder="管理 Token（可选）"
+              value={adminToken}
+              onChange={e=>saveAdminToken(e.target.value)}
+            />
+            <span style={{fontSize:12,color:'#c9cdd4'}}>法律文书智能生成系统</span>
+          </div>
         </div>
         <div className="page-body">
           {page.type === 'cases' && <CaseList nav={nav} />}

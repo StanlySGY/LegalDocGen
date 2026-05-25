@@ -3,6 +3,7 @@ import httpx
 from typing import AsyncIterator
 from backend.database import SessionLocal
 from backend.models.channel import Channel
+from backend.services.secret_service import decrypt_secret
 
 
 class ChannelDispatcher:
@@ -70,8 +71,9 @@ class ChannelDispatcher:
 
     def _build_headers(self, ch: Channel) -> dict:
         headers = {"Content-Type": "application/json"}
-        if ch.api_key:
-            headers["Authorization"] = f"Bearer {ch.api_key}"
+        api_key = decrypt_secret(ch.api_key)
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def _call_api(self, ch: Channel, model: str, prompt: str, stream: bool = False) -> str:

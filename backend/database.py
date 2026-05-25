@@ -9,12 +9,27 @@ Base = declarative_base()
 
 def _ensure_existing_columns():
     inspector = inspect(engine)
-    if "cases" not in inspector.get_table_names():
-        return
-    columns = {column["name"] for column in inspector.get_columns("cases")}
-    if "template_id" not in columns:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE cases ADD COLUMN template_id VARCHAR(36)"))
+    table_names = inspector.get_table_names()
+    if "cases" in table_names:
+        columns = {column["name"] for column in inspector.get_columns("cases")}
+        if "template_id" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cases ADD COLUMN template_id VARCHAR(36)"))
+
+    if "channels" in table_names:
+        from backend.models.channel import Channel
+        from backend.services.secret_service import encrypt_secret
+        db = SessionLocal()
+        try:
+            changed = False
+            for channel in db.query(Channel).all():
+                if channel.api_key and not channel.api_key.startswith("enc:"):
+                    channel.api_key = encrypt_secret(channel.api_key)
+                    changed = True
+            if changed:
+                db.commit()
+        finally:
+            db.close()
 
 
 def get_db():

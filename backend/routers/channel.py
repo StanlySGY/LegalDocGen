@@ -6,7 +6,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.database import get_db
+from backend.dependencies import require_admin
 from backend.models.channel import Channel
+from backend.services.secret_service import decrypt_secret, encrypt_secret, mask_secret
 
 router = APIRouter(prefix="/api/channel", tags=["channel"])
 
@@ -38,8 +40,8 @@ def _channel_to_dict(ch: Channel) -> dict:
         "name": ch.name,
         "type": ch.type,
         "base_url": ch.base_url,
-        "api_key": ch.api_key[:8] + "***" if len(ch.api_key) > 8 else ch.api_key,
-        "api_key_set": bool(ch.api_key),
+        "api_key": mask_secret(ch.api_key),
+        "api_key_set": bool(decrypt_secret(ch.api_key)),
         "models": json.loads(ch.models) if ch.models else [],
         "default_model": ch.default_model,
         "status": ch.status,
@@ -56,13 +58,13 @@ def list_channels(db: Session = Depends(get_db)):
     return [_channel_to_dict(ch) for ch in channels]
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_admin)])
 def create_channel(data: ChannelCreate, db: Session = Depends(get_db)):
     ch = Channel(
         name=data.name,
         type=data.type,
         base_url=data.base_url.rstrip("/"),
-        api_key=data.api_key,
+        api_key=encrypt_secret(data.api_key),
         models=json.dumps(data.models),
         default_model=data.default_model,
         priority=data.priority,
@@ -79,11 +81,11 @@ def get_channel(channel_id: str, db: Session = Depends(get_db)):
     if not ch:
         raise HTTPException(404, "渠道不存在")
     d = _channel_to_dict(ch)
-    d["api_key"] = ch.api_key
+    d["api_key"] = ""
     return d
 
 
-@router.put("/{channel_id}")
+@router.put("/{channel_id}", dependencies=[Depends(require_admin)])
 def update_channel(channel_id: str, data: ChannelUpdate, db: Session = Depends(get_db)):
     ch = db.query(Channel).filter(Channel.id == channel_id).first()
     if not ch:
@@ -91,6 +93,8 @@ def update_channel(channel_id: str, data: ChannelUpdate, db: Session = Depends(g
     for k, v in data.model_dump(exclude_unset=True).items():
         if k == "models":
             setattr(ch, k, json.dumps(v))
+        elif k == "api_key" and v:
+            setattr(ch, k, encrypt_secret(v))
         elif k == "base_url" and v:
             setattr(ch, k, v.rstrip("/"))
         else:
@@ -100,7 +104,7 @@ def update_channel(channel_id: str, data: ChannelUpdate, db: Session = Depends(g
     return _channel_to_dict(ch)
 
 
-@router.delete("/{channel_id}")
+@router.delete("/{channel_id}", dependencies=[Depends(require_admin)])
 def delete_channel(channel_id: str, db: Session = Depends(get_db)):
     ch = db.query(Channel).filter(Channel.id == channel_id).first()
     if not ch:
@@ -115,13 +119,13 @@ async def test_channel(channel_id: str, db: Session = Depends(get_db)):
     ch = db.query(Channel).filter(Channel.id == channel_id).first()
     if not ch:
         raise HTTPException(404, "渠道不存在")
-    result = await _test_connection(ch.base_url, ch.api_key)
+    result = await _test_connection(ch.base_url, decrypt_secret(ch.api_key))
     ch.test_status = "success" if result["success"] else "failed"
     db.commit()
     return result
 
 
-@router.post("/test")
+@router.post("/test", dependencies=[Depends(require_admin)])
 async def test_channel_direct(data: dict):
     base_url = data.get("base_url", "").rstrip("/")
     api_key = data.get("api_key", "")
@@ -133,10 +137,10 @@ async def fetch_models_from_channel(channel_id: str, db: Session = Depends(get_d
     ch = db.query(Channel).filter(Channel.id == channel_id).first()
     if not ch:
         raise HTTPException(404, "渠道不存在")
-    return await _fetch_models(ch.base_url, ch.api_key)
+    return await _fetch_models(ch.base_url, decrypt_secret(ch.api_key))
 
 
-@router.post("/fetch_models")
+@router.post("/fetch_models", dependencies=[Depends(require_admin)])
 async def fetch_models_direct(data: dict):
     base_url = data.get("base_url", "").rstrip("/")
     api_key = data.get("api_key", "")
