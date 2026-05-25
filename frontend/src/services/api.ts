@@ -1,6 +1,8 @@
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
 
+export const apiBaseUrl = BASE
+
 export class ApiConnectionError extends Error {
   constructor(message: string) {
     super(message)
@@ -57,6 +59,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  health: () => request<any>('/health'),
   cases: {
     list: (params?: { status?: string; keyword?: string; case_type?: string; template_id?: string }) => {
       const query = new URLSearchParams()

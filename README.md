@@ -157,6 +157,7 @@ npm run dev
 - 前端：http://localhost:5173
 - 后端：http://localhost:8000
 - API 文档：http://localhost:8000/docs
+- 健康检查：http://localhost:8000/api/health
 
 ## 部署说明
 

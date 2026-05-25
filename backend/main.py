@@ -1,18 +1,22 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
+import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
-from backend.database import init_db, SessionLocal
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+
 from backend.config import settings
-from backend.routers import audit, cases, materials, workflow, config, channel, templates
-from backend.services.prompt_manager.manager import PromptManager
-from backend.services.template_manager import init_default_templates
-from backend.models.channel import Channel
-from backend.services.secret_service import encrypt_secret
+from backend.database import SessionLocal, init_db
 from backend.exceptions import (
     AppException, app_exception_handler, validation_exception_handler, general_exception_handler
 )
+from backend.models.channel import Channel
+from backend.routers import audit, cases, channel, config, materials, templates, workflow
+from backend.services.prompt_manager.manager import PromptManager
+from backend.services.secret_service import encrypt_secret
+from backend.services.template_manager import init_default_templates
 
 
 def _seed_default_channel(db):
@@ -75,6 +79,52 @@ app.include_router(channel.router)
 app.include_router(templates.router)
 
 
+def _database_health() -> tuple[dict, dict]:
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "ok": True,
+            "dialect": db.bind.dialect.name if db.bind else "unknown",
+        }, {
+            "total": db.query(Channel).count(),
+            "enabled": db.query(Channel).filter(Channel.status == 1).count(),
+            "tested_success": db.query(Channel).filter(Channel.test_status == "success").count(),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error_type": exc.__class__.__name__,
+        }, {"total": 0, "enabled": 0, "tested_success": 0}
+    finally:
+        db.close()
+
+
+def _storage_health() -> dict:
+    upload_dir = settings.UPLOAD_DIR
+    return {
+        "mode": "local",
+        "upload_dir": str(upload_dir),
+        "exists": upload_dir.exists(),
+        "writable": os.access(upload_dir, os.W_OK),
+    }
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "1.0.0"}
+    database, channels = _database_health()
+    storage = _storage_health()
+    healthy = database["ok"] and storage["exists"] and storage["writable"]
+    return {
+        "status": "ok" if healthy else "degraded",
+        "app": settings.APP_NAME,
+        "version": app.version,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": database,
+        "storage": storage,
+        "channels": channels,
+        "config": {
+            "admin_token_enabled": bool(settings.ADMIN_TOKEN),
+            "cors_origins": settings.cors_origins_list,
+        },
+    }

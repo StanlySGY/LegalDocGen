@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
 import WorkflowPage from './pages/WorkflowPage'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
 import AuditLogPage from './pages/AuditLogPage'
-import { getAdminToken, setAdminToken } from './services/api'
+import { api, apiBaseUrl, getAdminToken, setAdminToken } from './services/api'
 
 type Page =
   | { type: 'cases' }
@@ -15,9 +15,34 @@ type Page =
   | { type: 'config' }
   | { type: 'audit' }
 
+type HealthState = {
+  status: 'checking' | 'ok' | 'degraded' | 'offline'
+  message: string
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>({ type: 'cases' })
   const [adminToken, setAdminTokenState] = useState(getAdminToken())
+  const [health, setHealth] = useState<HealthState>({ status: 'checking', message: '正在检测后端连接' })
+
+  const checkHealth = async () => {
+    setHealth(prev => prev.status === 'ok' ? prev : { status: 'checking', message: '正在检测后端连接' })
+    try {
+      const data = await api.health()
+      setHealth({
+        status: data.status === 'ok' ? 'ok' : 'degraded',
+        message: data.status === 'ok' ? '后端已连接' : '后端已连接，但部分诊断异常',
+      })
+    } catch (e: any) {
+      setHealth({ status: 'offline', message: e.message || `后端未连接：${apiBaseUrl}` })
+    }
+  }
+
+  useEffect(() => {
+    checkHealth()
+    const timer = window.setInterval(checkHealth, 60000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const saveAdminToken = (token: string) => {
     setAdminToken(token)
@@ -86,10 +111,17 @@ export default function App() {
       <div className="main-wrap">
         <div className="top-bar">
           <div className="breadcrumb">{breadcrumb()}</div>
-          <div className="flex items-center gap-2">
+          <div className="top-actions">
+            <button
+              className={`health-chip health-${health.status}`}
+              onClick={checkHealth}
+              title={`${health.message}；API：${apiBaseUrl}`}
+            >
+              <span className="health-dot" />
+              {health.status === 'checking' ? '检测中' : health.status === 'offline' ? '后端未连接' : health.status === 'degraded' ? '诊断异常' : '后端已连接'}
+            </button>
             <input
-              className="input"
-              style={{width:180,height:32,fontSize:12}}
+              className="input admin-token-input"
               type="password"
               placeholder="管理 Token（可选）"
               value={adminToken}
@@ -99,6 +131,12 @@ export default function App() {
           </div>
         </div>
         <div className="page-body">
+          {health.status !== 'ok' && (
+            <div className={`connection-banner connection-${health.status}`}>
+              <strong>{health.message}</strong>
+              <span>当前 API：{apiBaseUrl}。如果部署在 Vercel，请配置 VITE_API_BASE_URL 指向独立 FastAPI 后端。</span>
+            </div>
+          )}
           {page.type === 'cases' && <CaseList nav={nav} />}
           {page.type === 'detail' && <CaseDetail caseId={page.caseId} nav={nav} />}
           {page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
