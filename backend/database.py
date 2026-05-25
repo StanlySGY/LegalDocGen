@@ -26,6 +26,6 @@ def get_db():
 
 
 def init_db():
-    from backend.models import case, material, workflow, prompt, channel, case_template  # noqa
+    from backend.models import case, material, workflow, prompt, channel, case_template, audit  # noqa
     Base.metadata.create_all(bind=engine)
     _ensure_existing_columns()

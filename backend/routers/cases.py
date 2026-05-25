@@ -5,8 +5,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.database import get_db
-from backend.models.case import Case, CaseStatus
+from backend.models.case import Case
 from backend.models.case_template import CaseTemplate
+from backend.services.audit_service import record_audit
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -42,6 +43,8 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
         template_id=template_id,
     )
     db.add(case)
+    db.flush()
+    record_audit(db, "case.create", "case", case.id, f"创建案件：{case.name}")
     db.commit()
     db.refresh(case)
     return case
@@ -70,6 +73,7 @@ def batch_delete_cases(data: CaseBatchRequest, db: Session = Depends(get_db)):
     if len(cases) != len(set(data.case_ids)):
         raise HTTPException(404, "部分案件不存在")
     for case in cases:
+        record_audit(db, "case.delete", "case", case.id, f"批量删除案件：{case.name}")
         db.delete(case)
     db.commit()
     return {"message": f"已删除 {len(cases)} 个案件", "deleted": len(cases)}
@@ -95,6 +99,7 @@ def update_case(case_id: str, data: CaseUpdate, db: Session = Depends(get_db)):
         raise HTTPException(404, "案件模板不存在")
     for k, v in updates.items():
         setattr(case, k, v)
+    record_audit(db, "case.update", "case", case.id, f"更新案件：{case.name}")
     db.commit()
     db.refresh(case)
     return case
@@ -103,8 +108,7 @@ def update_case(case_id: str, data: CaseUpdate, db: Session = Depends(get_db)):
 @router.delete("/{case_id}")
 def delete_case(case_id: str, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
-    if not case:
-        raise HTTPException(404, "案件不存在")
+    record_audit(db, "case.delete", "case", case.id, f"删除案件：{case.name}")
     db.delete(case)
     db.commit()
     return {"message": "已删除"}

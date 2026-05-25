@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from backend.database import init_db, SessionLocal
 from backend.config import settings
-from backend.routers import cases, materials, workflow, config, channel, templates
+from backend.routers import audit, cases, materials, workflow, config, channel, templates
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.template_manager import init_default_templates
 from backend.models.channel import Channel
@@ -65,6 +65,7 @@ app.add_exception_handler(AppException, app_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
+app.include_router(audit.router)
 app.include_router(cases.router)
 app.include_router(materials.router)
 app.include_router(workflow.router)

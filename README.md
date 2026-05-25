@@ -58,7 +58,7 @@
 
 ## 系统架构
 
-<img src="docs/architecture.svg" alt="LegalDocGen 系统架构" width="100%" />
+![LegalDocGen 系统架构](https://raw.githubusercontent.com/StanlySGY/LegalDocGen/main/docs/architecture.svg)
 
 ## 技术栈
 
@@ -230,6 +230,8 @@ https://legal-doc-gen-wine.vercel.app/
 - `GET /api/workflow/export/{case_id}`：导出单案 Word
 - `POST /api/workflow/export-batch`：批量导出 zip
 
+- `GET /api/audit`：审计日志列表
+
 ### 模板与渠道
 - `GET /api/templates/list`：模板列表
 - `GET /api/templates/{template_id}`：模板详情
@@ -279,6 +281,7 @@ LegalDocGen/
 - 生成结果保存、复制、历史和回滚
 - Word 导出与批量 zip 导出
 - 证据目录和事实时间线
+- 基础审计日志和审计日志页面
 - 上传文件名安全处理
 - 材料预览 XSS 风险修复
 - 统一错误提示
@@ -288,7 +291,7 @@ LegalDocGen/
 
 仍可继续推进的长期优化包括：
 - 用户登录、角色权限和团队协作
-- 操作审计日志
+- 更完整的操作审计日志检索与导出
 - API Key 加密存储
 - PostgreSQL 迁移与正式数据库迁移工具
 - 对象存储接入

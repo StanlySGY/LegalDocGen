@@ -4,6 +4,7 @@ import CaseDetail from './pages/CaseDetail'
 import WorkflowPage from './pages/WorkflowPage'
 import ChannelManage from './pages/ChannelManage'
 import ModelConfig from './pages/ModelConfig'
+import AuditLogPage from './pages/AuditLogPage'
 
 type Page =
   | { type: 'cases' }
@@ -11,6 +12,7 @@ type Page =
   | { type: 'workflow'; caseId: string }
   | { type: 'channels' }
   | { type: 'config' }
+  | { type: 'audit' }
 
 export default function App() {
   const [page, setPage] = useState<Page>({ type: 'cases' })
@@ -21,11 +23,13 @@ export default function App() {
     workflow: (id: string) => setPage({ type: 'workflow', caseId: id }),
     channels: () => setPage({ type: 'channels' }),
     config: () => setPage({ type: 'config' }),
+    audit: () => setPage({ type: 'audit' }),
   }
 
   const isCases = page.type === 'cases' || page.type === 'detail' || page.type === 'workflow'
   const isChannels = page.type === 'channels'
   const isConfig = page.type === 'config'
+  const isAudit = page.type === 'audit'
 
   const breadcrumb = () => {
     switch (page.type) {
@@ -34,6 +38,7 @@ export default function App() {
       case 'workflow': return (<><a onClick={nav.cases}>案件管理</a><span style={{color:'#d1d5db'}}>/</span><span className="current">工作流</span></>)
       case 'channels': return null
       case 'config': return null
+      case 'audit': return null
     }
   }
 
@@ -62,6 +67,10 @@ export default function App() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
               Prompt模板
             </div>
+            <div className={`nav-item ${isAudit ? 'active' : ''}`} onClick={nav.audit}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              审计日志
+            </div>
           </div>
         </nav>
         <div className="sidebar-footer">v1.0.0</div>
@@ -78,6 +87,7 @@ export default function App() {
           {page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
           {page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
           {page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
+          {page.type === 'audit' && <AuditLogPage />}
         </div>
       </div>
     </>

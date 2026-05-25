@@ -8,6 +8,7 @@ from backend.models.material import Material
 from backend.models.case import Case
 from backend.config import settings
 from backend.services.file_parser.parser import parse_file
+from backend.services.audit_service import record_audit
 from backend.exceptions import NotFoundError, ValidationError, InternalServerError
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
@@ -51,6 +52,8 @@ async def upload_material(case_id: str, file: UploadFile = File(...), db: Sessio
             parse_status="completed" if not parsed_text.startswith("[") else "error",
         )
         db.add(material)
+        db.flush()
+        record_audit(db, "material.upload", "case", case_id, f"上传材料：{safe_name}")
         db.commit()
         db.refresh(material)
         return material
@@ -95,6 +98,7 @@ def delete_material(material_id: str, db: Session = Depends(get_db)):
         Path(m.file_path).unlink(missing_ok=True)
     except Exception:
         pass
+    record_audit(db, "material.delete", "case", m.case_id, f"删除材料：{m.filename}")
     db.delete(m)
     db.commit()
     return {"message": "已删除"}

@@ -15,7 +15,8 @@ from backend.services.workflow_engine.engine import WorkflowEngine
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.export_service import ExportService
-from backend.exceptions import NotFoundError, ValidationError
+from backend.services.audit_service import record_audit
+from backend.exceptions import NotFoundError, ValidationError, InternalServerError
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 
@@ -154,6 +155,8 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
         output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
     )
+    record_audit(db, "workflow.generate", "case", case_id, f"生成阶段：{stage.value}")
+    db.commit()
     return {"node_id": node.id, "output": output, "version": node.version}
 
 
@@ -242,6 +245,7 @@ def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = 
         raise NotFoundError("工作流节点不存在")
     node.output = req.output
     engine.sync_case_status(case_id)
+    record_audit(db, "workflow.save_output", "case", case_id, f"保存阶段输出：{stage_type.value}")
     db.commit()
     return {"message": "已保存"}
 
@@ -256,6 +260,8 @@ def export_case(case_id: str, db: Session = Depends(get_db)):
             raise NotFoundError("案件不存在")
         export_service = ExportService(db)
         content = export_service.export_to_word(case_id)
+        record_audit(db, "workflow.export", "case", case_id, f"导出案件：{case.name}")
+        db.commit()
         return _build_docx_response(content, f"{_safe_filename(case.name)}.docx")
     except ValueError as e:
         raise HTTPException(404, str(e))
@@ -291,6 +297,8 @@ def export_batch(req: BatchExportRequest, db: Session = Depends(get_db)):
             filename = f"{base_name}.docx" if count == 1 else f"{base_name}_{count}.docx"
             archive.writestr(filename, export_service.export_to_word(case_id))
 
+    record_audit(db, "workflow.export_batch", "case", "", f"批量导出 {len(req.case_ids)} 个案件")
+    db.commit()
     buffer.seek(0)
     filename = f"LegalDocGen_批量导出_{len(req.case_ids)}份.zip"
     return Response(

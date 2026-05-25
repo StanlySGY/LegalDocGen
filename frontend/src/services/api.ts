@@ -120,6 +120,16 @@ export const api = {
     updatePrompt: (id: string, data: any) => request<any>(`/config/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     getStages: () => request<any[]>('/config/stages'),
   },
+  audit: {
+    list: (params?: { limit?: number; resource_type?: string; resource_id?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.resource_type) query.set('resource_type', params.resource_type)
+      if (params?.resource_id) query.set('resource_id', params.resource_id)
+      const suffix = query.toString() ? `?${query}` : ''
+      return request<any[]>(`/audit${suffix}`)
+    },
+  },
   channel: {
     list: () => request<any[]>('/channel'),
     get: (id: string) => request<any>(`/channel/${id}`),
