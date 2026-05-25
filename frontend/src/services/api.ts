@@ -20,11 +20,20 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   cases: {
-    list: () => request<any[]>('/cases'),
+    list: (params?: { status?: string; keyword?: string; case_type?: string; template_id?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.keyword) query.set('keyword', params.keyword)
+      if (params?.case_type) query.set('case_type', params.case_type)
+      if (params?.template_id) query.set('template_id', params.template_id)
+      const suffix = query.toString() ? `?${query}` : ''
+      return request<any[]>(`/cases${suffix}`)
+    },
     get: (id: string) => request<any>(`/cases/${id}`),
     create: (data: any) => request<any>('/cases', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => request<any>(`/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/cases/${id}`, { method: 'DELETE' }),
+    batchDelete: (caseIds: string[]) => request<any>('/cases/batch-delete', { method: 'POST', body: JSON.stringify({ case_ids: caseIds }) }),
   },
   materials: {
     list: (caseId: string) => request<any[]>(`/materials/case/${caseId}`),
@@ -80,6 +89,23 @@ export const api = {
       const a = document.createElement('a')
       a.href = url
       a.download = `case_${caseId}.docx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    },
+    exportBatch: async (caseIds: string[]) => {
+      const res = await fetch(`${BASE}/workflow/export-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case_ids: caseIds }),
+      })
+      if (!res.ok) throw new Error(await parseError(res, '批量导出失败'))
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cases_${new Date().toISOString().slice(0, 10)}.zip`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)

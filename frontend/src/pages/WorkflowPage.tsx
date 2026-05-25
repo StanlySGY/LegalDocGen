@@ -66,6 +66,10 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   }
 
   const handleExport = async () => {
+    if (!canExport) {
+      showToast(`请先完成全部阶段，仍缺少：${missingStages.join('、')}`, 'err')
+      return
+    }
     try {
       await api.workflow.export(caseId)
       showToast('导出成功')
@@ -96,6 +100,9 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   }
 
   const idx = STAGE_ORDER.indexOf(activeStage)
+  const completedCount = progress.filter(item => item.has_output).length
+  const missingStages = progress.filter(item => !item.has_output).map(item => item.name)
+  const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
   const icons:Record<StageType,string> = {fact_extraction:'📋',legal_analysis:'⚖️',dispute_focus:'🎯',draft_generation:'📝',review_optimization:'🔍'}
 
   return (
@@ -123,7 +130,17 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
         })}
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      <div className="card workflow-summary">
+        <div>
+          <div style={{fontWeight:600}}>交付完成度：{completedCount}/{STAGE_ORDER.length}</div>
+          <div style={{fontSize:12,color:'#86909c',marginTop:4}}>
+            {canExport ? '全部阶段已完成，可导出正式 Word 文档。' : `导出前需补齐：${missingStages.join('、') || '加载中'}`}
+          </div>
+        </div>
+        <span className={`tag ${canExport ? 't-green' : 't-orange'}`}>{canExport ? '可导出' : '待完善'}</span>
+      </div>
+
+      <div className="workflow-grid">
         {/* Prompt */}
         <div className="card">
           <div className="card-hd">
@@ -200,7 +217,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
 
       <div className="flex justify-between" style={{marginTop:20}}>
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>← 上一阶段</button>
-        <button className="btn btn-p" onClick={handleExport}>📥 导出为 Word</button>
+        <button className="btn btn-p" onClick={handleExport} disabled={!canExport}>导出为 Word</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段 →</button>
       </div>
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}

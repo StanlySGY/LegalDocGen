@@ -1,5 +1,14 @@
 from backend.models.workflow import StageType, STAGE_ORDER, STAGE_NAMES
 
+TRUSTED_OUTPUT_GUIDE = """
+
+## 可信输出要求
+- 仅基于案件材料和前序阶段内容作答，不得编造未出现的事实、证据或程序进展。
+- 对关键事实、证据和结论尽量标注依据材料；依据不足时明确写入“需人工核验事项”。
+- 法律条文、金额计算和诉讼策略必须提示律师复核；不确定的法条不得强行断言。
+- 输出末尾保留“需人工核验事项”小节。
+"""
+
 STAGE_PROMPTS = {
     StageType.FACT_EXTRACTION: """你是一名资深律师，请从以下案件材料中提取关键信息。
 
@@ -24,7 +33,8 @@ STAGE_PROMPTS = {
 ---
 案件材料：
 {materials}
-{previous_context}""",
+{previous_context}
+""" + TRUSTED_OUTPUT_GUIDE,
 
     StageType.LEGAL_ANALYSIS: """你是一名资深律师，请基于以下案件信息进行法律关系分析。
 
@@ -45,7 +55,8 @@ STAGE_PROMPTS = {
 ---
 案件信息：
 {materials}
-{previous_context}""",
+{previous_context}
+""" + TRUSTED_OUTPUT_GUIDE,
 
     StageType.DISPUTE_FOCUS: """你是一名资深律师，请基于以下分析梳理本案的争议焦点。
 
@@ -63,7 +74,8 @@ STAGE_PROMPTS = {
 ---
 案件信息：
 {materials}
-{previous_context}""",
+{previous_context}
+""" + TRUSTED_OUTPUT_GUIDE,
 
     StageType.DRAFT_GENERATION: """你是一名资深律师，请基于以下分析生成法律文书初稿。
 
@@ -78,7 +90,8 @@ STAGE_PROMPTS = {
 ---
 案件信息：
 {materials}
-{previous_context}""",
+{previous_context}
+""" + TRUSTED_OUTPUT_GUIDE,
 
     StageType.REVIEW_OPTIMIZATION: """你是一名法律文书审查专家，请对以下法律文书进行全面审查。
 
@@ -103,5 +116,6 @@ STAGE_PROMPTS = {
 ---
 原始文书：
 {materials}
-{previous_context}""",
+{previous_context}
+""" + TRUSTED_OUTPUT_GUIDE,
 }

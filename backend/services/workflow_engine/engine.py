@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.workflow import WorkflowNode, StageType, STAGE_ORDER, STAGE_NAMES
 from backend.models.material import Material
-from backend.models.case import Case
+from backend.models.case import Case, CaseStatus
 
 
 class WorkflowEngine:
@@ -73,9 +73,39 @@ class WorkflowEngine:
                 status="completed",
             )
             self.db.add(new_node)
+        self.db.flush()
+        self.sync_case_status(case_id)
         self.db.commit()
         self.db.refresh(new_node)
         return new_node
+
+    def get_missing_previous_stages(self, case_id: str, current_stage: StageType) -> list[str]:
+        current_idx = STAGE_ORDER.index(current_stage)
+        missing = []
+        for stage in STAGE_ORDER[:current_idx]:
+            node = self.get_stage_node(case_id, stage)
+            if not node or not node.output:
+                missing.append(STAGE_NAMES[stage])
+        return missing
+
+    def get_missing_output_stages(self, case_id: str) -> list[str]:
+        missing = []
+        for stage in STAGE_ORDER:
+            node = self.get_stage_node(case_id, stage)
+            if not node or not node.output:
+                missing.append(STAGE_NAMES[stage])
+        return missing
+
+    def sync_case_status(self, case_id: str):
+        case = self.db.query(Case).filter(Case.id == case_id).first()
+        if not case:
+            return
+        if not self.get_case_nodes(case_id):
+            case.status = CaseStatus.DRAFT
+        elif self.get_missing_output_stages(case_id):
+            case.status = CaseStatus.IN_PROGRESS
+        else:
+            case.status = CaseStatus.COMPLETED
 
     def get_version_history(self, case_id: str, stage: StageType) -> list[WorkflowNode]:
         return (
@@ -96,6 +126,8 @@ class WorkflowEngine:
         if current:
             current.is_current = False
         target.is_current = True
+        self.db.flush()
+        self.sync_case_status(target.case_id)
         self.db.commit()
         self.db.refresh(target)
         return target

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -25,6 +26,10 @@ class CaseUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class CaseBatchRequest(BaseModel):
+    case_ids: list[str]
+
+
 @router.post("")
 def create_case(data: CaseCreate, db: Session = Depends(get_db)):
     template_id = data.template_id or None
@@ -43,11 +48,31 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db)):
 
 
 @router.get("")
-def list_cases(status: str = "", db: Session = Depends(get_db)):
+def list_cases(status: str = "", keyword: str = "", case_type: str = "", template_id: str = "", db: Session = Depends(get_db)):
     q = db.query(Case)
     if status:
         q = q.filter(Case.status == status)
+    if case_type:
+        q = q.filter(Case.case_type == case_type)
+    if template_id:
+        q = q.filter(Case.template_id == template_id)
+    if keyword:
+        like = f"%{keyword.strip()}%"
+        q = q.filter(or_(Case.name.ilike(like), Case.description.ilike(like), Case.case_type.ilike(like)))
     return q.order_by(Case.created_at.desc()).all()
+
+
+@router.post("/batch-delete")
+def batch_delete_cases(data: CaseBatchRequest, db: Session = Depends(get_db)):
+    if not data.case_ids:
+        raise HTTPException(400, "请选择要删除的案件")
+    cases = db.query(Case).filter(Case.id.in_(data.case_ids)).all()
+    if len(cases) != len(set(data.case_ids)):
+        raise HTTPException(404, "部分案件不存在")
+    for case in cases:
+        db.delete(case)
+    db.commit()
+    return {"message": f"已删除 {len(cases)} 个案件", "deleted": len(cases)}
 
 
 @router.get("/{case_id}")
