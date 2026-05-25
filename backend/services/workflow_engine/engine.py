@@ -1,4 +1,4 @@
-import json
+import re
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -34,14 +34,50 @@ class WorkflowEngine:
 
     def get_case_context(self, case_id: str) -> dict:
         materials = self.db.query(Material).filter(Material.case_id == case_id).all()
+        material_catalog = self.get_material_catalog(case_id)
         materials_text = "\n\n".join(
-            f"【{m.filename}】\n{m.parsed_content}" for m in materials if m.parsed_content
+            f"【材料{index}: {item['filename']}】\n{item['excerpt']}"
+            for index, item in enumerate(material_catalog, start=1)
+            if item["excerpt"]
         )
         nodes = self.get_case_nodes(case_id)
         stage_outputs = {}
         for node in nodes:
             stage_outputs[node.stage] = node.output
-        return {"materials": materials_text, "stage_outputs": stage_outputs}
+        return {"materials": materials_text, "stage_outputs": stage_outputs, "material_catalog": material_catalog}
+
+    def get_material_catalog(self, case_id: str) -> list[dict]:
+        materials = self.db.query(Material).filter(Material.case_id == case_id).order_by(Material.created_at.asc()).all()
+        return [self._material_summary(material) for material in materials]
+
+    def get_fact_timeline(self, case_id: str) -> list[dict]:
+        timeline = []
+        for material in self.db.query(Material).filter(Material.case_id == case_id).all():
+            if not material.parsed_content:
+                continue
+            sentences = re.split(r"[。；;\n]", material.parsed_content)
+            for sentence in sentences:
+                text = sentence.strip()
+                if not text:
+                    continue
+                dates = re.findall(r"\d{4}[年/-]\d{1,2}(?:[月/-]\d{1,2}日?)?|\d{1,2}月\d{1,2}日", text)
+                for date in dates:
+                    timeline.append({"date": date, "event": text[:160], "source": material.filename})
+        return timeline[:80]
+
+    def _material_summary(self, material: Material) -> dict:
+        content = material.parsed_content or ""
+        compact = re.sub(r"\s+", " ", content).strip()
+        return {
+            "id": material.id,
+            "filename": material.filename,
+            "file_type": material.file_type,
+            "file_size": material.file_size,
+            "parse_status": material.parse_status,
+            "created_at": material.created_at.isoformat() if material.created_at else None,
+            "excerpt": compact[:500],
+            "word_count": len(content),
+        }
 
     def create_or_update_node(
         self, case_id: str, stage: StageType, prompt: str, output: str, model_used: str

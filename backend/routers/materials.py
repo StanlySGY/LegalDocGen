@@ -65,6 +65,19 @@ def list_materials(case_id: str, db: Session = Depends(get_db)):
     return db.query(Material).filter(Material.case_id == case_id).order_by(Material.created_at.desc()).all()
 
 
+@router.get("/case/{case_id}/catalog")
+def get_material_catalog(case_id: str, db: Session = Depends(get_db)):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise NotFoundError(f"案件 {case_id} 不存在")
+    from backend.services.workflow_engine.engine import WorkflowEngine
+    engine = WorkflowEngine(db)
+    return {
+        "catalog": engine.get_material_catalog(case_id),
+        "timeline": engine.get_fact_timeline(case_id),
+    }
+
+
 @router.get("/{material_id}")
 def get_material(material_id: str, db: Session = Depends(get_db)):
     m = db.query(Material).filter(Material.id == material_id).first()

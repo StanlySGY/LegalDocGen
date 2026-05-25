@@ -37,6 +37,7 @@ export const api = {
   },
   materials: {
     list: (caseId: string) => request<any[]>(`/materials/case/${caseId}`),
+    catalog: (caseId: string) => request<any>(`/materials/case/${caseId}/catalog`),
     upload: async (caseId: string, file: File) => {
       const form = new FormData()
       form.append('file', file)

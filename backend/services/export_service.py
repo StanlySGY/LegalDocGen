@@ -26,6 +26,8 @@ class ExportService:
 
         self._add_review_notice(doc)
         self._add_case_info(doc, case)
+        self._add_material_catalog(doc, case_id)
+        self._add_fact_timeline(doc, case_id)
 
         if case.description:
             doc.add_heading("案件描述", level=2)
@@ -76,6 +78,39 @@ class ExportService:
         for index, (label, value) in enumerate(info_data):
             table.rows[index].cells[0].text = label
             table.rows[index].cells[1].text = str(value)
+
+    def _add_material_catalog(self, doc: Document, case_id: str):
+        catalog = self.engine.get_material_catalog(case_id)
+        if not catalog:
+            return
+        doc.add_heading("证据材料目录", level=2)
+        table = doc.add_table(rows=1, cols=5)
+        table.style = "Light Grid Accent 1"
+        headers = ["序号", "材料名称", "类型", "解析状态", "内容摘要"]
+        for index, header in enumerate(headers):
+            table.rows[0].cells[index].text = header
+        for index, item in enumerate(catalog, start=1):
+            cells = table.add_row().cells
+            cells[0].text = str(index)
+            cells[1].text = item["filename"]
+            cells[2].text = item["file_type"]
+            cells[3].text = "已解析" if item["parse_status"] == "completed" else "失败"
+            cells[4].text = item["excerpt"][:120]
+
+    def _add_fact_timeline(self, doc: Document, case_id: str):
+        timeline = self.engine.get_fact_timeline(case_id)
+        if not timeline:
+            return
+        doc.add_heading("材料事实时间线", level=2)
+        table = doc.add_table(rows=1, cols=3)
+        table.style = "Light Grid Accent 1"
+        for index, header in enumerate(["时间", "事件摘录", "来源材料"]):
+            table.rows[0].cells[index].text = header
+        for item in timeline[:30]:
+            cells = table.add_row().cells
+            cells[0].text = item["date"]
+            cells[1].text = item["event"]
+            cells[2].text = item["source"]
 
     def _add_text_block(self, doc: Document, text: str):
         for raw_line in text.splitlines():

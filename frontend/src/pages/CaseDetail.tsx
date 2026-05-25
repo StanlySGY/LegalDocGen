@@ -9,6 +9,7 @@ interface Props { caseId: string; nav: { cases: () => void; workflow: (id: strin
 export default function CaseDetail({ caseId, nav }: Props) {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
+  const [materialInsights, setMaterialInsights] = useState<{catalog:any[];timeline:any[]}>({ catalog: [], timeline: [] })
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
@@ -16,11 +17,12 @@ export default function CaseDetail({ caseId, nav }: Props) {
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = async () => {
-    const [c, m] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId)])
+    const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
     const tpl = c.template_id ? await api.templates.get(c.template_id) : null
     setChecklist(tpl?.materials_checklist || [])
     setCaseData(c)
     setMaterials(m)
+    setMaterialInsights({ catalog: insights.catalog || [], timeline: insights.timeline || [] })
   }
   useEffect(() => { load() }, [caseId])
 
@@ -115,6 +117,37 @@ export default function CaseDetail({ caseId, nav }: Props) {
       )}
 
       {caseData.template_id && <MaterialChecklist caseId={caseId} templateId={caseData.template_id} />}
+
+      <div className="evidence-grid">
+        <div className="card">
+          <div className="card-hd"><span className="card-title">证据材料目录</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:8,maxHeight:260,overflow:'auto'}}>
+            {materialInsights.catalog.map((item, index) => (
+              <div key={item.id || index} style={{border:'1px solid #e5e7eb',borderRadius:8,padding:10,background:'#fafbfc'}}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
+                  <strong style={{fontSize:13}}>{index + 1}. {item.filename}</strong>
+                  <span className={`tag ${item.parse_status==='completed'?'t-green':'t-red'}`}>{item.parse_status==='completed'?'已解析':'失败'}</span>
+                </div>
+                <div style={{fontSize:12,color:'#86909c',marginTop:6,lineHeight:1.6}}>{item.excerpt || '暂无可解析内容'}</div>
+              </div>
+            ))}
+            {materialInsights.catalog.length===0 && <div className="empty" style={{padding:'36px 0'}}><p>暂无证据目录</p></div>}
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-hd"><span className="card-title">材料事实时间线</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:8,maxHeight:260,overflow:'auto'}}>
+            {materialInsights.timeline.slice(0, 20).map((item, index) => (
+              <div key={`${item.date}-${index}`} style={{borderLeft:'3px solid #6366f1',padding:'6px 0 6px 10px'}}>
+                <div style={{fontSize:12,fontWeight:600,color:'#4f46e5'}}>{item.date}</div>
+                <div style={{fontSize:12,lineHeight:1.6,marginTop:3}}>{item.event}</div>
+                <div style={{fontSize:11,color:'#86909c',marginTop:3}}>来源：{item.source}</div>
+              </div>
+            ))}
+            {materialInsights.timeline.length===0 && <div className="empty" style={{padding:'36px 0'}}><p>未识别到明确日期事实</p></div>}
+          </div>
+        </div>
+      </div>
 
       <div className="card">
         <div className="card-hd">
