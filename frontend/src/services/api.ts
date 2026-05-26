@@ -1,4 +1,4 @@
-import type { BillingStatus, Plan, QuotaExceededDetail } from '../types'
+import type { BillingOrder, BillingOrderStatus, BillingStatus, OperationsSummary, Plan, QuotaExceededDetail } from '../types'
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
@@ -114,6 +114,18 @@ export const api = {
     status: () => request<BillingStatus>('/billing/status'),
     updateSubscription: (teamId: string, data: { plan_code: string; status?: string }) =>
       request<BillingStatus>(`/billing/teams/${teamId}/subscription`, { method: 'PUT', body: JSON.stringify(data) }),
+    operationsSummary: () => request<OperationsSummary>('/billing/operations/summary'),
+    orders: (params?: { status?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const suffix = query.toString() ? `?${query}` : ''
+      return request<BillingOrder[]>(`/billing/operations/orders${suffix}`)
+    },
+    createOrder: (data: { team_id: string; plan_code: string; billing_period: string; amount_cents: number; currency: string; external_reference?: string; notes?: string }) =>
+      request<BillingOrder>('/billing/operations/orders', { method: 'POST', body: JSON.stringify(data) }),
+    updateOrder: (id: string, data: { status: BillingOrderStatus; notes?: string }) =>
+      request<BillingOrder>(`/billing/operations/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   teams: {
     list: () => request<any[]>('/teams'),

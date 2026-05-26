@@ -9,6 +9,7 @@ import TeamManagePage from './pages/TeamManagePage'
 import TaskMonitorPage from './pages/TaskMonitorPage'
 import LegalArticlePage from './pages/LegalArticlePage'
 import BillingUsagePage from './pages/BillingUsagePage'
+import OperationsPage from './pages/OperationsPage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 
 type Page =
@@ -20,6 +21,7 @@ type Page =
   | { type: 'audit' }
   | { type: 'teams' }
   | { type: 'billing' }
+  | { type: 'operations' }
   | { type: 'tasks' }
   | { type: 'legalArticles' }
 
@@ -117,6 +119,7 @@ export default function App() {
     audit: () => setPage({ type: 'audit' }),
     teams: () => setPage({ type: 'teams' }),
     billing: () => setPage({ type: 'billing' }),
+    operations: () => setPage({ type: 'operations' }),
     tasks: () => setPage({ type: 'tasks' }),
     legalArticles: () => setPage({ type: 'legalArticles' }),
   }
@@ -127,6 +130,7 @@ export default function App() {
   const isAudit = page.type === 'audit'
   const isTeams = page.type === 'teams'
   const isBilling = page.type === 'billing'
+  const isOperations = page.type === 'operations'
   const isTasks = page.type === 'tasks'
   const isLegalArticles = page.type === 'legalArticles'
   const needsLogin = authRequired && !currentUser
@@ -141,6 +145,7 @@ export default function App() {
       case 'audit': return null
       case 'teams': return null
       case 'billing': return null
+      case 'operations': return null
       case 'tasks': return null
       case 'legalArticles': return null
     }
@@ -194,6 +199,12 @@ export default function App() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16v10H4z"/><path d="M8 11h4"/><path d="M16 11h.01"/><path d="M8 15h8"/></svg>
                 用量与套餐
               </div>
+              {currentUser.role === 'admin' && (
+                <div className={`nav-item ${isOperations ? 'active' : ''}`} onClick={nav.operations}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/><path d="M7 19v-4"/><path d="M11 19v-8"/><path d="M15 19v-5"/><path d="M19 19V7"/></svg>
+                  运营后台
+                </div>
+              )}
             </div>
           )}
           <div className="nav-section">
@@ -276,6 +287,7 @@ export default function App() {
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'audit' && <AuditLogPage />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'teams' && <TeamManagePage />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'billing' && <BillingUsagePage currentUser={currentUser} />}
+          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'operations' && <OperationsPage currentUser={currentUser} />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'tasks' && <TaskMonitorPage />}
           {!authLoading && !needsLogin && !showAuthPanel && page.type === 'legalArticles' && <LegalArticlePage />}
         </div>

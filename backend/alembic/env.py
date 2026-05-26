@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from backend.config import settings
 from backend.database import Base
-from backend.models import audit, case, case_template, channel, legal_article, material, prompt, task, team, user, workflow  # noqa
+from backend.models import audit, billing, case, case_template, channel, legal_article, material, prompt, task, team, user, workflow  # noqa
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

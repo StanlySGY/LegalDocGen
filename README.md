@@ -24,14 +24,16 @@
 - 团队创建、成员添加、角色调整和成员移除作为可选协作能力保留
 - 兼容旧版 `ADMIN_TOKEN`，用于保护渠道、模板、审计和 Prompt 写入等高风险接口
 
-### SaaS 套餐、订阅与用量
+### SaaS 套餐、订阅、用量与试运营账务
 - 内置免费体验版、团队专业版、商业旗舰版套餐
 - 复用团队作为 SaaS 租户边界，记录团队订阅状态和当前套餐
 - 统计案件数、材料数、月度 AI 生成次数和成员数
 - 创建案件、上传材料、AI 生成和添加成员前执行配额检查
 - 超限时返回结构化 `quota_exceeded` 错误，前端显示升级提示
 - “用量与套餐”页面展示当前套餐、订阅状态、用量进度和套餐权益
-- 当前为本地计费模拟，不发起真实扣费，后续可接 Stripe、支付宝、微信支付或企业合同订阅
+- 管理员可在“运营后台”创建线下订单，确认收款后自动开通目标团队套餐
+- 运营后台展示团队数、付费团队数、待确认订单、模拟收入和接近配额上限团队
+- 当前为试运营线下收款模式，不发起真实扣费，后续可接 Stripe、支付宝、微信支付或企业合同订阅
 
 ### 案件模板与材料齐备度
 - 内置合同纠纷、劳动争议、房产纠纷、侵权纠纷等案件模板
@@ -216,12 +218,43 @@ VITE_API_BASE_URL=https://your-backend.example.com/api
 - 配置 `ADMIN_TOKEN` 保护渠道、审计和高风险配置接口，也可使用管理员账号 Bearer Token
 - 配置 `API_KEY_SECRET`，用于本地加密保存模型渠道 API Key
 
+### 试运营部署
+
+本批已提供 Docker 方式运行独立后端和 PostgreSQL，适合小规模试运营验证：
+
+```bash
+cp backend/.env.example backend/.env
+# 按需修改 backend/.env 中的数据库、CORS、认证密钥和模型渠道
+```
+
+使用 Docker Compose 启动后端和 PostgreSQL：
+
+```bash
+docker compose up --build
+```
+
+后端容器启动时会执行：
+
+```bash
+python -m alembic upgrade head
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+试运营检查清单：
+1. `DATABASE_URL` 指向 PostgreSQL。
+2. `AUTH_REQUIRED=true`，并设置高强度 `AUTH_SECRET`、`API_KEY_SECRET`、`ADMIN_TOKEN`。
+3. `CORS_ORIGINS` 只包含真实前端域名。
+4. Vercel/Netlify 配置 `VITE_API_BASE_URL=https://你的后端域名/api`。
+5. 执行 `python -m alembic upgrade head` 后再开放后端访问。
+6. 打开 `/api/health`，确认数据库和存储状态正常。
+7. 使用管理员账号进入“运营后台”，创建线下订单并标记已支付，确认目标团队套餐生效。
+
 ### 数据库迁移
 
 默认本地开发仍可直接使用自动建表；生产环境建议使用 Alembic 管理 PostgreSQL 迁移：
 
 ```bash
-alembic upgrade head
+python -m alembic upgrade head
 ```
 
 如需切换 PostgreSQL，将 `DATABASE_URL` 配置为 `postgresql+psycopg://user:password@host:5432/dbname`。
@@ -275,10 +308,14 @@ alembic upgrade head
 - `PUT /api/teams/{team_id}/members/{user_id}`：更新成员角色
 - `DELETE /api/teams/{team_id}/members/{user_id}`：移除团队成员
 
-### 计费与用量
+### 计费、用量与运营
 - `GET /api/billing/plans`：查看启用套餐
 - `GET /api/billing/status`：查看当前团队订阅、套餐和用量
-- `PUT /api/billing/teams/{team_id}/subscription`：管理员切换团队套餐或订阅状态
+- `PUT /api/billing/teams/{team_id}/subscription`：管理员切换目标团队套餐或订阅状态
+- `GET /api/billing/operations/summary`：管理员查看团队、订阅、订单和模拟收入汇总
+- `GET /api/billing/operations/orders`：管理员查看线下订单列表，支持状态筛选
+- `POST /api/billing/operations/orders`：管理员创建线下订单
+- `PUT /api/billing/operations/orders/{order_id}`：管理员更新订单状态，标记已支付后开通套餐
 
 ### 案件管理
 - `GET /api/cases`：案件列表，支持状态、关键词、类型、模板筛选
@@ -380,6 +417,9 @@ LegalDocGen/
 - 上传文件名安全处理
 - 材料预览 XSS 风险修复
 - 统一错误提示
+- SaaS 套餐、订阅、用量配额和线下订单试运营闭环
+- 运营后台、订单状态流转和模拟收入汇总
+- Docker Compose 试运营部署入口和 GitHub Actions CI
 - 基础响应式布局
 
 ## 后续优化方向

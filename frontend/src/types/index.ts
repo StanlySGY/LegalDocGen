@@ -32,6 +32,40 @@ export interface BillingStatus {
   period: string
 }
 
+export type BillingOrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded'
+
+export interface BillingOrder {
+  id: string
+  team: { id: string; name: string }
+  plan_code: string
+  plan_name: string
+  billing_period: string
+  amount_cents: number
+  currency: string
+  status: BillingOrderStatus
+  paid_at?: string | null
+  operator_id?: string | null
+  external_reference: string
+  notes: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface OperationsSummary {
+  team_count: number
+  paid_team_count: number
+  trialing_subscription_count: number
+  pending_order_count: number
+  paid_amount_cents: number
+  currency: string
+  recent_orders: BillingOrder[]
+  near_limit_teams: Array<{
+    team_id: string
+    team_name: string
+    usage: UsageItem[]
+  }>
+}
+
 export interface QuotaExceededDetail {
   code: 'quota_exceeded'
   metric: string

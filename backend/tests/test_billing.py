@@ -1,12 +1,12 @@
 import pytest
 from fastapi import HTTPException
 
-from backend.models.billing import Plan, SubscriptionStatus, UsageMetric
+from backend.models.billing import BillingOrderStatus, Plan, SubscriptionStatus, UsageMetric
 from backend.models.case import Case
 from backend.models.user import User, UserRole
 from backend.routers.billing import billing_status
 from backend.services.auth_service import hash_password
-from backend.services.billing_service import enforce_quota, seed_default_plans, update_team_subscription
+from backend.services.billing_service import billing_status_for_team, create_billing_order, enforce_quota, operations_summary, seed_default_plans, update_billing_order_status, update_team_subscription
 from backend.services.team_service import ensure_default_team
 
 
@@ -99,3 +99,65 @@ def test_member_cannot_update_subscription(db_session):
         update_team_subscription(db_session, team.id, "team", SubscriptionStatus.ACTIVE, owner)
 
     assert exc.value.status_code == 403
+
+
+def test_paid_order_activates_target_team_subscription(db_session):
+    admin = _user("admin", UserRole.ADMIN)
+    owner = _user("owner")
+    db_session.add_all([admin, owner])
+    db_session.flush()
+    team = ensure_default_team(db_session, owner)
+    seed_default_plans(db_session)
+    db_session.commit()
+
+    order = create_billing_order(db_session, team.id, "business", "yearly", 199900, "cny", admin, "offline-001", "线下转账")
+    assert order.status == BillingOrderStatus.PENDING
+    assert order.currency == "CNY"
+
+    paid = update_billing_order_status(db_session, order.id, BillingOrderStatus.PAID, admin, "已确认到账")
+    status = billing_status_for_team(db_session, team.id, admin)
+
+    assert paid.status == BillingOrderStatus.PAID
+    assert paid.paid_at is not None
+    assert status["team"]["id"] == team.id
+    assert status["subscription"]["plan_code"] == "business"
+    assert status["subscription"]["status"] == SubscriptionStatus.ACTIVE
+    assert status["plan"]["case_limit"] == 500
+
+
+def test_member_cannot_create_billing_order(db_session):
+    owner = _user("owner")
+    db_session.add(owner)
+    db_session.flush()
+    team = ensure_default_team(db_session, owner)
+    seed_default_plans(db_session)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        create_billing_order(db_session, team.id, "team", "monthly", 29900, "CNY", owner)
+
+    assert exc.value.status_code == 403
+
+
+def test_operations_summary_counts_paid_and_pending_orders(db_session):
+    admin = _user("admin", UserRole.ADMIN)
+    owner = _user("owner")
+    other = _user("other")
+    db_session.add_all([admin, owner, other])
+    db_session.flush()
+    paid_team = ensure_default_team(db_session, owner)
+    pending_team = ensure_default_team(db_session, other)
+    seed_default_plans(db_session)
+    db_session.commit()
+
+    paid_order = create_billing_order(db_session, paid_team.id, "team", "monthly", 29900, "CNY", admin)
+    create_billing_order(db_session, pending_team.id, "business", "yearly", 199900, "CNY", admin)
+    update_billing_order_status(db_session, paid_order.id, BillingOrderStatus.PAID, admin)
+
+    summary = operations_summary(db_session, admin)
+
+    assert summary["team_count"] == 2
+    assert summary["paid_team_count"] == 1
+    assert summary["pending_order_count"] == 1
+    assert summary["paid_amount_cents"] == 29900
+    assert summary["recent_orders"]

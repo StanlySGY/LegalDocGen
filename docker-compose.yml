@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: legaldocgen
+      POSTGRES_USER: legaldocgen
+      POSTGRES_PASSWORD: legaldocgen-change-me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legaldocgen -d legaldocgen"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://legaldocgen:legaldocgen-change-me@db:5432/legaldocgen
+      UPLOAD_DIR: /app/uploads
+      STORAGE_BACKEND: local
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      AUTH_REQUIRED: "true"
+      ALLOW_USER_REGISTRATION: "true"
+      DEFAULT_ADMIN_USERNAME: admin
+      DEFAULT_ADMIN_PASSWORD: change-me-now
+      ADMIN_TOKEN: change-me-admin-token
+      API_KEY_SECRET: change-me-api-key-secret
+      AUTH_SECRET: change-me-auth-secret
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
+  uploads:

@@ -25,6 +25,7 @@ class Team(Base):
     cases = relationship("Case", back_populates="team")
     subscription = relationship("TeamSubscription", back_populates="team", uselist=False, cascade="all, delete-orphan")
     usage_records = relationship("UsageRecord", back_populates="team", cascade="all, delete-orphan")
+    billing_orders = relationship("BillingOrder", back_populates="team", cascade="all, delete-orphan")
 
 
 class TeamMember(Base):

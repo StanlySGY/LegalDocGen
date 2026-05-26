@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -19,6 +19,13 @@ class UsageMetric:
     MATERIALS = "materials"
     AI_TASKS = "ai_tasks"
     MEMBERS = "members"
+
+
+class BillingOrderStatus:
+    PENDING = "pending"
+    PAID = "paid"
+    CANCELLED = "cancelled"
+    REFUNDED = "refunded"
 
 
 class Plan(Base):
@@ -68,3 +75,25 @@ class UsageRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     team = relationship("Team", back_populates="usage_records")
+
+
+class BillingOrder(Base):
+    __tablename__ = "billing_orders"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
+    plan_code = Column(String(50), ForeignKey("plans.code"), nullable=False, index=True)
+    billing_period = Column(String(30), default="monthly")
+    amount_cents = Column(Integer, default=0)
+    currency = Column(String(10), default="CNY")
+    status = Column(String(30), default=BillingOrderStatus.PENDING, index=True)
+    paid_at = Column(DateTime, nullable=True)
+    operator_id = Column(String, ForeignKey("users.id"), nullable=True)
+    external_reference = Column(String(160), default="")
+    notes = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    team = relationship("Team", back_populates="billing_orders")
+    plan = relationship("Plan")
+    operator = relationship("User")
