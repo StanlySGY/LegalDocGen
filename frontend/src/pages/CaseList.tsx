@@ -9,6 +9,12 @@ type CaseForm = { name: string; description: string; case_type: string }
 
 const emptyForm: CaseForm = { name: '', description: '', case_type: '' }
 const statusText: Record<string, string> = { draft: '草稿', in_progress: '进行中', completed: '已完成' }
+const caseTypePresets = ['合同纠纷', '劳动争议', '房产纠纷', '侵权纠纷']
+const onboardingSteps = [
+  { title: '1. 建立案件', text: '先写清案件名称、类型和目标文书，避免后续 Prompt 过散。' },
+  { title: '2. 上传材料', text: '合同、流水、聊天记录、通知书等材料建议按类型命名。' },
+  { title: '3. 五阶段生成', text: '按顺序生成事实、法律关系、争议焦点、初稿和审查意见。' },
+]
 
 const statusTag = (status: string) => status === 'completed' ? 't-green' : status === 'in_progress' ? 't-orange' : 't-gray'
 const formatDate = (value: string) => new Date(value).toLocaleDateString('zh-CN')
@@ -34,7 +40,7 @@ export default function CaseList({ nav }: Props) {
   useEffect(() => { load() }, [load])
 
   const create = async () => {
-    if (!form.name.trim()) return
+    if (!form.name.trim()) return showToast('请先填写案件名称', 'err')
     try {
       const c = await api.cases.create({ ...form, template_id: selectedTemplate?.id || '' })
       setForm(emptyForm)
@@ -117,6 +123,7 @@ export default function CaseList({ nav }: Props) {
   const deliveryRate = total ? Math.round(completedCount / total * 100) : 0
   const recentCases = [...cases].sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()).slice(0, 3)
   const primaryCase = cases.find(c => c.status === 'in_progress') || cases.find(c => c.status === 'draft') || cases[0]
+  const hasActiveFilters = Boolean(filters.keyword || filters.status || filters.case_type)
 
   if (showTemplateSelector) {
     return <TemplateSelector onSelectTemplate={handleTemplateSelect} onBack={() => setShowTemplateSelector(false)} />
@@ -232,9 +239,21 @@ export default function CaseList({ nav }: Props) {
                 ))}
                 {cases.length===0 && (
                   <tr><td colSpan={6}>
-                    <div className="empty refined-empty" style={{padding:'60px 0'}}>
+                    <div className="empty refined-empty case-empty-state" style={{padding:'56px 16px'}}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                      <p>暂无案件，点击「新建案件」开始</p>
+                      <p>{hasActiveFilters ? '没有匹配当前筛选条件的案件' : '暂无案件，按三步开始个人文书写作'}</p>
+                      <span>{hasActiveFilters ? '可以调整关键词、状态或案件类型后再试。' : '先建立案件，再补材料，最后进入五阶段生成。'}</span>
+                      {!hasActiveFilters && (
+                        <div className="onboarding-grid compact">
+                          {onboardingSteps.map(step => (
+                            <div key={step.title} className="onboarding-step">
+                              <strong>{step.title}</strong>
+                              <span>{step.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button className="btn btn-p btn-sm" onClick={() => setShowCreate(true)}>{hasActiveFilters ? '新建案件' : '开始新建案件'}</button>
                     </div>
                   </td></tr>
                 )}
@@ -261,6 +280,14 @@ export default function CaseList({ nav }: Props) {
             <strong>推荐办案顺序</strong>
             <span>先补齐关键材料，再完成五阶段生成，最后核验法条、金额、证据引用并导出 Word。</span>
           </div>
+          <div className="onboarding-grid vertical">
+            {onboardingSteps.map(step => (
+              <div key={step.title} className="onboarding-step">
+                <strong>{step.title}</strong>
+                <span>{step.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -276,6 +303,11 @@ export default function CaseList({ nav }: Props) {
               <div>
                 <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件类型</label>
                 <input className="input" placeholder="如：合同纠纷、劳动争议" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}/>
+                <div className="quick-type-row">
+                  {caseTypePresets.map(type => (
+                    <button key={type} type="button" className={`chip-btn ${form.case_type === type ? 'on' : ''}`} onClick={() => setForm({...form, case_type: type})}>{type}</button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件描述</label>

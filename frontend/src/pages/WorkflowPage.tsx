@@ -6,12 +6,12 @@ import { STAGE_NAMES, STAGE_ORDER } from '../types'
 
 interface Props { caseId: string; onBack: () => void; onCaseNav: () => void }
 
-const stageGuides: Record<StageType, { input: string; output: string; risk: string }> = {
-  fact_extraction: { input: '上传材料与案件基本信息', output: '当事人、关键事实、证据清单', risk: '核对事实是否均可追溯到材料' },
-  legal_analysis: { input: '案件要素与证据目录', output: '法律关系、适用规则、权利义务', risk: '法条与诉讼策略必须人工复核' },
-  dispute_focus: { input: '事实提取与法律关系分析', output: '事实争议、法律争议、证据关键点', risk: '避免遗漏对方可能抗辩点' },
-  draft_generation: { input: '前三阶段分析结论', output: '诉状、仲裁申请书等初稿', risk: '金额、主体、请求事项逐项核验' },
-  review_optimization: { input: '文书初稿与全部阶段输出', output: '逻辑、依据、完整性和表达审查', risk: '最终提交前仍需律师确认' },
+const stageGuides: Record<StageType, { input: string; output: string; action: string; review: string; risk: string }> = {
+  fact_extraction: { input: '上传材料与案件基本信息', output: '当事人、关键事实、证据清单', action: '先确认合同、流水、通知、聊天记录等核心材料已经解析，再抽取事实。', review: '逐条核对主体、时间、金额和证据来源，缺依据的事实不要直接进入后续阶段。', risk: '核对事实是否均可追溯到材料' },
+  legal_analysis: { input: '案件要素与证据目录', output: '法律关系、适用规则、权利义务', action: '基于已确认事实分析法律关系，不要让模型补写材料中没有的情节。', review: '重点复核法律关系定性、请求权基础、时效和管辖等关键判断。', risk: '法条与诉讼策略必须人工复核' },
+  dispute_focus: { input: '事实提取与法律关系分析', output: '事实争议、法律争议、证据关键点', action: '把对方可能抗辩点和己方证据短板列清楚，再进入文书起草。', review: '检查是否遗漏付款、履行、通知、违约责任等常见争点。', risk: '避免遗漏对方可能抗辩点' },
+  draft_generation: { input: '前三阶段分析结论', output: '诉状、仲裁申请书等初稿', action: '先确认诉请结构和金额口径，再生成可编辑初稿。', review: '逐项核对当事人信息、请求事项、事实理由、金额和证据引用。', risk: '金额、主体、请求事项逐项核验' },
+  review_optimization: { input: '文书初稿与全部阶段输出', output: '逻辑、依据、完整性和表达审查', action: '对照前四阶段输出做最终审查，标出仍需人工核验事项。', review: '检查法条、金额、证据链、诉请表达和提交前风险提示。', risk: '最终提交前仍需律师确认' },
 }
 
 const statusLabel = (item?: StageProgress) => item?.has_output ? '已完成' : item?.status === 'running' ? '生成中' : '待处理'
@@ -50,6 +50,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
 
   const idx = STAGE_ORDER.indexOf(activeStage)
   const previousStage = idx > 0 ? STAGE_ORDER[idx - 1] : null
+  const nextStage = idx < STAGE_ORDER.length - 1 ? STAGE_ORDER[idx + 1] : null
   const previousDone = !previousStage || Boolean(progress.find(item => item.stage === previousStage)?.has_output)
   const activeProgress = progress.find(item => item.stage === activeStage)
   const completedCount = progress.filter(item => item.has_output).length
@@ -162,6 +163,11 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
         <div className={`trust-card ${previousDone ? 'success' : 'warn'}`}><strong>前置条件</strong><span>{previousDone ? '可生成当前阶段内容' : `需先完成 ${previousStage ? STAGE_NAMES[previousStage] : ''}`}</span></div>
       </div>
 
+      <div className="workflow-next-action">
+        <div><strong>本阶段建议操作</strong><span>{guide.action}</span></div>
+        <div><strong>人工复核重点</strong><span>{guide.review}</span></div>
+      </div>
+
       <div className="card workflow-summary">
         <div>
           <div style={{fontWeight:600}}>交付完成度：{completedCount}/{STAGE_ORDER.length}</div>
@@ -239,6 +245,14 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             <div>依据材料与前序阶段生成</div>
             <div>法条、金额、策略需人工复核</div>
             <div>{guide.risk}</div>
+          </div>
+          <div className={`workflow-output-action ${output ? 'ready' : previousDone ? 'pending' : 'blocked'}`}>
+            <strong>{output ? '下一步建议' : previousDone ? '生成前检查' : '等待前置阶段'}</strong>
+            <span>
+              {output
+                ? nextStage ? `先编辑保存当前结果，再进入「${STAGE_NAMES[nextStage]}」。` : '完成最终审查后，核对法条、金额和证据引用，再导出 Word。'
+                : previousDone ? '确认材料、Prompt 和模型渠道无误后，点击生成当前阶段。' : `请先完成「${previousStage ? STAGE_NAMES[previousStage] : ''}」。`}
+            </span>
           </div>
           {editingOutput ? (
             <div>

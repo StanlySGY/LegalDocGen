@@ -77,6 +77,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const parsedCount = materials.filter(m=>m.parse_status==='completed').length
   const failedCount = materials.filter(m=>m.parse_status!=='completed').length
   const hasTemplateGate = Boolean(caseData?.template_id && checklist.length > 0)
+  const missingMaterialNames = materialCompletion.missingRequiredItems.slice(0, 4).map(({ item }) => item.name)
 
   const handleEnterWorkflow = () => {
     if (caseData?.template_id && materialCompletion.missingRequired > 0) {
@@ -124,7 +125,11 @@ export default function CaseDetail({ caseId, nav }: Props) {
         <div className={`notice-card ${materialCompletion.missingRequired > 0 ? 'notice-warn' : 'notice-success'}`}>
           <div>
             <strong>材料齐备度：{materialCompletion.completedRequired}/{materialCompletion.requiredItems.length}</strong>
-            <span>{materialCompletion.missingRequired > 0 ? `进入工作流前建议补齐 ${materialCompletion.missingRequired} 项必需材料。` : '必需材料已齐备，可以进入工作流。'}</span>
+            <span>
+              {materialCompletion.missingRequired > 0
+                ? `缺失项：${missingMaterialNames.join('、')}${materialCompletion.missingRequired > missingMaterialNames.length ? '等' : ''}。建议补齐后再生成，降低事实缺漏风险。`
+                : '必需材料已齐备，可以进入工作流；生成前仍建议核对页码引用和事实时间线。'}
+            </span>
           </div>
         </div>
       )}
@@ -174,6 +179,11 @@ export default function CaseDetail({ caseId, nav }: Props) {
           <div>
             <strong>{uploading ? '正在上传并解析材料...' : '先上传关键材料，再进入文书生成'}</strong>
             <p>建议文件名包含材料类型，例如“合同”“流水”“通知书”，便于自动匹配清单、生成证据目录和页码引用。</p>
+            <div className="material-upload-tips">
+              <span>推荐命名：材料类型-日期-来源</span>
+              <span>扫描件优先转为清晰 PDF 或图片</span>
+              <span>先上传合同、付款流水、通知书等核心证据</span>
+            </div>
           </div>
           <label className={`btn ${uploading?'btn-o':'btn-p'} btn-sm`} style={{cursor:'pointer'}}>
             {uploading ? '处理中...' : '+ 上传材料'}
@@ -198,12 +208,17 @@ export default function CaseDetail({ caseId, nav }: Props) {
                 <button className="btn btn-o btn-sm" onClick={()=>previewMaterial(m.parsed_content)}>查看</button>
                 <button className="btn btn-d btn-sm" onClick={()=>del(m.id)}>删除</button>
               </div>
+              {m.parse_status !== 'completed' && (
+                <div className="material-fix-hint">解析失败时可先查看任务号，删除后重新上传清晰 PDF/Word，或改传可复制文字版本。</div>
+              )}
             </div>
           ))}
           {materials.length===0 && (
-            <div className="empty refined-empty" style={{padding:'50px 0'}}>
+            <div className="empty refined-empty" style={{padding:'50px 16px'}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-              <p>暂无材料，上传 PDF / Word / 图片文件</p>
+              <p>暂无材料，先上传 PDF / Word / 图片文件</p>
+              <span>建议从合同、付款流水、聊天记录、通知书等能支撑事实的材料开始。</span>
+              <button className="btn btn-p btn-sm" onClick={() => fileRef.current?.click()}>上传第一份材料</button>
             </div>
           )}
         </div>
