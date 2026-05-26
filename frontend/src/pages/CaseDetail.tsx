@@ -103,8 +103,8 @@ export default function CaseDetail({ caseId, nav }: Props) {
           </div>
           {caseData.description && <p style={{fontSize:13,color:'#64748b',marginTop:8,lineHeight:1.8}}>{caseData.description}</p>}
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
-            <span className="tag t-gray">团队：{caseData.team_id ? caseData.team_id.slice(0, 8) : '未绑定'}</span>
-            <span className="tag t-gray">创建人：{caseData.owner_id ? caseData.owner_id.slice(0, 8) : '兼容模式'}</span>
+            <span className="tag t-purple">个人文书写作</span>
+            <span className="tag t-gray">先材料整理，再生成初稿，最后人工复核导出</span>
           </div>
         </div>
         <div className="case-detail-actions">
@@ -172,8 +172,8 @@ export default function CaseDetail({ caseId, nav }: Props) {
         </div>
         <div className="material-upload-zone">
           <div>
-            <strong>{uploading ? '正在上传并解析材料...' : '拖拽区暂不启用，请点击右侧上传材料'}</strong>
-            <p>建议文件名包含材料类型，例如“劳动合同”“工资流水”“解除通知书”，便于自动匹配清单。</p>
+            <strong>{uploading ? '正在上传并解析材料...' : '先上传关键材料，再进入文书生成'}</strong>
+            <p>建议文件名包含材料类型，例如“合同”“流水”“通知书”，便于自动匹配清单、生成证据目录和页码引用。</p>
           </div>
           <label className={`btn ${uploading?'btn-o':'btn-p'} btn-sm`} style={{cursor:'pointer'}}>
             {uploading ? '处理中...' : '+ 上传材料'}

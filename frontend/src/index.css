@@ -831,7 +831,8 @@ body {
 
 .refined-empty svg { color: #94a3b8; }
 
-.stage-guide {
+.stage-guide,
+.delivery-check-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -1281,7 +1282,7 @@ body {
   #root { grid-template-columns: 200px 1fr; }
   .workflow-grid, .evidence-grid, .workbench-grid, .team-layout { grid-template-columns: 1fr; }
   .side-insight { position: static; }
-  .stage-guide, .output-trust-strip, .verify-summary, .role-guide-grid, .prompt-template-list { grid-template-columns: 1fr; }
+  .stage-guide, .delivery-check-grid, .output-trust-strip, .verify-summary, .role-guide-grid, .prompt-template-list { grid-template-columns: 1fr; }
   .member-grid { grid-template-columns: 1fr; }
 }
 

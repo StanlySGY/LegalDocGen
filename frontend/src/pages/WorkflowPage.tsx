@@ -57,6 +57,11 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
   const guide = stageGuides[activeStage]
   const canGenerate = Boolean(selChannelId) && previousDone && !generating
+  const deliveryChecks = [
+    { label: '五阶段内容齐备', done: canExport, hint: canExport ? '可进入最终导出' : '仍需完成剩余阶段' },
+    { label: '证据引用复核', done: completedCount >= 1, hint: '检查事实是否能追溯到材料页码' },
+    { label: '法条金额复核', done: completedCount >= 4, hint: '导出前人工核对法条、金额与诉请' },
+  ]
 
   const handleGenerate = async () => {
     if (!previousDone && previousStage) {
@@ -165,6 +170,15 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
           </div>
         </div>
         <span className={`tag ${canExport ? 't-green' : 't-orange'}`}>{canExport ? '可导出' : '待完善'}</span>
+      </div>
+
+      <div className="delivery-check-grid">
+        {deliveryChecks.map(check => (
+          <div key={check.label} className={`trust-card ${check.done ? 'success' : 'warn'}`}>
+            <strong>{check.label}</strong>
+            <span>{check.hint}</span>
+          </div>
+        ))}
       </div>
 
       <div className="workflow-grid">

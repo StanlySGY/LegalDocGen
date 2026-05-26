@@ -12,7 +12,8 @@ const statusText: Record<string, string> = { draft: '草稿', in_progress: '进�
 
 const statusTag = (status: string) => status === 'completed' ? 't-green' : status === 'in_progress' ? 't-orange' : 't-gray'
 const formatDate = (value: string) => new Date(value).toLocaleDateString('zh-CN')
-const nextAction = (item: Case) => item.status === 'completed' ? '导出或复核文书' : item.status === 'in_progress' ? '继续生成文书' : '补充材料并启动流程'
+const nextAction = (item: Case) => item.status === 'completed' ? '复核并导出 Word' : item.status === 'in_progress' ? '继续生成文书' : '补材料并启动工作流'
+const caseFocus = (item: Case) => item.status === 'completed' ? '交付前复核法条、金额和证据引用' : item.status === 'in_progress' ? '优先完成剩余阶段，形成可编辑初稿' : '先上传合同、流水、通知等关键材料'
 
 export default function CaseList({ nav }: Props) {
   const [cases, setCases] = useState<Case[]>([])
@@ -127,7 +128,7 @@ export default function CaseList({ nav }: Props) {
         <div>
           <div className="eyebrow">CASE WORKBENCH</div>
           <h2>案件工作台</h2>
-          <p>聚合案件进度、材料状态和下一步动作，帮助律师快速回到当前最重要的办案任务。</p>
+          <p>聚合个人案件进度、材料状态和下一步写作动作，帮助你快速从材料进入可复核的法律文书初稿。</p>
           {primaryCase && (
             <div className="hero-action-card">
               <div>
@@ -146,10 +147,10 @@ export default function CaseList({ nav }: Props) {
       </div>
 
       <div className="stat-row dashboard-stats">
-        <div className="stat-card s-purple"><div className="s-label">当前结果</div><div className="s-value">{total}</div><div className="s-hint">筛选后案件总数</div></div>
-        <div className="stat-card s-orange"><div className="s-label">待启动</div><div className="s-value">{draftCount}</div><div className="s-hint">建议补充材料</div></div>
-        <div className="stat-card s-blue"><div className="s-label">进行中</div><div className="s-value">{activeCount}</div><div className="s-hint">可继续工作流</div></div>
-        <div className="stat-card s-green"><div className="s-label">交付率</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成案件占比</div></div>
+        <div className="stat-card s-purple"><div className="s-label">我的案件</div><div className="s-value">{total}</div><div className="s-hint">当前筛选结果</div></div>
+        <div className="stat-card s-orange"><div className="s-label">待补材料</div><div className="s-value">{draftCount}</div><div className="s-hint">先上传关键证据</div></div>
+        <div className="stat-card s-blue"><div className="s-label">写作中</div><div className="s-value">{activeCount}</div><div className="s-hint">继续生成或编辑</div></div>
+        <div className="stat-card s-green"><div className="s-label">可交付</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成复核阶段占比</div></div>
       </div>
 
       {cases.length === 0 && !toast && (
@@ -212,7 +213,12 @@ export default function CaseList({ nav }: Props) {
                       </div>
                     </td>
                     <td><span className={`tag ${statusTag(c.status)}`}>{statusText[c.status] || c.status}</span></td>
-                    <td style={{fontSize:12,color:'#4b5563'}}>{nextAction(c)}</td>
+                    <td style={{fontSize:12,color:'#4b5563'}}>
+                      <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                        <strong style={{fontSize:12,color:'#334155'}}>{nextAction(c)}</strong>
+                        <span style={{color:'#86909c'}}>{caseFocus(c)}</span>
+                      </div>
+                    </td>
                     <td style={{color:'#86909c',fontSize:12}}>{formatDate(c.updated_at || c.created_at)}</td>
                     <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
                       <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
@@ -253,7 +259,7 @@ export default function CaseList({ nav }: Props) {
           </div>
           <div className="process-hint">
             <strong>推荐办案顺序</strong>
-            <span>先补齐必需材料，再完成五阶段工作流，最后进行法条核验与 Word 导出。</span>
+            <span>先补齐关键材料，再完成五阶段生成，最后核验法条、金额、证据引用并导出 Word。</span>
           </div>
         </div>
       </div>
