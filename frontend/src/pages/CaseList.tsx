@@ -10,6 +10,10 @@ type CaseForm = { name: string; description: string; case_type: string }
 const emptyForm: CaseForm = { name: '', description: '', case_type: '' }
 const statusText: Record<string, string> = { draft: '草稿', in_progress: '进行中', completed: '已完成' }
 
+const statusTag = (status: string) => status === 'completed' ? 't-green' : status === 'in_progress' ? 't-orange' : 't-gray'
+const formatDate = (value: string) => new Date(value).toLocaleDateString('zh-CN')
+const nextAction = (item: Case) => item.status === 'completed' ? '导出或复核文书' : item.status === 'in_progress' ? '继续生成文书' : '补充材料并启动流程'
+
 export default function CaseList({ nav }: Props) {
   const [cases, setCases] = useState<Case[]>([])
   const [showCreate, setShowCreate] = useState(false)
@@ -105,6 +109,13 @@ export default function CaseList({ nav }: Props) {
   }
 
   const caseTypes = Array.from(new Set(cases.map(c => c.case_type).filter(Boolean)))
+  const total = cases.length
+  const draftCount = cases.filter(c => c.status === 'draft').length
+  const activeCount = cases.filter(c => c.status === 'in_progress').length
+  const completedCount = cases.filter(c => c.status === 'completed').length
+  const deliveryRate = total ? Math.round(completedCount / total * 100) : 0
+  const recentCases = [...cases].sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()).slice(0, 3)
+  const primaryCase = cases.find(c => c.status === 'in_progress') || cases.find(c => c.status === 'draft') || cases[0]
 
   if (showTemplateSelector) {
     return <TemplateSelector onSelectTemplate={handleTemplateSelect} onBack={() => setShowTemplateSelector(false)} />
@@ -112,10 +123,21 @@ export default function CaseList({ nav }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 page-title-row">
+      <div className="dashboard-hero">
         <div>
-          <h2 style={{fontSize:20,fontWeight:700,color:'#1d2129'}}>案件管理</h2>
-          <p style={{fontSize:13,color:'#86909c',marginTop:4}}>管理、筛选和批量交付法律案件</p>
+          <div className="eyebrow">CASE WORKBENCH</div>
+          <h2>案件工作台</h2>
+          <p>聚合案件进度、材料状态和下一步动作，帮助律师快速回到当前最重要的办案任务。</p>
+          {primaryCase && (
+            <div className="hero-action-card">
+              <div>
+                <span className={`tag ${statusTag(primaryCase.status)}`}>{statusText[primaryCase.status] || primaryCase.status}</span>
+                <strong>{primaryCase.name}</strong>
+                <span>{nextAction(primaryCase)}</span>
+              </div>
+              <button className="btn btn-p btn-sm" onClick={() => primaryCase.status === 'draft' ? nav.detail(primaryCase.id) : nav.workflow(primaryCase.id)}>继续处理</button>
+            </div>
+          )}
         </div>
         <button className="btn btn-p" onClick={() => setShowCreate(true)}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -123,40 +145,116 @@ export default function CaseList({ nav }: Props) {
         </button>
       </div>
 
-      <div className="stat-row">
-        <div className="stat-card s-purple"><div className="s-label">当前结果</div><div className="s-value">{cases.length}</div></div>
-        <div className="stat-card s-blue"><div className="s-label">进行中</div><div className="s-value">{cases.filter(c=>c.status==='in_progress').length}</div></div>
-        <div className="stat-card s-green"><div className="s-label">已完成</div><div className="s-value">{cases.filter(c=>c.status==='completed').length}</div></div>
+      <div className="stat-row dashboard-stats">
+        <div className="stat-card s-purple"><div className="s-label">当前结果</div><div className="s-value">{total}</div><div className="s-hint">筛选后案件总数</div></div>
+        <div className="stat-card s-orange"><div className="s-label">待启动</div><div className="s-value">{draftCount}</div><div className="s-hint">建议补充材料</div></div>
+        <div className="stat-card s-blue"><div className="s-label">进行中</div><div className="s-value">{activeCount}</div><div className="s-hint">可继续工作流</div></div>
+        <div className="stat-card s-green"><div className="s-label">交付率</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成案件占比</div></div>
       </div>
 
       {cases.length === 0 && !toast && (
-        <div className="card" style={{marginBottom:16,border:'1px solid #dbeafe',background:'#eff6ff'}}>
-          <div style={{fontWeight:600,color:'#1d4ed8'}}>线上预览提示</div>
-          <div style={{fontSize:13,color:'#475569',marginTop:6,lineHeight:1.7}}>
-            如果你正在访问 Vercel 在线预览，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。未配置后端时，页面只展示前端界面能力。
+        <div className="notice-card notice-info">
+          <div>
+            <strong>当前为前端预览模式时，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。</strong>
+            <span>如果只是体验界面，可以先新建示例案件；如需完整能力，请在部署环境配置后端 API。</span>
           </div>
         </div>
       )}
 
-      <div className="card" style={{marginBottom:16}}>
-        <div className="filters-grid">
-          <input className="input" placeholder="搜索名称、描述或类型" value={filters.keyword} onChange={e=>setFilters({...filters,keyword:e.target.value})}/>
-          <select className="select" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}>
-            <option value="">全部状态</option>
-            <option value="draft">草稿</option>
-            <option value="in_progress">进行中</option>
-            <option value="completed">已完成</option>
-          </select>
-          <select className="select" value={filters.case_type} onChange={e=>setFilters({...filters,case_type:e.target.value})}>
-            <option value="">全部类型</option>
-            {caseTypes.map(type => <option key={type} value={type}>{type}</option>)}
-          </select>
-          <button className="btn btn-o" onClick={load}>刷新</button>
+      <div className="workbench-grid">
+        <div className="card" style={{padding:0}}>
+          <div className="panel-head">
+            <div>
+              <span className="card-title">案件列表</span>
+              <p>按状态、类型和关键词快速定位案件</p>
+            </div>
+            <div className="bulk-actions compact">
+              <span>已选择 {selectedIds.length} 个案件</span>
+              <button className="btn btn-o btn-sm" onClick={batchExport}>批量导出</button>
+              <button className="btn btn-d btn-sm" onClick={batchDelete}>批量删除</button>
+            </div>
+          </div>
+          <div className="filters-grid" style={{padding:'0 16px 16px'}}>
+            <input className="input" placeholder="搜索名称、描述或类型" value={filters.keyword} onChange={e=>setFilters({...filters,keyword:e.target.value})}/>
+            <select className="select" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}>
+              <option value="">全部状态</option>
+              <option value="draft">草稿</option>
+              <option value="in_progress">进行中</option>
+              <option value="completed">已完成</option>
+            </select>
+            <select className="select" value={filters.case_type} onChange={e=>setFilters({...filters,case_type:e.target.value})}>
+              <option value="">全部类型</option>
+              {caseTypes.map(type => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <button className="btn btn-o" onClick={load}>刷新</button>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{width:44}}><input type="checkbox" checked={cases.length>0 && selectedIds.length===cases.length} onChange={toggleAll}/></th>
+                  <th>案件名称</th>
+                  <th>状态</th>
+                  <th>下一步</th>
+                  <th>更新时间</th>
+                  <th style={{textAlign:'right'}}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cases.map(c => (
+                  <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>nav.detail(c.id)}>
+                    <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
+                    <td>
+                      <div style={{fontWeight:600}}>{c.name}</div>
+                      <div className="case-meta-line">
+                        {c.case_type ? <span>{c.case_type}</span> : <span>未设置类型</span>}
+                        {c.description && <span>{c.description}</span>}
+                      </div>
+                    </td>
+                    <td><span className={`tag ${statusTag(c.status)}`}>{statusText[c.status] || c.status}</span></td>
+                    <td style={{fontSize:12,color:'#4b5563'}}>{nextAction(c)}</td>
+                    <td style={{color:'#86909c',fontSize:12}}>{formatDate(c.updated_at || c.created_at)}</td>
+                    <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
+                      <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                        <button className="btn btn-o btn-sm" onClick={()=>nav.detail(c.id)}>详情</button>
+                        <button className="btn btn-p btn-sm" onClick={()=>nav.workflow(c.id)}>{c.status === 'completed' ? '复核' : '继续'}</button>
+                        <button className="btn btn-o btn-sm" onClick={()=>openEdit(c)}>编辑</button>
+                        <button className="btn btn-d btn-sm" onClick={()=>deleteOne(c.id)}>删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {cases.length===0 && (
+                  <tr><td colSpan={6}>
+                    <div className="empty refined-empty" style={{padding:'60px 0'}}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                      <p>暂无案件，点击「新建案件」开始</p>
+                    </div>
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="bulk-actions">
-          <span style={{fontSize:12,color:'#86909c'}}>已选择 {selectedIds.length} 个案件</span>
-          <button className="btn btn-o btn-sm" onClick={batchExport}>批量导出</button>
-          <button className="btn btn-d btn-sm" onClick={batchDelete}>批量删除</button>
+
+        <div className="card side-insight">
+          <div className="card-hd"><span className="card-title">最近更新</span></div>
+          <div className="recent-list">
+            {recentCases.map(item => (
+              <div key={item.id} className="recent-item" onClick={() => nav.detail(item.id)}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>{formatDate(item.updated_at || item.created_at)} · {nextAction(item)}</span>
+                </div>
+                <span className={`tag ${statusTag(item.status)}`}>{statusText[item.status] || item.status}</span>
+              </div>
+            ))}
+            {recentCases.length === 0 && <div className="empty" style={{padding:'38px 0'}}><p>暂无最近案件</p></div>}
+          </div>
+          <div className="process-hint">
+            <strong>推荐办案顺序</strong>
+            <span>先补齐必需材料，再完成五阶段工作流，最后进行法条核验与 Word 导出。</span>
+          </div>
         </div>
       </div>
 
@@ -208,57 +306,6 @@ export default function CaseList({ nav }: Props) {
           </div>
         </div>
       )}
-
-      <div className="card" style={{padding:0}}>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{width:44}}><input type="checkbox" checked={cases.length>0 && selectedIds.length===cases.length} onChange={toggleAll}/></th>
-                <th>案件名称</th>
-                <th>类型</th>
-                <th>状态</th>
-                <th>创建时间</th>
-                <th style={{textAlign:'right'}}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cases.map(c => (
-                <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>nav.detail(c.id)}>
-                  <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
-                  <td>
-                    <div style={{fontWeight:500}}>{c.name}</div>
-                    {c.description && <div style={{fontSize:12,color:'#86909c',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:300}}>{c.description}</div>}
-                  </td>
-                  <td>{c.case_type ? <span className="tag t-blue">{c.case_type}</span> : <span style={{color:'#c9cdd4'}}>-</span>}</td>
-                  <td>
-                    <span className={`tag ${c.status==='completed'?'t-green':c.status==='in_progress'?'t-orange':'t-gray'}`}>
-                      {statusText[c.status] || c.status}
-                    </span>
-                  </td>
-                  <td style={{color:'#86909c',fontSize:12}}>{new Date(c.created_at).toLocaleDateString('zh-CN')}</td>
-                  <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
-                    <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
-                      <button className="btn btn-o btn-sm" onClick={()=>nav.detail(c.id)}>详情</button>
-                      <button className="btn btn-p btn-sm" onClick={()=>nav.workflow(c.id)}>工作流</button>
-                      <button className="btn btn-o btn-sm" onClick={()=>openEdit(c)}>编辑</button>
-                      <button className="btn btn-d btn-sm" onClick={()=>deleteOne(c.id)}>删除</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {cases.length===0 && (
-                <tr><td colSpan={6}>
-                  <div className="empty" style={{padding:'60px 0'}}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                    <p>暂无案件，点击「新建案件」开始</p>
-                  </div>
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
     </div>
   )

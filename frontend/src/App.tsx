@@ -244,8 +244,11 @@ export default function App() {
         <div className="page-body">
           {health.status !== 'ok' && (
             <div className={`connection-banner connection-${health.status}`}>
-              <strong>{health.message}</strong>
-              <span>当前 API：{apiBaseUrl}。如果部署在 Vercel，请配置 VITE_API_BASE_URL 指向独立 FastAPI 后端。</span>
+              <strong>{health.status === 'offline' ? '当前为前端预览模式' : health.message}</strong>
+              <div className="connection-copy">
+                <span>{health.status === 'offline' ? '上传、生成、导出和登录等后端能力暂不可用。' : '后端已响应，但部分诊断项需要检查。'}</span>
+                <span>开发者配置：当前 API 为 <code>{apiBaseUrl}</code>，Vercel 部署请设置 <code>VITE_API_BASE_URL=https://你的后端域名/api</code>。</span>
+              </div>
             </div>
           )}
           {authLoading && <div className="card auth-loading">正在检查登录状态...</div>}

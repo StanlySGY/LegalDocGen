@@ -40,28 +40,20 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
   const { items, requiredItems, completedRequired, missingRequired, completionPercent } = getMaterialCompletion(checklist, materials)
 
   return (
-    <div className="card" style={{ marginBottom: 20, borderLeft: '3px solid #6366f1' }}>
+    <div className="card" style={{ marginBottom: 20 }}>
       <div className="card-hd">
-        <span className="card-title">材料检查清单</span>
-        <span style={{ fontSize: 12, color: '#86909c' }}>
-          {completedRequired}/{requiredItems.length} 必需材料已识别
+        <div>
+          <span className="card-title">材料齐备度 checklist</span>
+          <p style={{fontSize:12,color:'#86909c',marginTop:4}}>基于案件模板自动匹配已上传材料，缺失项会阻止直接进入工作流。</p>
+        </div>
+        <span className={`tag ${missingRequired > 0 ? 't-orange' : 't-green'}`}>
+          {completedRequired}/{requiredItems.length} 必需材料
         </span>
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{
-          height: 8,
-          background: '#f0f0f0',
-          borderRadius: 4,
-          overflow: 'hidden',
-          marginBottom: 8
-        }}>
-          <div style={{
-            height: '100%',
-            background: completionPercent === 100 ? '#10b981' : '#f59e0b',
-            width: `${completionPercent}%`,
-            transition: 'width 0.3s'
-          }} />
+        <div style={{ height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ height: '100%', background: completionPercent === 100 ? '#10b981' : '#f59e0b', width: `${completionPercent}%`, transition: 'width 0.3s' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#86909c' }}>
           <span>{missingRequired > 0 ? `仍缺少 ${missingRequired} 项必需材料` : '必需材料已齐备'}</span>
@@ -69,41 +61,24 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="checklist-items">
         {items.map(({ item, keywords, matchedMaterial }, i) => {
           const isUploaded = Boolean(matchedMaterial)
           const isRequired = item.required !== false
           return (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 12,
-                padding: '10px 12px',
-                background: isUploaded ? '#f0fdf4' : isRequired ? '#fffbeb' : '#fafafa',
-                borderRadius: 8,
-                border: `1px solid ${isUploaded ? '#d1fae5' : isRequired ? '#fde68a' : '#e5e7eb'}`
-              }}
-            >
-              <div style={{
-                fontSize: 16,
-                marginTop: 2,
-                color: isUploaded ? '#10b981' : isRequired ? '#f59e0b' : '#d1d5db'
-              }}>
-                {isUploaded ? '✓' : isRequired ? '●' : '○'}
-              </div>
-              <div style={{ flex: 1 }}>
+            <div key={i} className={`checklist-item ${isUploaded ? 'done' : isRequired ? 'required' : ''}`}>
+              <span className="check-dot">{isUploaded ? '✓' : isRequired ? '!' : '·'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: isUploaded ? '#10b981' : '#1d2129' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: isUploaded ? '#047857' : '#1d2129' }}>
                     {item.name}{isRequired && <span style={{ color: '#ef4444' }}>*</span>}
                   </span>
                   <span className={`tag ${isUploaded ? 't-green' : isRequired ? 't-orange' : 't-gray'}`}>
                     {isUploaded ? '已匹配' : isRequired ? '待上传' : '选填'}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: '#86909c', marginTop: 2 }}>
-                  {matchedMaterial ? `匹配文件：${matchedMaterial.filename}` : item.description}
+                <div style={{ fontSize: 12, color: '#86909c', marginTop: 4, lineHeight: 1.6 }}>
+                  {matchedMaterial ? `匹配文件：${matchedMaterial.filename}` : item.description || '未配置说明'}
                 </div>
                 {!matchedMaterial && keywords.length > 0 && (
                   <div style={{ fontSize: 11, color: '#c97706', marginTop: 4 }}>
@@ -116,20 +91,12 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
         })}
       </div>
 
-      {completionPercent === 100 && (
-        <div style={{
-          marginTop: 16,
-          padding: 12,
-          background: '#f0fdf4',
-          border: '1px solid #d1fae5',
-          borderRadius: 8,
-          color: '#10b981',
-          fontSize: 12,
-          textAlign: 'center'
-        }}>
-          所有必需材料已上传，可以开始工作流
+      <div className={`notice-card ${completionPercent === 100 ? 'notice-success' : 'notice-warn'}`} style={{marginTop:16,marginBottom:0}}>
+        <div>
+          <strong>{completionPercent === 100 ? '所有必需材料已上传，可以开始工作流' : '仍有必需材料缺失'}</strong>
+          <span>{completionPercent === 100 ? '建议继续检查页码引用和事实时间线，再进入五阶段生成。' : '请优先补齐缺失材料，降低空材料生成和事实编造风险。'}</span>
         </div>
-      )}
+      </div>
     </div>
   )
 }

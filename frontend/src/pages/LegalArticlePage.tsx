@@ -34,6 +34,7 @@ export default function LegalArticlePage() {
   }
 
   const del = async (id: string) => {
+    if (!window.confirm('确认删除该法条？')) return
     try {
       await api.legalArticles.delete(id)
       await load()
@@ -44,6 +45,7 @@ export default function LegalArticlePage() {
   }
 
   const verify = async () => {
+    if (!verifyText.trim()) return showToast('请先粘贴需要核验的文本', 'err')
     try {
       const data = await api.legalArticles.verify(verifyText)
       setVerifyResult(data.references || [])
@@ -52,65 +54,105 @@ export default function LegalArticlePage() {
     }
   }
 
+  const matchedCount = verifyResult.filter(item => item.matched).length
+  const missingCount = verifyResult.filter(item => !item.matched).length
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 page-title-row">
+      <div className="dashboard-hero">
         <div>
-          <h2 style={{fontSize:20,fontWeight:700,color:'#1d2129'}}>法条核验</h2>
-          <p style={{fontSize:13,color:'#86909c',marginTop:4}}>维护本地法条库，并核验文本中的《法律名称》第X条引用</p>
+          <div className="eyebrow">LEGAL SOURCE CHECK</div>
+          <h2>法条核验</h2>
+          <p>维护本地法条库，自动识别文本中的《法律名称》第X条引用，并标记已匹配、未收录和需人工复核事项。</p>
         </div>
-        <button className="btn btn-o" onClick={load}>刷新</button>
+        <button className="btn btn-o" onClick={load}>刷新法条库</button>
+      </div>
+
+      <div className="verify-summary">
+        <div className="trust-card accent"><strong>本地法条</strong><span>{articles.length} 条已收录，可用于引用核验。</span></div>
+        <div className="trust-card success"><strong>已匹配引用</strong><span>{matchedCount} 条引用已在本地法条库命中。</span></div>
+        <div className={`trust-card ${missingCount > 0 ? 'warn' : ''}`}><strong>需人工复核</strong><span>{missingCount > 0 ? `${missingCount} 条引用未收录或需补充。` : '暂无未收录引用。'}</span></div>
       </div>
 
       <div className="evidence-grid" style={{marginBottom:20}}>
         <div className="card">
-          <div className="card-title" style={{marginBottom:12}}>录入法条</div>
+          <div className="card-hd">
+            <div>
+              <span className="card-title">录入法条</span>
+              <p style={{fontSize:12,color:'#86909c',marginTop:4}}>同一法律名称和条号会自动更新，避免重复录入。</p>
+            </div>
+          </div>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             <input className="input" placeholder="法律名称，例如：民法典" value={form.law_name} onChange={e=>setForm({...form,law_name:e.target.value})} />
             <input className="input" placeholder="条号，例如：五百七十七" value={form.article_no} onChange={e=>setForm({...form,article_no:e.target.value})} />
             <input className="input" placeholder="标题（可选）" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} />
-            <textarea className="textarea" style={{height:120}} placeholder="条文内容" value={form.content} onChange={e=>setForm({...form,content:e.target.value})} />
+            <textarea className="textarea" style={{height:130}} placeholder="条文内容" value={form.content} onChange={e=>setForm({...form,content:e.target.value})} />
             <button className="btn btn-p" onClick={save}>保存法条</button>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-title" style={{marginBottom:12}}>引用核验</div>
-          <textarea className="textarea" style={{height:160}} placeholder="粘贴包含法条引用的文本，例如：《民法典》第五百七十七条" value={verifyText} onChange={e=>setVerifyText(e.target.value)} />
-          <button className="btn btn-p" style={{marginTop:10}} onClick={verify}>核验引用</button>
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:12}}>
-            {verifyResult.map((item, index) => (
-              <div key={`${item.law_name}-${item.article_no}-${index}`} style={{border:'1px solid #e5e7eb',borderRadius:8,padding:10}}>
-                <div className="flex items-center justify-between">
-                  <strong style={{fontSize:13}}>《{item.law_name}》第{item.article_no}条</strong>
-                  <span className={`tag ${item.matched ? 't-green' : 't-red'}`}>{item.matched ? '已匹配' : '未收录'}</span>
-                </div>
-                {item.title && <div style={{fontSize:12,color:'#4b5563',marginTop:6}}>{item.title}</div>}
-              </div>
-            ))}
+          <div className="card-hd">
+            <div>
+              <span className="card-title">引用核验</span>
+              <p style={{fontSize:12,color:'#86909c',marginTop:4}}>支持识别格式： 《民法典》第五百七十七条。</p>
+            </div>
+          </div>
+          <textarea className="textarea" style={{height:150}} placeholder="粘贴 AI 初稿或律师审查文本" value={verifyText} onChange={e=>setVerifyText(e.target.value)} />
+          <div style={{display:'flex',gap:8,marginTop:10}}>
+            <button className="btn btn-p" onClick={verify}>核验引用</button>
+            <button className="btn btn-o" onClick={() => { setVerifyText(''); setVerifyResult([]) }}>清空</button>
+          </div>
+          <div className="notice-card notice-warn" style={{marginTop:12,marginBottom:0}}>
+            <div><strong>核验边界</strong><span>本功能只校验引用是否存在于本地法条库，不替代律师对现行有效性、适用条件和诉讼策略的判断。</span></div>
           </div>
         </div>
       </div>
 
+      {verifyResult.length > 0 && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-hd"><span className="card-title">核验结果</span><span className={`tag ${missingCount > 0 ? 't-orange' : 't-green'}`}>{missingCount > 0 ? '需复核' : '引用已匹配'}</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {verifyResult.map((item, index) => (
+              <div key={`${item.law_name}-${item.article_no}-${index}`} className={`verify-result-card ${item.matched ? 'matched' : 'missing'}`}>
+                <div className="flex items-center justify-between" style={{gap:10}}>
+                  <strong style={{fontSize:13}}>《{item.law_name}》第{item.article_no}条</strong>
+                  <span className={`tag ${item.matched ? 't-green' : 't-red'}`}>{item.matched ? '已匹配' : '未收录'}</span>
+                </div>
+                {item.title && <div style={{fontSize:12,color:'#4b5563',marginTop:6,fontWeight:600}}>{item.title}</div>}
+                {item.content && <div style={{fontSize:12,color:'#64748b',lineHeight:1.7,marginTop:6}}>{item.content.slice(0, 180)}{item.content.length > 180 ? '...' : ''}</div>}
+                {!item.matched && <div style={{fontSize:12,color:'#b91c1c',marginTop:6}}>建议补录该法条，或由律师确认引用名称、条号和现行有效性。</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{padding:0}}>
-        <div style={{padding:16,borderBottom:'1px solid #e5e7eb'}} className="flex gap-2">
-          <input className="input" placeholder="搜索法律名称或内容" value={keyword} onChange={e=>setKeyword(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') load() }} />
-          <button className="btn btn-o" onClick={load}>搜索</button>
+        <div className="panel-head">
+          <div>
+            <span className="card-title">本地法条库</span>
+            <p>用于文书引用核验，可按法律名称、条号或内容搜索。</p>
+          </div>
+          <div style={{display:'flex',gap:8,minWidth:280}}>
+            <input className="input" placeholder="搜索法律名称或内容" value={keyword} onChange={e=>setKeyword(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') load() }} />
+            <button className="btn btn-o" onClick={load}>搜索</button>
+          </div>
         </div>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>法律名称</th><th>条号</th><th>标题</th><th>内容</th><th>操作</th></tr></thead>
+            <thead><tr><th>法律名称</th><th>条号</th><th>标题</th><th>内容摘要</th><th>操作</th></tr></thead>
             <tbody>
               {articles.map(article => (
                 <tr key={article.id}>
                   <td>{article.law_name}</td>
-                  <td>第{article.article_no}条</td>
+                  <td><span className="tag t-blue">第{article.article_no}条</span></td>
                   <td>{article.title || '-'}</td>
-                  <td style={{maxWidth:420}}>{article.content ? `${article.content.slice(0, 120)}${article.content.length > 120 ? '...' : ''}` : '-'}</td>
+                  <td style={{maxWidth:420,color:'#64748b',fontSize:12,lineHeight:1.6}}>{article.content ? `${article.content.slice(0, 120)}${article.content.length > 120 ? '...' : ''}` : '-'}</td>
                   <td><button className="btn btn-d btn-sm" onClick={()=>del(article.id)}>删除</button></td>
                 </tr>
               ))}
-              {articles.length === 0 && <tr><td colSpan={5}><div className="empty" style={{padding:'50px 0'}}><p>暂无法条数据</p></div></td></tr>}
+              {articles.length === 0 && <tr><td colSpan={5}><div className="empty refined-empty" style={{padding:'50px 0'}}><p>暂无法条数据，录入后可用于引用核验</p></div></td></tr>}
             </tbody>
           </table>
         </div>
