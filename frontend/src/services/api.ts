@@ -1,3 +1,5 @@
+import type { BillingStatus, Plan, QuotaExceededDetail } from '../types'
+
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
 const AUTH_TOKEN_KEY = 'legaldocgen_auth_token'
@@ -19,6 +21,19 @@ export class ApiConnectionError extends Error {
     this.name = 'ApiConnectionError'
   }
 }
+
+export class QuotaExceededError extends Error {
+  detail: QuotaExceededDetail
+
+  constructor(detail: QuotaExceededDetail) {
+    super(detail.message || `${detail.label}已达到当前套餐上限`)
+    this.name = 'QuotaExceededError'
+    this.detail = detail
+  }
+}
+
+export const isQuotaExceededError = (error: unknown): error is QuotaExceededError => error instanceof QuotaExceededError
+export const quotaUpgradeMessage = (error: unknown) => isQuotaExceededError(error) ? `${error.detail.message} 当前用量 ${error.detail.used}/${error.detail.limit}。` : ''
 
 export const getAdminToken = () => localStorage.getItem(ADMIN_TOKEN_KEY) || ''
 export const setAdminToken = (token: string) => {
@@ -59,13 +74,16 @@ async function parseJsonResponse<T>(res: Response, fallback: string): Promise<T>
   return res.json()
 }
 
-async function parseError(res: Response, fallback: string): Promise<string> {
+async function createApiError(res: Response, fallback: string): Promise<Error> {
   try {
     const err = await parseJsonResponse<any>(res, fallback)
-    return err.detail || err.message || res.statusText || fallback
+    const detail = err.detail
+    if (detail?.code === 'quota_exceeded') return new QuotaExceededError(detail)
+    if (typeof detail === 'string') return new Error(detail)
+    return new Error(detail?.message || err.message || res.statusText || fallback)
   } catch (e) {
-    if (e instanceof ApiConnectionError) return e.message
-    return res.statusText || fallback
+    if (e instanceof ApiConnectionError) return e
+    return new Error(res.statusText || fallback)
   }
 }
 
@@ -75,7 +93,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     ...rest,
     headers: jsonHeaders(headers),
   })
-  if (!res.ok) throw new Error(await parseError(res, '请求失败'))
+  if (!res.ok) throw await createApiError(res, '请求失败')
   return parseJsonResponse<T>(res, '请求失败')
 }
 
@@ -90,6 +108,12 @@ export const api = {
     users: () => request<AuthUser[]>('/auth/users'),
     updateUser: (id: string, data: { role?: string; is_active?: boolean }) =>
       request<AuthUser>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  billing: {
+    plans: () => request<Plan[]>('/billing/plans'),
+    status: () => request<BillingStatus>('/billing/status'),
+    updateSubscription: (teamId: string, data: { plan_code: string; status?: string }) =>
+      request<BillingStatus>(`/billing/teams/${teamId}/subscription`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   teams: {
     list: () => request<any[]>('/teams'),
@@ -141,7 +165,7 @@ export const api = {
       const form = new FormData()
       form.append('file', file)
       const res = await fetch(`${BASE}/materials/upload/${caseId}`, { method: 'POST', headers: authHeaders(), body: form })
-      if (!res.ok) throw new Error(await parseError(res, '上传失败'))
+      if (!res.ok) throw await createApiError(res, '上传失败')
       return res.json()
     },
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
@@ -156,7 +180,7 @@ export const api = {
         headers: jsonHeaders(),
         body: JSON.stringify(data),
       })
-      if (!res.ok) throw new Error(await parseError(res, '生成失败'))
+      if (!res.ok) throw await createApiError(res, '生成失败')
       if (!res.body) throw new Error('生成响应为空')
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -183,7 +207,7 @@ export const api = {
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
     export: async (caseId: string) => {
       const res = await fetch(`${BASE}/workflow/export/${caseId}`, { headers: authHeaders() })
-      if (!res.ok) throw new Error(await parseError(res, '导出失败'))
+      if (!res.ok) throw await createApiError(res, '导出失败')
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -200,7 +224,7 @@ export const api = {
         headers: jsonHeaders(),
         body: JSON.stringify({ case_ids: caseIds }),
       })
-      if (!res.ok) throw new Error(await parseError(res, '批量导出失败'))
+      if (!res.ok) throw await createApiError(res, '批量导出失败')
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')

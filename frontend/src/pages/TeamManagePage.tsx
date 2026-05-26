@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, type AuthUser } from '../services/api'
+import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { Team, TeamMember } from '../types'
 
 const roleText: Record<string, string> = { owner: '所有者', admin: '管理员', member: '成员' }
@@ -74,7 +74,7 @@ export default function TeamManagePage() {
       await loadMembers(selectedTeamId)
       showToast('成员已添加')
     } catch (e: any) {
-      showToast(e.message || '添加成员失败', 'err')
+      showToast(quotaUpgradeMessage(e) || e.message || '添加成员失败', 'err')
     }
   }
 

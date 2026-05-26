@@ -1,3 +1,47 @@
+export interface UsageItem {
+  metric: 'cases' | 'materials' | 'ai_tasks' | 'members'
+  label: string
+  used: number
+  limit: number
+  percent: number
+  period: string
+}
+
+export interface Plan {
+  id: string
+  code: string
+  name: string
+  case_limit: number
+  material_limit: number
+  ai_task_limit_monthly: number
+  member_limit: number
+  is_active: boolean
+}
+
+export interface BillingStatus {
+  team: { id: string; name: string }
+  subscription: {
+    id: string
+    plan_code: string
+    status: 'trialing' | 'active' | 'past_due' | 'cancelled'
+    current_period_start?: string | null
+    current_period_end?: string | null
+  }
+  plan: Plan
+  usage: UsageItem[]
+  period: string
+}
+
+export interface QuotaExceededDetail {
+  code: 'quota_exceeded'
+  metric: string
+  label: string
+  used: number
+  limit: number
+  upgrade_required: boolean
+  message: string
+}
+
 export interface Case {
   id: string
   name: string

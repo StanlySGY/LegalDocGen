@@ -13,8 +13,9 @@ from backend.exceptions import (
 )
 from backend.models.channel import Channel
 from backend.models.user import User, UserRole
-from backend.routers import audit, auth, cases, channel, config, legal_articles, materials, tasks, teams, templates, workflow
+from backend.routers import audit, auth, billing, cases, channel, config, legal_articles, materials, tasks, teams, templates, workflow
 from backend.services.auth_service import hash_password
+from backend.services.billing_service import seed_default_plans
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.secret_service import encrypt_secret
 from backend.services.storage_service import get_storage
@@ -72,6 +73,7 @@ async def lifespan(app: FastAPI):
         pm = PromptManager(db)
         pm.init_default_templates()
         init_default_templates(db)
+        seed_default_plans(db)
         _seed_default_admin(db)
         _seed_default_channel(db)
     finally:
@@ -96,6 +98,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 app.include_router(audit.router)
 app.include_router(auth.router)
 app.include_router(teams.router)
+app.include_router(billing.router)
 app.include_router(cases.router)
 app.include_router(materials.router)
 app.include_router(tasks.router)

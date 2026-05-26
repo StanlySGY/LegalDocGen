@@ -24,6 +24,15 @@
 - 团队创建、成员添加、角色调整和成员移除作为可选协作能力保留
 - 兼容旧版 `ADMIN_TOKEN`，用于保护渠道、模板、审计和 Prompt 写入等高风险接口
 
+### SaaS 套餐、订阅与用量
+- 内置免费体验版、团队专业版、商业旗舰版套餐
+- 复用团队作为 SaaS 租户边界，记录团队订阅状态和当前套餐
+- 统计案件数、材料数、月度 AI 生成次数和成员数
+- 创建案件、上传材料、AI 生成和添加成员前执行配额检查
+- 超限时返回结构化 `quota_exceeded` 错误，前端显示升级提示
+- “用量与套餐”页面展示当前套餐、订阅状态、用量进度和套餐权益
+- 当前为本地计费模拟，不发起真实扣费，后续可接 Stripe、支付宝、微信支付或企业合同订阅
+
 ### 案件模板与材料齐备度
 - 内置合同纠纷、劳动争议、房产纠纷、侵权纠纷等案件模板
 - 每类模板包含必需/可选材料清单和阶段 Prompt
@@ -265,6 +274,11 @@ alembic upgrade head
 - `POST /api/teams/{team_id}/members`：添加团队成员
 - `PUT /api/teams/{team_id}/members/{user_id}`：更新成员角色
 - `DELETE /api/teams/{team_id}/members/{user_id}`：移除团队成员
+
+### 计费与用量
+- `GET /api/billing/plans`：查看启用套餐
+- `GET /api/billing/status`：查看当前团队订阅、套餐和用量
+- `PUT /api/billing/teams/{team_id}/subscription`：管理员切换团队套餐或订阅状态
 
 ### 案件管理
 - `GET /api/cases`：案件列表，支持状态、关键词、类型、模板筛选

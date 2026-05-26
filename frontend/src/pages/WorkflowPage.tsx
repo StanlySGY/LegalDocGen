@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { api } from '../services/api'
+import { api, quotaUpgradeMessage } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType } from '../types'
 import { STAGE_NAMES, STAGE_ORDER } from '../types'
 
@@ -80,7 +80,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       setOutput(full); setStreamingText('')
       await loadProgress(); await loadNode(activeStage); await loadHistory(activeStage)
       showToast('生成完成')
-    } catch(e:any){showToast(e.message||'生成失败','err')}
+    } catch(e:any){showToast(quotaUpgradeMessage(e) || e.message || '生成失败','err')}
     finally { setGenerating(false); setStreamingText('') }
   }
 

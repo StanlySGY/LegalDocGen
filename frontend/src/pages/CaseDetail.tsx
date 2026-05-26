@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
-import { api } from '../services/api'
+import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
 import type { Case, Material, MaterialCatalogItem } from '../types'
@@ -39,7 +39,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
       showToast(`已上传并解析 ${files.length} 个文件`)
     } catch (e) {
       await load()
-      showToast(e instanceof Error ? e.message : '上传失败', 'err')
+      showToast(quotaUpgradeMessage(e) || (e instanceof Error ? e.message : '上传失败'), 'err')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''

@@ -7,9 +7,11 @@ from typing import Optional
 from backend.database import get_db
 from backend.dependencies import assign_case_owner, case_query_for_user, get_accessible_case, get_current_user
 from backend.models.case import Case
+from backend.models.billing import UsageMetric
 from backend.models.case_template import CaseTemplate
 from backend.models.user import User
 from backend.services.audit_service import record_audit
+from backend.services.billing_service import enforce_quota, record_usage
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -45,8 +47,10 @@ def create_case(data: CaseCreate, db: Session = Depends(get_db), current_user: O
         template_id=template_id,
     )
     assign_case_owner(case, current_user, db)
+    enforce_quota(db, case.team_id, UsageMetric.CASES)
     db.add(case)
     db.flush()
+    record_usage(db, case.team_id, UsageMetric.CASES, "case", case.id)
     record_audit(db, "case.create", "case", case.id, f"创建案件：{case.name}")
     db.commit()
     db.refresh(case)

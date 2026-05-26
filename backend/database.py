@@ -71,7 +71,7 @@ def get_db():
 
 
 def init_db():
-    from backend.models import audit, case, case_template, channel, legal_article, material, prompt, task, team, user, workflow  # noqa
+    from backend.models import audit, billing, case, case_template, channel, legal_article, material, prompt, task, team, user, workflow  # noqa
     Base.metadata.create_all(bind=engine)
     _ensure_existing_columns()
     _ensure_default_teams()

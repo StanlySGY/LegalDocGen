@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.dependencies import case_query_for_user, get_accessible_case, get_current_user
 from backend.exceptions import NotFoundError, ValidationError, InternalServerError
+from backend.models.billing import UsageMetric
 from backend.models.case import Case
 from backend.models.user import User
 from backend.models.workflow import StageType, WorkflowNode
 from backend.services.audit_service import record_audit
+from backend.services.billing_service import enforce_quota, record_usage
 from backend.services.export_service import ExportService
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
@@ -138,7 +140,8 @@ def get_node(case_id: str, stage: str, db: Session = Depends(get_db), current_us
 
 @router.post("/generate/{case_id}")
 async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
-    get_accessible_case(db, case_id, current_user)
+    case = get_accessible_case(db, case_id, current_user)
+    enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
 
@@ -168,6 +171,7 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
         case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
         output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
     )
+    record_usage(db, case.team_id, UsageMetric.AI_TASKS, "workflow", node.id)
     record_audit(db, "workflow.generate", "case", case_id, f"生成阶段：{stage.value}")
     db.commit()
     return {"node_id": node.id, "output": output, "version": node.version}
@@ -175,7 +179,8 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
 
 @router.post("/generate-stream/{case_id}")
 async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
-    get_accessible_case(db, case_id, current_user)
+    case = get_accessible_case(db, case_id, current_user)
+    enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
 
@@ -206,10 +211,11 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
                 full_output.append(chunk)
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
             output = "".join(full_output)
-            engine.create_or_update_node(
+            node = engine.create_or_update_node(
                 case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
             )
+            record_usage(db, case.team_id, UsageMetric.AI_TASKS, "workflow", node.id)
             record_audit(db, "workflow.generate_stream", "case", case_id, f"流式生成阶段：{stage.value}")
             db.commit()
             yield f"data: {json.dumps({'done': True})}\n\n"

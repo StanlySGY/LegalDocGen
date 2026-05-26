@@ -10,10 +10,12 @@ from backend.config import settings
 from backend.database import get_db
 from backend.dependencies import get_accessible_case, get_current_user
 from backend.exceptions import InternalServerError, NotFoundError, ValidationError
+from backend.models.billing import UsageMetric
 from backend.models.material import Material
 from backend.models.task import BackgroundTask
 from backend.models.user import User
 from backend.services.audit_service import record_audit
+from backend.services.billing_service import enforce_quota, record_usage
 from backend.services.file_parser.parser import parse_file_with_pages
 from backend.services.storage_service import get_storage
 from backend.services.task_service import complete_task, fail_task, public_task, start_task
@@ -28,7 +30,8 @@ async def upload_material(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
-    get_accessible_case(db, case_id, current_user)
+    case = get_accessible_case(db, case_id, current_user)
+    enforce_quota(db, case.team_id, UsageMetric.MATERIALS)
     safe_name = Path(file.filename or "").name
     if not safe_name:
         raise ValidationError("文件名不能为空")
@@ -64,6 +67,7 @@ async def upload_material(
         )
         db.add(material)
         db.flush()
+        record_usage(db, case.team_id, UsageMetric.MATERIALS, "material", material.id)
         complete_task(db, task, json.dumps({"material_id": material.id}, ensure_ascii=False), "材料解析完成")
         record_audit(db, "material.upload", "case", case_id, f"上传材料：{safe_name}")
         db.commit()

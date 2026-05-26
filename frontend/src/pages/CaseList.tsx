@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { api } from '../services/api'
+import { api, quotaUpgradeMessage } from '../services/api'
 import TemplateSelector from './TemplateSelector'
 import type { Case } from '../types'
 
@@ -42,7 +42,7 @@ export default function CaseList({ nav }: Props) {
       setSelectedTemplate(null)
       nav.detail(c.id)
     } catch (e: any) {
-      showToast(e.message || '创建失败', 'err')
+      showToast(quotaUpgradeMessage(e) || e.message || '创建失败', 'err')
     }
   }
 

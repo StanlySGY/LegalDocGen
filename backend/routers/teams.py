@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.dependencies import require_user
 from backend.exceptions import NotFoundError, ValidationError
+from backend.models.billing import UsageMetric
 from backend.models.team import Team, TeamMember, TeamRole
 from backend.models.user import User, UserRole
 from backend.services.audit_service import record_audit
-from backend.services.team_service import add_team_member, ensure_default_team, get_accessible_team, require_team_manager, remove_team_member
+from backend.services.billing_service import enforce_quota
+from backend.services.team_service import add_team_member, ensure_default_team, get_accessible_team, get_team_member, require_team_manager, remove_team_member
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -89,6 +91,8 @@ def add_member(team_id: str, req: TeamMemberRequest, db: Session = Depends(get_d
     target = db.query(User).filter(User.id == req.user_id, User.is_active == True).first()
     if not target:
         raise NotFoundError("用户不存在或已停用")
+    if not get_team_member(db, team_id, target.id):
+        enforce_quota(db, team_id, UsageMetric.MEMBERS)
     member = add_team_member(db, team_id, target.id, req.role)
     record_audit(db, "team.add_member", "team", team_id, f"添加团队成员：{target.username}")
     db.commit()
