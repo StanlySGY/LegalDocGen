@@ -23,6 +23,7 @@ const caseFocus = (item: Case) => item.status === 'completed' ? '交付前复核
 
 export default function CaseList({ nav }: Props) {
   const [cases, setCases] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [form, setForm] = useState<CaseForm>(emptyForm)
@@ -34,8 +35,17 @@ export default function CaseList({ nav }: Props) {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = useCallback(() => {
-    api.cases.list(filters).then(data => { setCases(data); setSelectedIds([]) }).catch((e: any) => showToast(e.message || '案件加载失败', 'err'))
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.cases.list(filters)
+      setCases(data)
+      setSelectedIds([])
+    } catch (e: any) {
+      showToast(e.message || '案件加载失败', 'err')
+    } finally {
+      setLoading(false)
+    }
   }, [filters])
   useEffect(() => { load() }, [load])
 
@@ -81,6 +91,7 @@ export default function CaseList({ nav }: Props) {
   }
 
   const batchDelete = async () => {
+    if (loading) return showToast('案件加载中，请稍后操作', 'err')
     if (!selectedIds.length) return showToast('请先选择案件', 'err')
     if (!window.confirm(`确认删除选中的 ${selectedIds.length} 个案件？`)) return
     try {
@@ -93,6 +104,7 @@ export default function CaseList({ nav }: Props) {
   }
 
   const batchExport = async () => {
+    if (loading) return showToast('案件加载中，请稍后操作', 'err')
     if (!selectedIds.length) return showToast('请先选择案件', 'err')
     try {
       await api.workflow.exportBatch(selectedIds)
@@ -160,7 +172,7 @@ export default function CaseList({ nav }: Props) {
         <div className="stat-card s-green"><div className="s-label">可交付</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成复核阶段占比</div></div>
       </div>
 
-      {cases.length === 0 && !toast && (
+      {!loading && cases.length === 0 && !toast && (
         <div className="notice-card notice-info">
           <div>
             <strong>当前为前端预览模式时，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。</strong>
@@ -209,7 +221,17 @@ export default function CaseList({ nav }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {cases.map(c => (
+                {loading && Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={`loading-${i}`} className="loading-row"><td colSpan={6}>
+                    <div className="table-skeleton-row">
+                      <span className="skeleton-line wide"/>
+                      <span className="skeleton-line short"/>
+                      <span className="skeleton-line medium"/>
+                      <span className="skeleton-line short"/>
+                    </div>
+                  </td></tr>
+                ))}
+                {!loading && cases.map(c => (
                   <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>nav.detail(c.id)}>
                     <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
                     <td>
@@ -237,7 +259,7 @@ export default function CaseList({ nav }: Props) {
                     </td>
                   </tr>
                 ))}
-                {cases.length===0 && (
+                {!loading && cases.length===0 && (
                   <tr><td colSpan={6}>
                     <div className="empty refined-empty case-empty-state" style={{padding:'56px 16px'}}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>

@@ -26,7 +26,11 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const [editingOutput, setEditingOutput] = useState(false)
   const [outputDraft, setOutputDraft] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [progressLoading, setProgressLoading] = useState(true)
+  const [nodeLoading, setNodeLoading] = useState(true)
+  const [modelsLoading, setModelsLoading] = useState(true)
   const [streamingText, setStreamingText] = useState('')
+  const [generationError, setGenerationError] = useState('')
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [models, setModels] = useState<any[]>([])
@@ -36,16 +40,40 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const loadProgress = useCallback(async () => { const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)]); setProgress(p); setCaseName(c.name) }, [caseId])
-  const loadNode = useCallback(async (s: StageType) => { const n = await api.workflow.getNode(caseId, s); setNode(n); setPrompt(n.prompt||''); setOutput(n.output||''); setEditingOutput(false); setStreamingText('') }, [caseId])
+  const loadProgress = useCallback(async () => {
+    setProgressLoading(true)
+    try {
+      const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)])
+      setProgress(p)
+      setCaseName(c.name)
+    } finally {
+      setProgressLoading(false)
+    }
+  }, [caseId])
+  const loadNode = useCallback(async (s: StageType) => {
+    setNodeLoading(true)
+    try {
+      const n = await api.workflow.getNode(caseId, s)
+      setNode(n)
+      setPrompt(n.prompt||'')
+      setOutput(n.output||'')
+      setEditingOutput(false)
+      setStreamingText('')
+      setGenerationError('')
+    } finally {
+      setNodeLoading(false)
+    }
+  }, [caseId])
   const loadHistory = useCallback(async (s: StageType) => { setHistory(await api.workflow.history(caseId, s)) }, [caseId])
 
   useEffect(() => { loadProgress().catch((e: any) => showToast(e.message || '工作流加载失败', 'err')) }, [loadProgress])
   useEffect(() => { loadNode(activeStage).catch((e: any) => showToast(e.message || '阶段加载失败', 'err')) }, [activeStage, loadNode])
   useEffect(() => {
+    setModelsLoading(true)
     api.config.getModels()
       .then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} })
       .catch((e: any) => showToast(e.message || '模型加载失败', 'err'))
+      .finally(() => setModelsLoading(false))
   }, [])
 
   const idx = STAGE_ORDER.indexOf(activeStage)
@@ -57,7 +85,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const missingStages = progress.filter(item => !item.has_output).map(item => item.name)
   const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
   const guide = stageGuides[activeStage]
-  const canGenerate = Boolean(selChannelId) && previousDone && !generating
+  const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading
+  const workflowLoading = progressLoading || nodeLoading
   const deliveryChecks = [
     { label: '五阶段内容齐备', done: canExport, hint: canExport ? '可进入最终导出' : '仍需完成剩余阶段' },
     { label: '证据引用复核', done: completedCount >= 1, hint: '检查事实是否能追溯到材料页码' },
@@ -70,9 +99,10 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       return
     }
     if(!selChannelId){showToast('请先在「渠道管理」中添加 API 渠道','err');return}
-    setGenerating(true); setStreamingText(''); setOutput('')
+    const previousOutput = output
+    setGenerating(true); setGenerationError(''); setStreamingText(''); setOutput('')
+    let full = ''
     try {
-      let full = ''
       for await (const chunk of api.workflow.generateStream(caseId,{stage:activeStage,prompt,provider:selChannelId,model:selModel})) {
         if(chunk.error) throw new Error(chunk.error)
         if(chunk.chunk){full+=chunk.chunk;setStreamingText(full)}
@@ -81,7 +111,12 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       setOutput(full); setStreamingText('')
       await loadProgress(); await loadNode(activeStage); await loadHistory(activeStage)
       showToast('生成完成')
-    } catch(e:any){showToast(quotaUpgradeMessage(e) || e.message || '生成失败','err')}
+    } catch(e:any){
+      const msg = quotaUpgradeMessage(e) || e.message || '生成失败'
+      setOutput(full || previousOutput)
+      setGenerationError(msg)
+      showToast(full ? '生成中断，已保留部分内容' : previousOutput ? '生成失败，已保留原结果' : msg, 'err')
+    }
     finally { setGenerating(false); setStreamingText('') }
   }
 
@@ -138,6 +173,12 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
         <a onClick={onBack}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
         <span className="current">工作流</span>
       </div>
+
+      {workflowLoading && (
+        <div className="notice-card notice-info workflow-loading-notice">
+          <div><strong>正在加载工作流数据...</strong><span>阶段进度、Prompt 和历史结果加载完成后即可继续处理。</span></div>
+        </div>
+      )}
 
       <div className="stepper-bar">
         {STAGE_ORDER.map((stage,i) => {
@@ -196,7 +237,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
                 const [cid,mid] = e.target.value.split('|')
                 setSelChannelId(cid); setSelModel(mid)
               }}>
-                {models.length===0 && <option>未配置渠道</option>}
+                {modelsLoading && <option>模型加载中...</option>}
+                {!modelsLoading && models.length===0 && <option>未配置渠道</option>}
                 {models.map((m,i)=><option key={i} value={`${m.channel_id}|${m.model}`}>{m.channel_name} / {m.model}</option>)}
               </select>
               <button className="btn btn-o btn-sm" onClick={toggleHistory}>{showHistory?'关闭':'历史'}</button>
@@ -206,9 +248,18 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             <div><strong>本阶段目标：{guide.output}</strong><span>生成内容必须基于材料和前序阶段输出，不能补写未出现的事实。</span></div>
           </div>
           {!previousDone && previousStage && (
-            <div className="notice-card notice-warn"><div><strong>暂不建议生成</strong><span>请先完成「{STAGE_NAMES[previousStage]}」，以保证当前阶段引用链完整。</span></div></div>
+            <div className="notice-card notice-warn"><div><strong>暂不建议生成</strong><span>{`请先完成「${STAGE_NAMES[previousStage]}」，以保证当前阶段引用链完整。`}</span></div></div>
           )}
-          <textarea className="textarea" style={{height:246}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
+          {nodeLoading ? (
+            <div className="prompt-skeleton">
+              <span className="skeleton-line wide"/>
+              <span className="skeleton-line medium"/>
+              <span className="skeleton-block tall"/>
+            </div>
+          ) : (
+            <textarea className="textarea" style={{height:246}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
+          )}
+          <div className="prompt-meta"><span>{prompt.length} 字</span><span>{modelsLoading ? '模型渠道加载中' : selChannelId ? '模型渠道已选择' : '未配置模型渠道'}</span></div>
           <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:12}} onClick={handleGenerate} disabled={!canGenerate}>
             {generating ? <span className="flex items-center justify-center gap-2"><svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0110 10"/></svg>生成中...</span> : node?.output?'重新生成当前阶段':'生成当前阶段'}
           </button>
@@ -246,14 +297,25 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             <div>法条、金额、策略需人工复核</div>
             <div>{guide.risk}</div>
           </div>
-          <div className={`workflow-output-action ${output ? 'ready' : previousDone ? 'pending' : 'blocked'}`}>
-            <strong>{output ? '下一步建议' : previousDone ? '生成前检查' : '等待前置阶段'}</strong>
+          <div className={`workflow-output-action ${generationError ? 'blocked' : output ? 'ready' : previousDone ? 'pending' : 'blocked'}`}>
+            <strong>{generationError ? '生成中断' : output ? '下一步建议' : previousDone ? '生成前检查' : '等待前置阶段'}</strong>
             <span>
-              {output
-                ? nextStage ? `先编辑保存当前结果，再进入「${STAGE_NAMES[nextStage]}」。` : '完成最终审查后，核对法条、金额和证据引用，再导出 Word。'
-                : previousDone ? '确认材料、Prompt 和模型渠道无误后，点击生成当前阶段。' : `请先完成「${previousStage ? STAGE_NAMES[previousStage] : ''}」。`}
+              {generationError
+                ? output ? '已保留可用内容，可检查后重试。' : '本次未收到有效输出，请检查模型渠道后重试。'
+                : output
+                  ? nextStage ? `先编辑保存当前结果，再进入「${STAGE_NAMES[nextStage]}」。` : '完成最终审查后，核对法条、金额和证据引用，再导出 Word。'
+                  : previousDone ? '确认材料、Prompt 和模型渠道无误后，点击生成当前阶段。' : `请先完成「${previousStage ? STAGE_NAMES[previousStage] : ''}」。`}
             </span>
           </div>
+          {generationError && !editingOutput && (
+            <div className="notice-card notice-warn" style={{marginBottom:12}}>
+              <div>
+                <strong>{generationError}</strong>
+                <span>{output ? '重试生成会覆盖当前页面显示内容；保存前请先人工复核。' : '重试前建议确认 Prompt、模型渠道和网络状态。'}</span>
+              </div>
+              <button className="btn btn-o btn-sm" style={{marginTop:10,width:'fit-content'}} onClick={handleGenerate} disabled={!canGenerate}>重试生成</button>
+            </div>
+          )}
           {editingOutput ? (
             <div>
               <textarea className="textarea" style={{height:400}} value={outputDraft} onChange={e=>setOutputDraft(e.target.value)}/>
@@ -266,6 +328,13 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             <div className="workflow-output-shell">
               <div className="md"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
               <span className="cursor-blink"/>
+            </div>
+          ) : generating ? (
+            <div className="workflow-output-shell output-skeleton">
+              <span className="skeleton-line wide"/>
+              <span className="skeleton-line medium"/>
+              <span className="skeleton-line wide"/>
+              <span className="skeleton-line short"/>
             </div>
           ) : output ? (
             <div className="workflow-output-shell">
