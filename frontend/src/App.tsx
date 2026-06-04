@@ -13,6 +13,7 @@ import BillingUsagePage from './pages/BillingUsagePage'
 import OperationsPage from './pages/OperationsPage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useNetworkStatus } from './hooks/useNetworkStatus'
 
 type HealthState = {
   status: 'checking' | 'ok' | 'degraded' | 'offline'
@@ -191,6 +192,7 @@ function AppLayout({
   logout
 }: AppLayoutProps) {
   const location = useLocation()
+  const isOnline = useNetworkStatus()
   const isCases = location.pathname.startsWith('/cases')
   const isChannels = location.pathname === '/channels'
   const isConfig = location.pathname === '/config'
@@ -302,6 +304,12 @@ function AppLayout({
               <span className="health-dot" />
               {health.status === 'checking' ? '检测中' : health.status === 'offline' ? '后端未连接' : health.status === 'degraded' ? '诊断异常' : '后端已连接'}
             </button>
+            {!isOnline && (
+              <span className="network-offline-badge">
+                <span className="offline-dot"></span>
+                网络已断开
+              </span>
+            )}
             {currentUser && (
               <span className="user-chip" title={currentUser.username}>
                 {currentUser.display_name || currentUser.username} · {currentUser.role === 'admin' ? '管理员' : '成员'}

@@ -1,6 +1,7 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { api, type AuthUser } from '../services/api'
 import type { BillingOrder, BillingOrderStatus, OperationsSummary, Plan, Team } from '../types'
 
@@ -99,7 +100,7 @@ export default function OperationsPage({ currentUser }: Props) {
     )
   }
 
-  if (loading && !summary) return <div className="card auth-loading">正在加载运营后台...</div>
+  if (loading && !summary) return <LoadingSpinner text="正在加载运营后台数据..." />
 
   return (
     <div>

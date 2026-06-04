@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface Props {
   onSelectTemplate: (templateId: string, templateName: string) => void
@@ -43,11 +44,7 @@ export default function TemplateSelector({ onSelectTemplate, onBack }: Props) {
   }
 
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: 80, color: '#86909c' }}>
-        加载模板中...
-      </div>
-    )
+    return <LoadingSpinner size="lg" text="正在加载案件模板..." />
   }
 
   return (
@@ -61,34 +58,28 @@ export default function TemplateSelector({ onSelectTemplate, onBack }: Props) {
       </div>
 
       {/* Category tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap gap-2 mb-6">
         {categories.map(cat => (
           <button
             key={cat.value}
             className={`btn ${selectedCategory === cat.value ? 'btn-p' : 'btn-o'} btn-sm`}
             onClick={() => setSelectedCategory(cat.value)}
-            style={{ fontSize: 13 }}
           >
-            <span style={{ marginRight: 4 }}>{cat.icon}</span>
+            <span className="mr-1">{cat.icon}</span>
             {cat.label}
           </button>
         ))}
       </div>
 
       {/* Template grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTemplates.map(template => (
           <div
             key={template.id}
-            className="card"
-            style={{
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              border: selectedTemplate?.id === template.id ? '2px solid #6366f1' : '1px solid #e5e7eb',
-            }}
+            className={`card hover:shadow-md transition-all duration-200 cursor-pointer ${
+              selectedTemplate?.id === template.id ? 'border-2 border-indigo-600' : 'border border-gray-200'
+            }`}
             onClick={() => setSelectedTemplate(template)}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
           >
             <div style={{ marginBottom: 12 }}>
               <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{template.name}</h3>

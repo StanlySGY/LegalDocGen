@@ -1,6 +1,7 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { BillingStatus, Plan, UsageItem } from '../types'
 
@@ -87,7 +88,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
   const usage = status?.usage || []
   const highUsage = usage.filter(item => item.limit > 0 && item.percent >= 80).length
 
-  if (loading) return <div className="card auth-loading">正在加载套餐与用量...</div>
+  if (loading) return <LoadingSpinner text="正在加载套餐与用量..." />
 
   return (
     <div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import TemplateSelector from './TemplateSelector'
 import { useToast } from '../hooks/useToast'
+import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { validateCaseForm } from '../utils/validation'
 import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -35,6 +36,7 @@ export default function CaseList() {
   const [filters, setFilters] = useState({ keyword: '', status: '', case_type: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [editingCase, setEditingCase] = useState<Case | null>(null)
   const [editForm, setEditForm] = useState<CaseForm>(emptyForm)
@@ -51,6 +53,12 @@ export default function CaseList() {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     }
   }, [searchTerm])
+
+  useKeyboardShortcut({ key: '/' }, () => {
+    const activeEl = document.activeElement
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return
+    searchInputRef.current?.focus()
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -236,7 +244,7 @@ export default function CaseList() {
             </div>
           </div>
           <div className="filters-grid" style={{padding:'0 16px 16px'}}>
-            <input className="input" placeholder="搜索名称、描述或类型" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+            <input ref={searchInputRef} className="input" placeholder="搜索名称、描述或类型 (按 / 聚焦)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
             <select className="select" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}>
               <option value="">全部状态</option>
               <option value="draft">草稿</option>

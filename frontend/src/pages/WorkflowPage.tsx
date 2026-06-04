@@ -1,4 +1,5 @@
 import { useToast } from '../hooks/useToast'
+import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import Toaster from '../components/Toaster'
 import ExportOptionsModal from '../components/ExportOptionsModal'
 import { useState, useEffect, useCallback } from 'react'
@@ -91,6 +92,13 @@ export default function WorkflowPage() {
   const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
   const guide = stageGuides[activeStage]
   const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading
+
+  useKeyboardShortcut({ key: 'Enter', ctrlKey: true }, () => {
+    if (canGenerate && !generating) {
+      handleGenerate()
+    }
+  }, [canGenerate, generating])
+
   const workflowLoading = progressLoading || nodeLoading
   const deliveryChecks = [
     { label: '五阶段内容齐备', done: canExport, hint: canExport ? '可进入最终导出' : '仍需完成剩余阶段' },

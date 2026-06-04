@@ -286,3 +286,33 @@ export const api = {
     delete: (id: string) => request<any>(`/templates/${id}`, { method: 'DELETE' }),
   },
 }
+
+// ===== Prefetch Cache =====
+const prefetchCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 30000
+
+export const prefetchCaseDetail = async (caseId: string) => {
+  const now = Date.now()
+  const cached = prefetchCache.get(caseId)
+  if (cached && now - cached.timestamp < CACHE_TTL) return cached.data
+
+  try {
+    const data = await api.cases.get(caseId)
+    prefetchCache.set(caseId, { data, timestamp: now })
+    return data
+  } catch (e) {
+    console.error('Prefetch failed:', e)
+  }
+}
+
+export const getCachedCaseDetail = (caseId: string) => {
+  const cached = prefetchCache.get(caseId)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data
+  }
+  return null
+}
+
+export const clearPrefetchCache = () => {
+  prefetchCache.clear()
+}

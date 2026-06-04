@@ -3,6 +3,7 @@ import Toaster from '../components/Toaster'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function ModelConfig() {
   const navigate = useNavigate()
@@ -10,12 +11,22 @@ export default function ModelConfig() {
   const [editingPrompt, setEditingPrompt] = useState<any>(null)
   const [stages, setStages] = useState<any[]>([])
   const { toasts, showToast, removeToast } = useToast()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.config.getPrompts().then(setPrompts).catch((e: any) => showToast(e.message || '模板加载失败', { type: 'err' }))
-    api.config.getStages().then(setStages).catch(() => setStages([]))
+    setLoading(true)
+    Promise.all([
+      api.config.getPrompts().then(setPrompts),
+      api.config.getStages().then(setStages).catch(() => setStages([]))
+    ]).catch((e: any) => {
+      showToast(e.message || '模板加载失败', { type: 'err' })
+    }).finally(() => {
+      setLoading(false)
+    })
   }, [])
   const savePrompt = async () => { if(!editingPrompt)return; if(editingPrompt.id) await api.config.updatePrompt(editingPrompt.id,editingPrompt); else await api.config.createPrompt(editingPrompt); setEditingPrompt(null); api.config.getPrompts().then(setPrompts); showToast('模板已保存') }
+
+  if (loading) return <LoadingSpinner text="正在加载 Prompt 模板..." />
 
   const stageName = (stage: string) => stages.find(item => item.value === stage)?.name || stage
   const defaultCount = prompts.filter(prompt => prompt.is_default).length
