@@ -287,6 +287,16 @@ export const api = {
     update: (id: string, data: any) => request<any>(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/templates/${id}`, { method: 'DELETE' }),
   },
+  documents: {
+    list: (caseId: string) => request<any[]>(`/documents/case/${caseId}`),
+    get: (id: string) => request<any>(`/documents/${id}`),
+    create: (caseId: string, data: { name: string; doc_type?: string }) =>
+      request<any>(`/documents/case/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; doc_type?: string }) =>
+      request<any>(`/documents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<any>(`/documents/${id}`, { method: 'DELETE' }),
+    getTypes: () => request<any>('/documents/types'),
+  },
 }
 
 // ===== Prefetch Cache =====
@@ -318,3 +328,4 @@ export const getCachedCaseDetail = (caseId: string) => {
 export const clearPrefetchCache = () => {
   prefetchCache.clear()
 }
+

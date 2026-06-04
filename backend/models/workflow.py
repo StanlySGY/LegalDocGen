@@ -37,6 +37,7 @@ class WorkflowNode(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     case_id = Column(String, ForeignKey("cases.id"), nullable=False)
+    document_id = Column(String, ForeignKey("case_documents.id"), nullable=True)
     stage = Column(String(50), nullable=False)
     prompt = Column(Text, default="")
     output = Column(Text, default="")
@@ -49,11 +50,13 @@ class WorkflowNode(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     case = relationship("Case", back_populates="workflow_nodes")
+    document = relationship("CaseDocument", back_populates="workflow_nodes")
     children = relationship("WorkflowNode", backref="parent", remote_side=[id])
 
     def create_new_version(self):
         return WorkflowNode(
             case_id=self.case_id,
+            document_id=self.document_id,
             stage=self.stage,
             prompt=self.prompt,
             output="",

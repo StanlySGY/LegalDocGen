@@ -27,8 +27,15 @@ class Case(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    materials = relationship("Material", back_populates="case", cascade="all, delete-orphan")
-    workflow_nodes = relationship("WorkflowNode", back_populates="case", cascade="all, delete-orphan")
+    materials = relationship(
+        "Material", back_populates="case", cascade="all, delete-orphan"
+    )
+    documents = relationship(
+        "CaseDocument", back_populates="case", cascade="all, delete-orphan"
+    )
+    workflow_nodes = relationship(
+        "WorkflowNode", back_populates="case", cascade="all, delete-orphan"
+    )
     template = relationship("CaseTemplate")
     owner = relationship("User", back_populates="cases")
     team = relationship("Team", back_populates="cases")

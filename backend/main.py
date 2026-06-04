@@ -9,11 +9,28 @@ from sqlalchemy import text
 from backend.config import settings
 from backend.database import SessionLocal, init_db
 from backend.exceptions import (
-    AppException, app_exception_handler, validation_exception_handler, general_exception_handler
+    AppException,
+    app_exception_handler,
+    validation_exception_handler,
+    general_exception_handler,
 )
 from backend.models.channel import Channel
 from backend.models.user import User, UserRole
-from backend.routers import audit, auth, billing, cases, channel, config, legal_articles, materials, tasks, teams, templates, workflow
+from backend.routers import (
+    audit,
+    auth,
+    billing,
+    cases,
+    channel,
+    config,
+    documents,
+    legal_articles,
+    materials,
+    tasks,
+    teams,
+    templates,
+    workflow,
+)
 from backend.services.auth_service import hash_password
 from backend.services.billing_service import seed_default_plans
 from backend.services.prompt_manager.manager import PromptManager
@@ -100,6 +117,7 @@ app.include_router(auth.router)
 app.include_router(teams.router)
 app.include_router(billing.router)
 app.include_router(cases.router)
+app.include_router(documents.router)
 app.include_router(materials.router)
 app.include_router(tasks.router)
 app.include_router(workflow.router)
@@ -119,7 +137,9 @@ def _database_health() -> tuple[dict, dict]:
         }, {
             "total": db.query(Channel).count(),
             "enabled": db.query(Channel).filter(Channel.status == 1).count(),
-            "tested_success": db.query(Channel).filter(Channel.test_status == "success").count(),
+            "tested_success": db.query(Channel)
+            .filter(Channel.test_status == "success")
+            .count(),
         }
     except Exception as exc:
         return {
