@@ -1,5 +1,6 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
+import ExportOptionsModal from '../components/ExportOptionsModal'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -42,6 +43,7 @@ export default function WorkflowPage() {
   const [selModel, setSelModel] = useState('')
   const [caseName, setCaseName] = useState('')
   const { toasts, showToast, removeToast } = useToast()
+  const [showExportModal, setShowExportModal] = useState(false)
 
   const loadProgress = useCallback(async () => {
     setProgressLoading(true)
@@ -134,11 +136,16 @@ export default function WorkflowPage() {
     }
   }
 
-  const handleExport = async () => {
+  const handleExportClick = () => {
     if (!canExport) {
       showToast(`请先完成全部阶段，仍缺少：${missingStages.join('、')}`, { type: 'err' })
       return
     }
+    setShowExportModal(true)
+  }
+
+  const handleExportConfirm = async (selectedOptions: string[]) => {
+    setShowExportModal(false)
     try {
       await api.workflow.export(caseId)
       showToast('导出成功')
@@ -354,9 +361,14 @@ export default function WorkflowPage() {
 
       <div className="flex justify-between" style={{marginTop:20}}>
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>上一阶段</button>
-        <button className="btn btn-p" onClick={handleExport} disabled={!canExport}>导出为 Word</button>
+        <button className="btn btn-p" onClick={handleExportClick} disabled={!canExport}>导出为 Word</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段</button>
       </div>
+      <ExportOptionsModal
+        open={showExportModal}
+        onConfirm={handleExportConfirm}
+        onCancel={() => setShowExportModal(false)}
+      />
       <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )

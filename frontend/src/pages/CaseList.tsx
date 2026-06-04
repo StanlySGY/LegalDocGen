@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import TemplateSelector from './TemplateSelector'
@@ -33,12 +33,25 @@ export default function CaseList() {
   const [form, setForm] = useState<CaseForm>(emptyForm)
   const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; name: string } | null>(null)
   const [filters, setFilters] = useState({ keyword: '', status: '', case_type: '' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [editingCase, setEditingCase] = useState<Case | null>(null)
   const [editForm, setEditForm] = useState<CaseForm>(emptyForm)
   const { toasts, showToast, removeToast } = useToast()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setFilters(prev => ({ ...prev, keyword: searchTerm }))
+    }, 300)
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [searchTerm])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -223,7 +236,7 @@ export default function CaseList() {
             </div>
           </div>
           <div className="filters-grid" style={{padding:'0 16px 16px'}}>
-            <input className="input" placeholder="搜索名称、描述或类型" value={filters.keyword} onChange={e=>setFilters({...filters,keyword:e.target.value})}/>
+            <input className="input" placeholder="搜索名称、描述或类型" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
             <select className="select" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}>
               <option value="">全部状态</option>
               <option value="draft">草稿</option>

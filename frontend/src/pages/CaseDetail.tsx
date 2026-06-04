@@ -2,7 +2,7 @@ import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
 import MaterialPreviewModal from '../components/MaterialPreviewModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { useState, useEffect, useRef, type ChangeEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
@@ -24,16 +24,34 @@ export default function CaseDetail() {
   const { toasts, showToast, removeToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [previewMaterial, setPreviewMaterial] = useState<{open:boolean;filename:string;content:string}|null>(null)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
     const tpl = c.template_id ? await api.templates.get(c.template_id) : null
     setChecklist(tpl?.materials_checklist || [])
     setCaseData(c)
     setMaterials(m)
     setMaterialInsights({ catalog: insights.catalog || [], timeline: insights.timeline || [] })
-  }
-  useEffect(() => { load() }, [caseId])
+  }, [caseId])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const hasParsingMaterials = materials.some(m => m.parse_status === 'parsing' || m.parse_status === 'pending')
+    
+    if (hasParsingMaterials) {
+      pollTimerRef.current = setInterval(() => {
+        load()
+      }, 5000)
+    }
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+      }
+    }
+  }, [materials, load])
 
   const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -73,6 +91,7 @@ export default function CaseDetail() {
   const materialCompletion = getMaterialCompletion(checklist, materials)
   const parsedCount = materials.filter(m=>m.parse_status==='completed').length
   const failedCount = materials.filter(m=>m.parse_status!=='completed').length
+  const parsingCount = materials.filter(m=>m.parse_status==='parsing' || m.parse_status==='pending').length
   const hasTemplateGate = Boolean(caseData?.template_id && checklist.length > 0)
   const missingMaterialNames = materialCompletion.missingRequiredItems.slice(0, 4).map(({ item }) => item.name)
 
@@ -99,8 +118,14 @@ export default function CaseDetail() {
             </span>
             {caseData.case_type && <span className="tag t-blue">{caseData.case_type}</span>}
           </div>
-          {caseData.description && <p style={{fontSize:13,color:'#64748b',marginTop:8,lineHeight:1.8}}>{caseData.description}</p>}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
+          {caseData.description && <p className="text-sm-muted" style={{marginTop:8,lineHeight:1.8}}>{caseData.description}</p>}
+          {parsingCount > 0 && (
+            <div className="auto-poll-indicator">
+              <span className="poll-dot"></span>
+              <span>{parsingCount} 个材料正在解析中，自动刷新中...</span>
+            </div>
+          )}
+          <div className="flex-wrap-sm" style={{marginTop:12}}>
             <span className="tag t-purple">个人文书写作</span>
             <span className="tag t-gray">先材料整理，再生成初稿，最后人工复核导出</span>
           </div>

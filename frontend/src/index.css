@@ -2025,3 +2025,130 @@ body {
 .mt-3 { margin-top: 12px; }
 .w-full { width: 100%; }
 .h-textarea { height: 96px; }
+
+/* ===== Auto Poll Indicator ===== */
+.auto-poll-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #f59e0b;
+}
+
+.poll-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: pollPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pollPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ===== Case Link in Task Monitor ===== */
+.case-link {
+  color: #6366f1;
+  font-weight: 500;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.case-link:hover {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+/* ===== ExportOptionsModal ===== */
+.export-options-modal {
+  max-width: 560px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.export-modal-header {
+  margin-bottom: 20px;
+}
+
+.export-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d2129;
+  margin: 0 0 8px;
+}
+
+.export-modal-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.export-options-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 20px;
+}
+
+.export-option-toggle-all {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.export-option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.export-option-item:hover {
+  background: #f8fafc;
+}
+
+.export-option-item input[type="checkbox"] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: #6366f1;
+}
+
+.export-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-option-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d2129;
+}
+
+.export-option-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.export-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.export-modal-actions {
+  display: flex;
+  gap: 8px;
+}

@@ -1,6 +1,7 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import type { BackgroundTask } from '../types'
 
@@ -24,6 +25,7 @@ export default function TaskMonitorPage() {
   const [tasks, setTasks] = useState<BackgroundTask[]>([])
   const [statusFilter, setStatusFilter] = useState('')
   const { toasts, showToast, removeToast } = useToast()
+  const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
 
   const load = async () => {
     try {
@@ -33,7 +35,25 @@ export default function TaskMonitorPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
+
+  useEffect(() => {
+    const hasActiveTasks = tasks.some(t => t.status === 'running' || t.status === 'pending')
+    
+    if (hasActiveTasks) {
+      pollTimerRef.current = setInterval(() => {
+        load()
+      }, 5000)
+    }
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+      }
+    }
+  }, [tasks])
 
   const runningCount = tasks.filter(task => task.status === 'running' || task.status === 'pending').length
   const completedCount = tasks.filter(task => task.status === 'completed').length
@@ -47,6 +67,12 @@ export default function TaskMonitorPage() {
           <div className="eyebrow">PROCESS CENTER</div>
           <h2>后台任务处理中心</h2>
           <p>集中查看材料解析等后台任务状态，快速识别失败任务并回到对应案件处理。</p>
+          {runningCount > 0 && (
+            <div className="auto-poll-indicator">
+              <span className="poll-dot"></span>
+              <span>自动刷新中（{runningCount} 个任务处理中）</span>
+            </div>
+          )}
         </div>
         <button className="btn btn-o" onClick={load}>刷新任务</button>
       </div>
@@ -73,7 +99,7 @@ export default function TaskMonitorPage() {
           <span className="tag t-purple">{visibleTasks.length} 条</span>
         </div>
         <div className="task-filter-row">
-          <div style={{fontSize:12,color:'#64748b'}}>按状态筛选任务，失败项会给出处理建议。</div>
+          <div className="text-xs-muted">按状态筛选任务，失败项会给出处理建议。</div>
           <select className="select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
             <option value="">全部状态</option>
             <option value="pending">待处理</option>
@@ -93,10 +119,16 @@ export default function TaskMonitorPage() {
                   <td className="text-xs-muted">{task.created_at ? new Date(task.created_at).toLocaleString('zh-CN') : '-'}</td>
                   <td><span className="tag t-purple">{typeText(task.task_type)}</span></td>
                   <td><span className={`tag ${statusTag(task.status)}`}>{statusText[task.status] || task.status}</span></td>
-                  <td className="text-sm-muted">{task.case_id ? task.case_id.slice(0, 8) : '-'}</td>
-                  <td style={{fontSize:12,color:'#475569'}}>{task.message || '-'}</td>
-                  <td style={{fontSize:12,color:task.status === 'failed' ? '#b45309' : '#64748b'}}>{handlingTip(task)}</td>
-                  <td style={{color:'#dc2626',fontSize:12,maxWidth:300}}>{task.error || '-'}</td>
+                  <td>
+                    {task.case_id ? (
+                      <Link to={`/cases/${task.case_id}`} className="case-link">
+                        {task.case_id.slice(0, 8)}
+                      </Link>
+                    ) : '-'}
+                  </td>
+                  <td className="text-sm-muted">{task.message || '-'}</td>
+                  <td style={{color:task.status === 'failed' ? '#b45309' : '#64748b'}} className="text-xs-muted">{handlingTip(task)}</td>
+                  <td style={{color:'#dc2626'}} className="text-xs-muted">{task.error || '-'}</td>
                 </tr>
               ))}
               {visibleTasks.length === 0 && <tr><td colSpan={7}><div className="empty refined-empty p-lg"><p>{tasks.length === 0 ? '暂无后台任务，上传材料后会自动记录解析任务' : '当前筛选条件下暂无任务'}</p></div></td></tr>}
