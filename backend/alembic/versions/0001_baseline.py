@@ -61,7 +61,9 @@ def upgrade():
         sa.Column("template_id", sa.String(36), sa.ForeignKey("case_templates.id")),
         sa.Column("owner_id", sa.String(36), sa.ForeignKey("users.id")),
         sa.Column("team_id", sa.String(36), sa.ForeignKey("teams.id")),
-        sa.Column("status", sa.Enum("DRAFT", "IN_PROGRESS", "COMPLETED", name="casestatus")),
+        sa.Column(
+            "status", sa.Enum("DRAFT", "IN_PROGRESS", "COMPLETED", name="casestatus")
+        ),
         sa.Column("created_at", sa.DateTime()),
         sa.Column("updated_at", sa.DateTime()),
     )
@@ -96,9 +98,29 @@ def upgrade():
     )
 
     op.create_table(
+        "case_documents",
+        sa.Column("id", sa.String(), primary_key=True),
+        sa.Column("case_id", sa.String(), sa.ForeignKey("cases.id"), nullable=False),
+        sa.Column("name", sa.String(200), nullable=False),
+        sa.Column("doc_type", sa.String(50), server_default="complaint"),
+        sa.Column("status", sa.String(50), server_default="draft"),
+        sa.Column("final_file_path", sa.String(1000), nullable=True),
+        sa.Column("final_file_name", sa.String(500), nullable=True),
+        sa.Column("final_uploaded_at", sa.DateTime(), nullable=True),
+        sa.Column("created_at", sa.DateTime()),
+        sa.Column("updated_at", sa.DateTime()),
+    )
+
+    op.create_table(
         "workflow_nodes",
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("case_id", sa.String(), sa.ForeignKey("cases.id"), nullable=False),
+        sa.Column(
+            "document_id",
+            sa.String(),
+            sa.ForeignKey("case_documents.id"),
+            nullable=True,
+        ),
         sa.Column("stage", sa.String(50), nullable=False),
         sa.Column("prompt", sa.Text()),
         sa.Column("output", sa.Text()),
@@ -168,6 +190,7 @@ def downgrade():
     op.drop_table("prompt_templates")
     op.drop_table("channels")
     op.drop_table("workflow_nodes")
+    op.drop_table("case_documents")
     op.drop_table("background_tasks")
     op.drop_table("materials")
     op.drop_table("cases")
