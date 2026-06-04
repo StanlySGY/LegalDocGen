@@ -327,7 +327,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             </div>
           ) : generating && streamingText ? (
             <div className="workflow-output-shell">
-              <div className="md"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
+              <div className="md legal-prose"><ReactMarkdown>{streamingText}</ReactMarkdown></div>
               <span className="cursor-blink"/>
             </div>
           ) : generating ? (
@@ -339,7 +339,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
             </div>
           ) : output ? (
             <div className="workflow-output-shell">
-              <div className="md"><ReactMarkdown>{output}</ReactMarkdown></div>
+              <div className="md legal-prose"><ReactMarkdown>{output}</ReactMarkdown></div>
             </div>
           ) : (
             <div className="empty refined-empty" style={{height:500}}>

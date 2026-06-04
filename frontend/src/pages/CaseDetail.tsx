@@ -1,5 +1,7 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
+import MaterialPreviewModal from '../components/MaterialPreviewModal'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
@@ -19,6 +21,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const [uploading, setUploading] = useState(false)
   const { toasts, showToast, removeToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [previewMaterial, setPreviewMaterial] = useState<{open:boolean;filename:string;content:string}|null>(null)
 
   const load = async () => {
     const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
@@ -57,21 +60,12 @@ export default function CaseDetail({ caseId, nav }: Props) {
     }
   }
 
-  const previewMaterial = (content: string) => {
-    const w = window.open('', '', 'width=760,height=640')
-    if (!w) {
-      showToast('浏览器阻止了预览窗口', { type: 'err' })
-      return
-    }
-    w.document.title = '材料内容预览'
-    w.document.body.style.margin = '0'
-    const pre = w.document.createElement('pre')
-    pre.textContent = content || '暂无内容'
-    pre.style.padding = '20px'
-    pre.style.fontSize = '13px'
-    pre.style.whiteSpace = 'pre-wrap'
-    pre.style.fontFamily = 'sans-serif'
-    w.document.body.appendChild(pre)
+  const openPreview = (filename: string, content: string) => {
+    setPreviewMaterial({ open: true, filename, content })
+  }
+
+  const closePreview = () => {
+    setPreviewMaterial(null)
   }
 
   const materialCompletion = getMaterialCompletion(checklist, materials)
@@ -89,7 +83,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
     nav.workflow(caseId)
   }
 
-  if (!caseData) return <div style={{textAlign:'center',padding:80,color:'#86909c'}}>加载中...</div>
+  if (!caseData) return <LoadingSpinner text="加载案件信息..." />
 
   return (
     <div>
@@ -206,7 +200,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="btn btn-o btn-sm" onClick={()=>previewMaterial(m.parsed_content)}>查看</button>
+                <button className="btn btn-o btn-sm" onClick={()=>openPreview(m.filename, m.parsed_content)}>查看</button>
                 <button className="btn btn-d btn-sm" onClick={()=>del(m.id)}>删除</button>
               </div>
               {m.parse_status !== 'completed' && (
@@ -225,6 +219,12 @@ export default function CaseDetail({ caseId, nav }: Props) {
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />
+      <MaterialPreviewModal
+        open={previewMaterial?.open || false}
+        title={previewMaterial?.filename || '材料预览'}
+        content={previewMaterial?.content || ''}
+        onClose={closePreview}
+      />
     </div>
   )
 }

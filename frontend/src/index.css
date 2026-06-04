@@ -1840,3 +1840,161 @@ body {
   color: #f5222d;
   margin-top: 4px;
 }
+
+/* ===== MaterialPreviewModal ===== */
+.material-preview-modal {
+  max-width: 800px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2129;
+  margin: 0;
+}
+
+.preview-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.preview-content pre {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+}
+
+/* ===== LoadingSpinner ===== */
+.loading-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.loading-spinner svg {
+  width: 24px;
+  height: 24px;
+  color: #6366f1;
+}
+
+.spinner-sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+.spinner-lg svg {
+  width: 32px;
+  height: 32px;
+}
+
+.loading-spinner-text {
+  font-size: 13px;
+  color: #86909c;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Legal Document Markdown ===== */
+.markdown-body.legal-prose {
+  font-family: 'Songti SC', 'SimSun', serif;
+  line-height: 1.8;
+  color: #1d2129;
+}
+
+.markdown-body.legal-prose h1 {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin: 24px 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1d2129;
+}
+
+.markdown-body.legal-prose h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 20px 0 12px;
+  padding-left: 12px;
+  border-left: 4px solid #6366f1;
+}
+
+.markdown-body.legal-prose h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+
+.markdown-body.legal-prose p {
+  text-indent: 2em;
+  margin-bottom: 12px;
+}
+
+.markdown-body.legal-prose ul,
+.markdown-body.legal-prose ol {
+  padding-left: 2em;
+  margin-bottom: 12px;
+}
+
+.markdown-body.legal-prose li {
+  margin-bottom: 4px;
+}
+
+.markdown-body.legal-prose blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: #4b5563;
+  font-style: italic;
+}
+
+.markdown-body.legal-prose strong {
+  font-weight: 600;
+  color: #1d2129;
+}
+
+.markdown-body.legal-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.markdown-body.legal-prose th,
+.markdown-body.legal-prose td {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-body.legal-prose th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
