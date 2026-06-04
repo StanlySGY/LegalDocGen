@@ -210,7 +210,7 @@ export default function CaseList() {
       )}
 
       <div className="workbench-grid">
-        <div className="card" style={{padding:0}}>
+        <div className="card p-0">
           <div className="panel-head">
             <div>
               <span className="card-title">案件列表</span>
@@ -245,7 +245,7 @@ export default function CaseList() {
                   <th>状态</th>
                   <th>下一步</th>
                   <th>更新时间</th>
-                  <th style={{textAlign:'right'}}>操作</th>
+                  <th className="text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,21 +263,21 @@ export default function CaseList() {
                   <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>navigate(`/cases/${c.id}`)}>
                     <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
                     <td>
-                      <div style={{fontWeight:600}}>{c.name}</div>
+                      <div className="font-semibold">{c.name}</div>
                       <div className="case-meta-line">
                         {c.case_type ? <span>{c.case_type}</span> : <span>未设置类型</span>}
                         {c.description && <span>{c.description}</span>}
                       </div>
                     </td>
                     <td><span className={`tag ${statusTag(c.status)}`}>{statusText[c.status] || c.status}</span></td>
-                    <td style={{fontSize:12,color:'#4b5563'}}>
+                    <td className="text-sm-muted">
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
                         <strong style={{fontSize:12,color:'#334155'}}>{nextAction(c)}</strong>
                         <span style={{color:'#86909c'}}>{caseFocus(c)}</span>
                       </div>
                     </td>
                     <td style={{color:'#86909c',fontSize:12}}>{formatDate(c.updated_at || c.created_at)}</td>
-                    <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
+                    <td className="text-right" onClick={e=>e.stopPropagation()}>
                       <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
                         <button className="btn btn-o btn-sm" onClick={()=>navigate(`/cases/${c.id}`)}>详情</button>
                         <button className="btn btn-p btn-sm" onClick={()=>navigate(`/cases/${c.id}/workflow`)}>{c.status === 'completed' ? '复核' : '继续'}</button>
@@ -347,12 +347,12 @@ export default function CaseList() {
             <h3>新建案件</h3>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div>
-                <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件名称 *</label>
+                <label className="text-xs-label">案件名称 *</label>
                 <input className={`input${formErrors.name ? ' input-error' : ''}`} placeholder="输入案件名称" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setFormErrors(prev=>({...prev,name:''}))}}/>
                 {formErrors.name && <span className="field-error">{formErrors.name}</span>}
               </div>
               <div>
-                <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件类型</label>
+                <label className="text-xs-label">案件类型</label>
                 <input className="input" placeholder="如：合同纠纷、劳动争议" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}/>
                 <div className="quick-type-row">
                   {caseTypePresets.map(type => (
@@ -361,7 +361,7 @@ export default function CaseList() {
                 </div>
               </div>
               <div>
-                <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件描述</label>
+                <label className="text-xs-label">案件描述</label>
                 <textarea className="textarea" style={{height:80}} placeholder="简要描述" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
               </div>
               {selectedTemplate && (

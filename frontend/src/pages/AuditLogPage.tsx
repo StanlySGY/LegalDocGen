@@ -55,7 +55,7 @@ export default function AuditLogPage() {
         <div><strong>最近操作</strong><span>{latestLog ? `${latestLog.created_at ? new Date(latestLog.created_at).toLocaleString('zh-CN') : '时间未知'} · ${latestLog.summary || latestLog.action}` : '暂无审计记录，关键操作发生后会自动写入。'}</span></div>
       </div>
 
-      <div className="card" style={{padding:0}}>
+      <div className="card p-0">
         <div className="panel-head">
           <div>
             <span className="card-title">审计明细</span>
@@ -87,14 +87,14 @@ export default function AuditLogPage() {
             <tbody>
               {visibleLogs.map(log => (
                 <tr key={log.id}>
-                  <td style={{fontSize:12,color:'#86909c'}}>{log.created_at ? new Date(log.created_at).toLocaleString('zh-CN') : '-'}</td>
+                  <td className="text-xs-muted">{log.created_at ? new Date(log.created_at).toLocaleString('zh-CN') : '-'}</td>
                   <td><span className={`tag ${actionTone(log.action)}`}>{log.action}</span></td>
-                  <td style={{fontSize:12,color:'#4b5563'}}>{log.resource_type || '-'}{log.resource_id ? ` / ${log.resource_id.slice(0, 8)}` : ''}</td>
+                  <td className="text-sm-muted">{log.resource_type || '-'}{log.resource_id ? ` / ${log.resource_id.slice(0, 8)}` : ''}</td>
                   <td>{log.summary || '-'}</td>
                 </tr>
               ))}
               {visibleLogs.length === 0 && (
-                <tr><td colSpan={4}><div className="empty refined-empty" style={{padding:'50px 0'}}><p>{logs.length === 0 ? '暂无审计日志' : '当前筛选条件下暂无审计日志'}</p></div></td></tr>
+                <tr><td colSpan={4}><div className="empty refined-empty p-lg"><p>{logs.length === 0 ? '暂无审计日志' : '当前筛选条件下暂无审计日志'}</p></div></td></tr>
               )}
             </tbody>
           </table>

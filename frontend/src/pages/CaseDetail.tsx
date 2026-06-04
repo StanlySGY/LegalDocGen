@@ -140,14 +140,14 @@ export default function CaseDetail() {
             {materialInsights.catalog.map((item, index) => (
               <div key={item.id || index} style={{border:'1px solid #e5e7eb',borderRadius:10,padding:12,background:'#fafbfc'}}>
                 <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-                  <strong style={{fontSize:13}}>{index + 1}. {item.filename}</strong>
+                  <strong className="text-sm">{index + 1}. {item.filename}</strong>
                   <span className={`tag ${item.parse_status==='completed'?'t-green':'t-red'}`}>{statusLabel(item.parse_status)}</span>
                 </div>
                 <div style={{fontSize:11,color:'#4f46e5',marginTop:7,fontWeight:600}}>{item.citation || '页码未识别'}</div>
                 <div style={{fontSize:12,color:'#64748b',marginTop:6,lineHeight:1.7}}>{item.excerpt || '暂无可解析内容'}</div>
               </div>
             ))}
-            {materialInsights.catalog.length===0 && <div className="empty refined-empty" style={{padding:'36px 0'}}><p>暂无证据目录，上传材料后自动生成</p></div>}
+            {materialInsights.catalog.length===0 && <div className="empty refined-empty p-md"><p>暂无证据目录，上传材料后自动生成</p></div>}
           </div>
         </div>
         <div className="card">
@@ -160,7 +160,7 @@ export default function CaseDetail() {
                 <div style={{fontSize:11,color:'#86909c',marginTop:3}}>来源：{item.source}</div>
               </div>
             ))}
-            {materialInsights.timeline.length===0 && <div className="empty refined-empty" style={{padding:'36px 0'}}><p>未识别到明确日期事实</p></div>}
+            {materialInsights.timeline.length===0 && <div className="empty refined-empty p-md"><p>未识别到明确日期事实</p></div>}
           </div>
         </div>
       </div>
@@ -169,7 +169,7 @@ export default function CaseDetail() {
         <div className="card-hd">
           <div>
             <span className="card-title">案件材料</span>
-            <p style={{fontSize:12,color:'#86909c',marginTop:4}}>支持 PDF、Word、图片；上传后自动解析并写入证据目录。</p>
+            <p className="text-xs-desc">支持 PDF、Word、图片；上传后自动解析并写入证据目录。</p>
           </div>
         </div>
         <div className="material-upload-zone">

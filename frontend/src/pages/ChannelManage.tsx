@@ -246,11 +246,11 @@ export default function ChannelManage() {
             <h3>{editingChannel ? '编辑渠道' : '添加渠道'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>渠道名称 *</label>
+                <label className="text-xs-label">渠道名称 *</label>
                 <input className="input" placeholder="如：OpenAI主渠道" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>渠道类型</label>
+                <label className="text-xs-label">渠道类型</label>
                 <select className="select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                   <option value="openai">OpenAI 兼容</option>
                   <option value="claude">Claude</option>
@@ -258,15 +258,15 @@ export default function ChannelManage() {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>Base URL *</label>
+                <label className="text-xs-label">Base URL *</label>
                 <input className="input" placeholder="https://api.openai.com/v1" value={form.base_url} onChange={e => setForm({ ...form, base_url: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>API Key {editingChannel ? '(留空不修改)' : ''}</label>
+                <label className="text-xs-label">API Key {editingChannel ? '(留空不修改)' : ''}</label>
                 <input type="password" className="input" placeholder="sk-..." value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>优先级 (越高越优先)</label>
+                <label className="text-xs-label">优先级 (越高越优先)</label>
                 <input type="number" className="input" value={form.priority} onChange={e => setForm({ ...form, priority: parseInt(e.target.value) || 0 })} />
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', paddingTop: 8 }}>

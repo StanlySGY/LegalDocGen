@@ -86,12 +86,12 @@ export default function LegalArticlePage() {
         <div className={`trust-card ${missingCount > 0 ? 'warn' : ''}`}><strong>需人工复核</strong><span>{missingCount > 0 ? `${missingCount} 条引用未收录或需补充。` : '暂无未收录引用。'}</span></div>
       </div>
 
-      <div className="evidence-grid" style={{marginBottom:20}}>
+      <div className="evidence-grid mb-5">
         <div className="card">
           <div className="card-hd">
             <div>
               <span className="card-title">录入法条</span>
-              <p style={{fontSize:12,color:'#86909c',marginTop:4}}>同一法律名称和条号会自动更新，避免重复录入。</p>
+              <p className="text-xs-desc">同一法律名称和条号会自动更新，避免重复录入。</p>
             </div>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -107,7 +107,7 @@ export default function LegalArticlePage() {
           <div className="card-hd">
             <div>
               <span className="card-title">引用核验</span>
-              <p style={{fontSize:12,color:'#86909c',marginTop:4}}>支持识别格式： 《民法典》第五百七十七条。</p>
+              <p className="text-xs-desc">支持识别格式： 《民法典》第五百七十七条。</p>
             </div>
           </div>
           <textarea className="textarea" style={{height:150}} placeholder="粘贴 AI 初稿或律师审查文本" value={verifyText} onChange={e=>setVerifyText(e.target.value)} />
@@ -122,13 +122,13 @@ export default function LegalArticlePage() {
       </div>
 
       {verifyResult.length > 0 && (
-        <div className="card" style={{marginBottom:20}}>
+        <div className="card mb-5">
           <div className="card-hd"><span className="card-title">核验结果</span><span className={`tag ${missingCount > 0 ? 't-orange' : 't-green'}`}>{missingCount > 0 ? '需复核' : '引用已匹配'}</span></div>
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {verifyResult.map((item, index) => (
               <div key={`${item.law_name}-${item.article_no}-${index}`} className={`verify-result-card ${item.matched ? 'matched' : 'missing'}`}>
                 <div className="flex items-center justify-between" style={{gap:10}}>
-                  <strong style={{fontSize:13}}>《{item.law_name}》第{item.article_no}条</strong>
+                  <strong className="text-sm">《{item.law_name}》第{item.article_no}条</strong>
                   <span className={`tag ${item.matched ? 't-green' : 't-red'}`}>{item.matched ? '已匹配' : '未收录'}</span>
                 </div>
                 {item.title && <div style={{fontSize:12,color:'#4b5563',marginTop:6,fontWeight:600}}>{item.title}</div>}
@@ -140,7 +140,7 @@ export default function LegalArticlePage() {
         </div>
       )}
 
-      <div className="card" style={{padding:0}}>
+      <div className="card p-0">
         <div className="panel-head">
           <div>
             <span className="card-title">本地法条库</span>
@@ -164,7 +164,7 @@ export default function LegalArticlePage() {
                   <td><button className="btn btn-d btn-sm" onClick={()=>del(article.id)}>删除</button></td>
                 </tr>
               ))}
-              {articles.length === 0 && <tr><td colSpan={5}><div className="empty refined-empty" style={{padding:'50px 0'}}><p>暂无法条数据，录入后可用于引用核验</p></div></td></tr>}
+              {articles.length === 0 && <tr><td colSpan={5}><div className="empty refined-empty p-lg"><p>暂无法条数据，录入后可用于引用核验</p></div></td></tr>}
             </tbody>
           </table>
         </div>

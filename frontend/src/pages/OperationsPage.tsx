@@ -125,7 +125,7 @@ export default function OperationsPage({ currentUser }: Props) {
       <div className="billing-grid">
         <div className="card">
           <div className="card-hd"><span className="card-title">创建线下订单</span><span className="tag t-orange">试运营</span></div>
-          <div className="create-team-box" style={{marginBottom:12}}>
+          <div className="create-team-box mb-3">
             <select className="input" value={form.team_id} onChange={e=>setForm({...form,team_id:e.target.value})}>
               <option value="">选择团队</option>
               {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
@@ -134,7 +134,7 @@ export default function OperationsPage({ currentUser }: Props) {
               {plans.map(plan => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
             </select>
           </div>
-          <div className="create-team-box" style={{marginBottom:12}}>
+          <div className="create-team-box mb-3">
             <select className="input" value={form.billing_period} onChange={e=>setForm({...form,billing_period:e.target.value})}>
               <option value="monthly">月付</option>
               <option value="yearly">年付</option>
@@ -142,7 +142,7 @@ export default function OperationsPage({ currentUser }: Props) {
             </select>
             <input className="input" placeholder="金额，例如 299.00" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} />
           </div>
-          <input className="input" style={{marginBottom:12}} placeholder="外部参考号（可选）" value={form.external_reference} onChange={e=>setForm({...form,external_reference:e.target.value})} />
+          <input className="input mb-3" placeholder="外部参考号（可选）" value={form.external_reference} onChange={e=>setForm({...form,external_reference:e.target.value})} />
           <textarea className="textarea" style={{height:96}} placeholder="备注（可选）" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} />
           <button className="btn btn-p" style={{width:'100%',marginTop:12}} onClick={createOrder}>创建待确认订单</button>
         </div>
@@ -161,7 +161,7 @@ export default function OperationsPage({ currentUser }: Props) {
         </div>
       </div>
 
-      <div className="card" style={{padding:0}}>
+      <div className="card p-0">
         <div className="panel-head">
           <div>
             <span className="card-title">订单列表</span>
@@ -184,7 +184,7 @@ export default function OperationsPage({ currentUser }: Props) {
             <tbody>
               {orders.map(order => (
                 <tr key={order.id}>
-                  <td style={{fontSize:12,color:'#86909c'}}>{order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-'}</td>
+                  <td className="text-xs-muted">{order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-'}</td>
                   <td>{order.team.name}</td>
                   <td>{order.plan_name} · {order.billing_period}</td>
                   <td>{formatMoney(order.amount_cents, order.currency)}</td>
@@ -198,7 +198,7 @@ export default function OperationsPage({ currentUser }: Props) {
                   </td>
                 </tr>
               ))}
-              {orders.length === 0 && <tr><td colSpan={6}><div className="empty refined-empty" style={{padding:'50px 0'}}><p>暂无订单</p></div></td></tr>}
+              {orders.length === 0 && <tr><td colSpan={6}><div className="empty refined-empty p-lg"><p>暂无订单</p></div></td></tr>}
             </tbody>
           </table>
         </div>

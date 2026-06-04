@@ -160,7 +160,7 @@ export default function TeamManagePage() {
           <div className="card-hd">
             <div>
               <span className="card-title">{selectedTeam?.name || '团队成员'}</span>
-              <p style={{fontSize:12,color:'#86909c',marginTop:4}}>团队成员可访问该团队下的案件；角色调整会立即影响后续操作权限。</p>
+              <p className="text-xs-desc">团队成员可访问该团队下的案件；角色调整会立即影响后续操作权限。</p>
             </div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
               <span className="tag t-purple">所有者 {ownerCount}</span>

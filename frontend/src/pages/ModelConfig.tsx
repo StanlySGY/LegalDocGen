@@ -61,7 +61,7 @@ export default function ModelConfig() {
         <div className="card-hd">
           <div>
             <span className="card-title">Prompt 模板库</span>
-            <p style={{fontSize:12,color:'#86909c',marginTop:4}}>建议仅在确认业务口径后修改模板，避免影响后续文书生成结果。</p>
+            <p className="text-xs-desc">建议仅在确认业务口径后修改模板，避免影响后续文书生成结果。</p>
           </div>
           <span className="tag t-purple">{prompts.length} 个模板</span>
         </div>
@@ -88,8 +88,8 @@ export default function ModelConfig() {
           <div className="modal-box" style={{maxWidth:700}} onClick={e=>e.stopPropagation()}>
             <h3>编辑 Prompt 模板</h3>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>模板名称</label><input className="input" value={editingPrompt.name} onChange={e=>setEditingPrompt({...editingPrompt,name:e.target.value})}/></div>
-              <div><label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>Prompt 内容</label><textarea className="textarea" style={{height:380}} value={editingPrompt.content} onChange={e=>setEditingPrompt({...editingPrompt,content:e.target.value})}/></div>
+              <div><label className="text-xs-label">模板名称</label><input className="input" value={editingPrompt.name} onChange={e=>setEditingPrompt({...editingPrompt,name:e.target.value})}/></div>
+              <div><label className="text-xs-label">Prompt 内容</label><textarea className="textarea" style={{height:380}} value={editingPrompt.content} onChange={e=>setEditingPrompt({...editingPrompt,content:e.target.value})}/></div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
                 <button className="btn btn-o" onClick={()=>setEditingPrompt(null)}>取消</button>
                 <button className="btn btn-p" onClick={savePrompt}>保存</button>

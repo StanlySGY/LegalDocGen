@@ -214,8 +214,8 @@ export default function WorkflowPage() {
 
       <div className="card workflow-summary">
         <div>
-          <div style={{fontWeight:600}}>交付完成度：{completedCount}/{STAGE_ORDER.length}</div>
-          <div style={{fontSize:12,color:'#86909c',marginTop:4}}>
+          <div className="font-semibold">交付完成度：{completedCount}/{STAGE_ORDER.length}</div>
+          <div className="text-xs-desc">
             {canExport ? '全部阶段已完成，可导出正式 Word 文档。' : `导出前需补齐：${missingStages.join('、') || '加载中'}`}
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function WorkflowPage() {
               <button className="btn btn-o btn-sm" onClick={toggleHistory}>{showHistory?'关闭':'历史'}</button>
             </div>
           </div>
-          <div className="notice-card notice-info" style={{marginBottom:12}}>
+          <div className="notice-card notice-info mb-3">
             <div><strong>本阶段目标：{guide.output}</strong><span>生成内容必须基于材料和前序阶段输出，不能补写未出现的事实。</span></div>
           </div>
           {!previousDone && previousStage && (
@@ -311,7 +311,7 @@ export default function WorkflowPage() {
             </span>
           </div>
           {generationError && !editingOutput && (
-            <div className="notice-card notice-warn" style={{marginBottom:12}}>
+            <div className="notice-card notice-warn mb-3">
               <div>
                 <strong>{generationError}</strong>
                 <span>{output ? '重试生成会覆盖当前页面显示内容；保存前请先人工复核。' : '重试前建议确认 Prompt、模型渠道和网络状态。'}</span>

@@ -44,7 +44,7 @@ export default function MaterialChecklist({ caseId, templateId }: Props) {
       <div className="card-hd">
         <div>
           <span className="card-title">材料齐备度 checklist</span>
-          <p style={{fontSize:12,color:'#86909c',marginTop:4}}>基于案件模板自动匹配已上传材料，缺失项会阻止直接进入工作流。</p>
+          <p className="text-xs-desc">基于案件模板自动匹配已上传材料，缺失项会阻止直接进入工作流。</p>
         </div>
         <span className={`tag ${missingRequired > 0 ? 't-orange' : 't-green'}`}>
           {completedRequired}/{requiredItems.length} 必需材料

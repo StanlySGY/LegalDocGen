@@ -64,7 +64,7 @@ export default function TaskMonitorPage() {
         </div>
       )}
 
-      <div className="card" style={{padding:0}}>
+      <div className="card p-0">
         <div className="panel-head">
           <div>
             <span className="card-title">任务列表</span>
@@ -90,16 +90,16 @@ export default function TaskMonitorPage() {
             <tbody>
               {visibleTasks.map(task => (
                 <tr key={task.id}>
-                  <td style={{fontSize:12,color:'#86909c'}}>{task.created_at ? new Date(task.created_at).toLocaleString('zh-CN') : '-'}</td>
+                  <td className="text-xs-muted">{task.created_at ? new Date(task.created_at).toLocaleString('zh-CN') : '-'}</td>
                   <td><span className="tag t-purple">{typeText(task.task_type)}</span></td>
                   <td><span className={`tag ${statusTag(task.status)}`}>{statusText[task.status] || task.status}</span></td>
-                  <td style={{fontSize:12,color:'#4b5563'}}>{task.case_id ? task.case_id.slice(0, 8) : '-'}</td>
+                  <td className="text-sm-muted">{task.case_id ? task.case_id.slice(0, 8) : '-'}</td>
                   <td style={{fontSize:12,color:'#475569'}}>{task.message || '-'}</td>
                   <td style={{fontSize:12,color:task.status === 'failed' ? '#b45309' : '#64748b'}}>{handlingTip(task)}</td>
                   <td style={{color:'#dc2626',fontSize:12,maxWidth:300}}>{task.error || '-'}</td>
                 </tr>
               ))}
-              {visibleTasks.length === 0 && <tr><td colSpan={7}><div className="empty refined-empty" style={{padding:'50px 0'}}><p>{tasks.length === 0 ? '暂无后台任务，上传材料后会自动记录解析任务' : '当前筛选条件下暂无任务'}</p></div></td></tr>}
+              {visibleTasks.length === 0 && <tr><td colSpan={7}><div className="empty refined-empty p-lg"><p>{tasks.length === 0 ? '暂无后台任务，上传材料后会自动记录解析任务' : '当前筛选条件下暂无任务'}</p></div></td></tr>}
             </tbody>
           </table>
         </div>
