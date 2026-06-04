@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import TemplateSelector from './TemplateSelector'
 import { useToast } from '../hooks/useToast'
@@ -6,8 +7,6 @@ import { validateCaseForm } from '../utils/validation'
 import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { Case } from '../types'
-
-interface Props { nav: { detail: (id: string) => void; workflow: (id: string) => void } }
 
 type CaseForm = { name: string; description: string; case_type: string }
 
@@ -25,7 +24,8 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString('zh-CN'
 const nextAction = (item: Case) => item.status === 'completed' ? '复核并导出 Word' : item.status === 'in_progress' ? '继续生成文书' : '补材料并启动工作流'
 const caseFocus = (item: Case) => item.status === 'completed' ? '交付前复核法条、金额和证据引用' : item.status === 'in_progress' ? '优先完成剩余阶段，形成可编辑初稿' : '先上传合同、流水、通知等关键材料'
 
-export default function CaseList({ nav }: Props) {
+export default function CaseList() {
+  const navigate = useNavigate()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -66,7 +66,7 @@ export default function CaseList({ nav }: Props) {
       setForm(emptyForm)
       setShowCreate(false)
       setSelectedTemplate(null)
-      nav.detail(c.id)
+      navigate(`/cases/${c.id}`)
     } catch (e: any) {
       showToast(quotaUpgradeMessage(e) || e.message || '创建失败', { type: 'err' })
     }
@@ -183,7 +183,7 @@ export default function CaseList({ nav }: Props) {
                 <strong>{primaryCase.name}</strong>
                 <span>{nextAction(primaryCase)}</span>
               </div>
-              <button className="btn btn-p btn-sm" onClick={() => primaryCase.status === 'draft' ? nav.detail(primaryCase.id) : nav.workflow(primaryCase.id)}>继续处理</button>
+              <button className="btn btn-p btn-sm" onClick={() => primaryCase.status === 'draft' ? navigate(`/cases/${primaryCase.id}`) : navigate(`/cases/${primaryCase.id}/workflow`)}>继续处理</button>
             </div>
           )}
         </div>
@@ -260,7 +260,7 @@ export default function CaseList({ nav }: Props) {
                   </td></tr>
                 ))}
                 {!loading && cases.map(c => (
-                  <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>nav.detail(c.id)}>
+                  <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>navigate(`/cases/${c.id}`)}>
                     <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
                     <td>
                       <div style={{fontWeight:600}}>{c.name}</div>
@@ -279,8 +279,8 @@ export default function CaseList({ nav }: Props) {
                     <td style={{color:'#86909c',fontSize:12}}>{formatDate(c.updated_at || c.created_at)}</td>
                     <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
                       <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
-                        <button className="btn btn-o btn-sm" onClick={()=>nav.detail(c.id)}>详情</button>
-                        <button className="btn btn-p btn-sm" onClick={()=>nav.workflow(c.id)}>{c.status === 'completed' ? '复核' : '继续'}</button>
+                        <button className="btn btn-o btn-sm" onClick={()=>navigate(`/cases/${c.id}`)}>详情</button>
+                        <button className="btn btn-p btn-sm" onClick={()=>navigate(`/cases/${c.id}/workflow`)}>{c.status === 'completed' ? '复核' : '继续'}</button>
                         <button className="btn btn-o btn-sm" onClick={()=>openEdit(c)}>编辑</button>
                         <button className="btn btn-d btn-sm" onClick={()=>deleteOne(c.id)}>删除</button>
                       </div>
@@ -316,7 +316,7 @@ export default function CaseList({ nav }: Props) {
           <div className="card-hd"><span className="card-title">最近更新</span></div>
           <div className="recent-list">
             {recentCases.map(item => (
-              <div key={item.id} className="recent-item" onClick={() => nav.detail(item.id)}>
+              <div key={item.id} className="recent-item" onClick={() => navigate(`/cases/${item.id}`)}>
                 <div>
                   <strong>{item.name}</strong>
                   <span>{formatDate(item.updated_at || item.created_at)} · {nextAction(item)}</span>

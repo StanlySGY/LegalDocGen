@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { FormEvent, useEffect, useState } from 'react'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
@@ -13,19 +14,6 @@ import OperationsPage from './pages/OperationsPage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 import ErrorBoundary from './components/ErrorBoundary'
 
-type Page =
-  | { type: 'cases' }
-  | { type: 'detail'; caseId: string }
-  | { type: 'workflow'; caseId: string }
-  | { type: 'channels' }
-  | { type: 'config' }
-  | { type: 'audit' }
-  | { type: 'teams' }
-  | { type: 'billing' }
-  | { type: 'operations' }
-  | { type: 'tasks' }
-  | { type: 'legalArticles' }
-
 type HealthState = {
   status: 'checking' | 'ok' | 'degraded' | 'offline'
   message: string
@@ -34,7 +22,6 @@ type HealthState = {
 type AuthMode = 'login' | 'register'
 
 export default function App() {
-  const [page, setPage] = useState<Page>({ type: 'cases' })
   const [adminToken, setAdminTokenState] = useState(getAdminToken())
   const [health, setHealth] = useState<HealthState>({ status: 'checking', message: '正在检测后端连接' })
   const [authLoading, setAuthLoading] = useState(true)
@@ -98,7 +85,6 @@ export default function App() {
       setCurrentUser(data.user)
       setShowAuthPanel(false)
       setAuthForm({ username: '', password: '', display_name: '' })
-      setPage({ type: 'cases' })
     } catch (err: any) {
       setAuthError(err.message || '认证失败')
     }
@@ -108,49 +94,9 @@ export default function App() {
     setAuthToken('')
     setCurrentUser(null)
     setShowAuthPanel(false)
-    setPage({ type: 'cases' })
   }
 
-  const nav = {
-    cases: () => setPage({ type: 'cases' }),
-    detail: (id: string) => setPage({ type: 'detail', caseId: id }),
-    workflow: (id: string) => setPage({ type: 'workflow', caseId: id }),
-    channels: () => setPage({ type: 'channels' }),
-    config: () => setPage({ type: 'config' }),
-    audit: () => setPage({ type: 'audit' }),
-    teams: () => setPage({ type: 'teams' }),
-    billing: () => setPage({ type: 'billing' }),
-    operations: () => setPage({ type: 'operations' }),
-    tasks: () => setPage({ type: 'tasks' }),
-    legalArticles: () => setPage({ type: 'legalArticles' }),
-  }
-
-  const isCases = page.type === 'cases' || page.type === 'detail' || page.type === 'workflow'
-  const isChannels = page.type === 'channels'
-  const isConfig = page.type === 'config'
-  const isAudit = page.type === 'audit'
-  const isTeams = page.type === 'teams'
-  const isBilling = page.type === 'billing'
-  const isOperations = page.type === 'operations'
-  const isTasks = page.type === 'tasks'
-  const isLegalArticles = page.type === 'legalArticles'
   const needsLogin = authRequired && !currentUser
-
-  const breadcrumb = () => {
-    switch (page.type) {
-      case 'cases': return null
-      case 'detail': return (<><a onClick={nav.cases}>案件管理</a><span style={{color:'#d1d5db'}}>/</span><span className="current">案件详情</span></>)
-      case 'workflow': return (<><a onClick={nav.cases}>案件管理</a><span style={{color:'#d1d5db'}}>/</span><span className="current">工作流</span></>)
-      case 'channels': return null
-      case 'config': return null
-      case 'audit': return null
-      case 'teams': return null
-      case 'billing': return null
-      case 'operations': return null
-      case 'tasks': return null
-      case 'legalArticles': return null
-    }
-  }
 
   const authPanel = (
     <div className="auth-panel card">
@@ -174,30 +120,113 @@ export default function App() {
     </div>
   )
 
-  const renderPage = () => {
+  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (authLoading) return <div className="card auth-loading">正在检查登录状态...</div>
     if (needsLogin) return authPanel
     if (showAuthPanel) return authPanel
+    return <>{children}</>
+  }
 
-    const pages: Record<string, React.ReactNode> = {
-      cases: <CaseList nav={nav} />,
-      detail: <CaseDetail caseId={(page as any).caseId} nav={nav} />,
-      workflow: <WorkflowPage caseId={(page as any).caseId} onBack={() => nav.detail((page as any).caseId)} onCaseNav={nav.cases} />,
-      channels: <ChannelManage onBack={nav.cases} />,
-      config: <ModelConfig onNavChannels={nav.channels} />,
-      audit: <AuditLogPage />,
-      teams: <TeamManagePage />,
-      billing: <BillingUsagePage currentUser={currentUser} />,
-      operations: <OperationsPage currentUser={currentUser} />,
-      tasks: <TaskMonitorPage />,
-      legalArticles: <LegalArticlePage />,
+  return (
+    <BrowserRouter>
+      <AppLayout
+        health={health}
+        checkHealth={checkHealth}
+        currentUser={currentUser}
+        adminToken={adminToken}
+        saveAdminToken={saveAdminToken}
+        authLoading={authLoading}
+        authRequired={authRequired}
+        showAuthPanel={showAuthPanel}
+        setShowAuthPanel={setShowAuthPanel}
+        logout={logout}
+      >
+        <Routes>
+          <Route path="/" element={<Navigate to="/cases" replace />} />
+          <Route path="/cases" element={<ProtectedRoute><CaseList /></ProtectedRoute>} />
+          <Route path="/cases/:caseId" element={<ProtectedRoute><CaseDetail /></ProtectedRoute>} />
+          <Route path="/cases/:caseId/workflow" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
+          <Route path="/channels" element={<ProtectedRoute><ChannelManage /></ProtectedRoute>} />
+          <Route path="/config" element={<ProtectedRoute><ModelConfig /></ProtectedRoute>} />
+          <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
+          <Route path="/teams" element={<ProtectedRoute><TeamManagePage /></ProtectedRoute>} />
+          <Route path="/billing" element={<ProtectedRoute><BillingUsagePage currentUser={currentUser} /></ProtectedRoute>} />
+          <Route path="/operations" element={<ProtectedRoute><OperationsPage currentUser={currentUser} /></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute><TaskMonitorPage /></ProtectedRoute>} />
+          <Route path="/legal-articles" element={<ProtectedRoute><LegalArticlePage /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/cases" replace />} />
+        </Routes>
+      </AppLayout>
+    </BrowserRouter>
+  )
+}
+
+import { NavLink, useLocation } from 'react-router-dom'
+
+interface AppLayoutProps {
+  children: React.ReactNode
+  health: HealthState
+  checkHealth: () => void
+  currentUser: AuthUser | null
+  adminToken: string
+  saveAdminToken: (token: string) => void
+  authLoading: boolean
+  authRequired: boolean
+  showAuthPanel: boolean
+  setShowAuthPanel: (show: boolean) => void
+  logout: () => void
+}
+
+function AppLayout({
+  children,
+  health,
+  checkHealth,
+  currentUser,
+  adminToken,
+  saveAdminToken,
+  authLoading,
+  authRequired,
+  showAuthPanel,
+  setShowAuthPanel,
+  logout
+}: AppLayoutProps) {
+  const location = useLocation()
+  const isCases = location.pathname.startsWith('/cases')
+  const isChannels = location.pathname === '/channels'
+  const isConfig = location.pathname === '/config'
+  const isAudit = location.pathname === '/audit'
+  const isTeams = location.pathname === '/teams'
+  const isBilling = location.pathname === '/billing'
+  const isOperations = location.pathname === '/operations'
+  const isTasks = location.pathname === '/tasks'
+  const isLegalArticles = location.pathname === '/legal-articles'
+
+  const breadcrumb = () => {
+    const pathParts = location.pathname.split('/').filter(Boolean)
+    if (pathParts.length === 0 || pathParts[0] === 'cases') {
+      if (pathParts.length === 1) return null
+      if (pathParts.length === 2) {
+        return (
+          <>
+            <NavLink to="/cases">案件管理</NavLink>
+            <span className="breadcrumb-sep">/</span>
+            <span className="current">案件详情</span>
+          </>
+        )
+      }
+      if (pathParts[2] === 'workflow') {
+        return (
+          <>
+            <NavLink to="/cases">案件管理</NavLink>
+            <span className="breadcrumb-sep">/</span>
+            <NavLink to={`/cases/${pathParts[1]}`}>案件详情</NavLink>
+            <span className="breadcrumb-sep">/</span>
+            <span className="current">工作流</span>
+          </>
+        )
+      }
     }
-
-    return (
-      <ErrorBoundary key={page.type}>
-        {pages[page.type]}
-      </ErrorBoundary>
-    )
+    return null
   }
 
   return (
@@ -210,52 +239,52 @@ export default function App() {
         <nav className="sidebar-nav">
           <div className="nav-section">
             <div className="nav-section-title">业务</div>
-            <div className={`nav-item ${isCases ? 'active' : ''}`} onClick={nav.cases}>
+            <NavLink to="/cases" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
               案件管理
-            </div>
-            <div className={`nav-item ${isTeams ? 'active' : ''}`} onClick={nav.teams}>
+            </NavLink>
+            <NavLink to="/teams" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
               可选协作
-            </div>
+            </NavLink>
           </div>
           {currentUser && (
             <div className="nav-section">
               <div className="nav-section-title">商业</div>
-              <div className={`nav-item ${isBilling ? 'active' : ''}`} onClick={nav.billing}>
+              <NavLink to="/billing" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16v10H4z"/><path d="M8 11h4"/><path d="M16 11h.01"/><path d="M8 15h8"/></svg>
                 用量与套餐
-              </div>
+              </NavLink>
               {currentUser.role === 'admin' && (
-                <div className={`nav-item ${isOperations ? 'active' : ''}`} onClick={nav.operations}>
+                <NavLink to="/operations" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/><path d="M7 19v-4"/><path d="M11 19v-8"/><path d="M15 19v-5"/><path d="M19 19V7"/></svg>
                   运营后台
-                </div>
+                </NavLink>
               )}
             </div>
           )}
           <div className="nav-section">
             <div className="nav-section-title">系统</div>
-            <div className={`nav-item ${isChannels ? 'active' : ''}`} onClick={nav.channels}>
+            <NavLink to="/channels" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
               渠道管理
-            </div>
-            <div className={`nav-item ${isConfig ? 'active' : ''}`} onClick={nav.config}>
+            </NavLink>
+            <NavLink to="/config" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
               Prompt模板
-            </div>
-            <div className={`nav-item ${isAudit ? 'active' : ''}`} onClick={nav.audit}>
+            </NavLink>
+            <NavLink to="/audit" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
               审计日志
-            </div>
-            <div className={`nav-item ${isTasks ? 'active' : ''}`} onClick={nav.tasks}>
+            </NavLink>
+            <NavLink to="/tasks" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6M8 17h4"/></svg>
               后台任务
-            </div>
-            <div className={`nav-item ${isLegalArticles ? 'active' : ''}`} onClick={nav.legalArticles}>
+            </NavLink>
+            <NavLink to="/legal-articles" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
               法条核验
-            </div>
+            </NavLink>
           </div>
         </nav>
         <div className="sidebar-footer">v1.0.0</div>
@@ -303,7 +332,9 @@ export default function App() {
               </div>
             </div>
           )}
-          {renderPage()}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </div>
     </>

@@ -3,6 +3,7 @@ import { validateChannelForm } from '../utils/validation'
 import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 
 interface Channel {
@@ -21,8 +22,6 @@ interface Channel {
   created_at: string
 }
 
-interface Props { onBack: () => void }
-
 const testStatusText: Record<string, string> = { success: '连接正常', failed: '测试失败' }
 const testStatusClass = (status: string) => status === 'success' ? 't-green' : status === 'failed' ? 't-red' : 't-gray'
 const channelRiskTip = (channel: Channel) => {
@@ -32,7 +31,8 @@ const channelRiskTip = (channel: Channel) => {
   return '可用于工作流生成，建议定期测试连接'
 }
 
-export default function ChannelManage({ onBack }: Props) {
+export default function ChannelManage() {
+  const navigate = useNavigate()
   const [channels, setChannels] = useState<Channel[]>([])
   const [showDrawer, setShowDrawer] = useState(false)
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
@@ -270,7 +270,7 @@ export default function ChannelManage({ onBack }: Props) {
                 <input type="number" className="input" value={form.priority} onChange={e => setForm({ ...form, priority: parseInt(e.target.value) || 0 })} />
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', paddingTop: 8 }}>
-                <button className="btn btn-o" onClick={onBack}>返回案件</button>
+                <button className="btn btn-o" onClick={() => navigate('/cases')}>返回案件</button>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn btn-o" onClick={() => setShowDrawer(false)}>取消</button>
                   <button className="btn btn-p" onClick={saveChannel}>{editingChannel ? '保存' : '创建'}</button>

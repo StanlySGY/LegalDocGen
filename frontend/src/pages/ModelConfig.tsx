@@ -1,11 +1,11 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 
-interface Props { onNavChannels: () => void }
-
-export default function ModelConfig({ onNavChannels }: Props) {
+export default function ModelConfig() {
+  const navigate = useNavigate()
   const [prompts, setPrompts] = useState<any[]>([])
   const [editingPrompt, setEditingPrompt] = useState<any>(null)
   const [stages, setStages] = useState<any[]>([])
@@ -32,7 +32,7 @@ export default function ModelConfig({ onNavChannels }: Props) {
         </div>
         <div className="hero-action-card">
           <div><strong>模型入口</strong><span>生成质量同时依赖模板、渠道和模型可用性。</span></div>
-          <button className="btn btn-p" onClick={onNavChannels}>配置模型渠道</button>
+          <button className="btn btn-p" onClick={() => navigate('/channels')}>配置模型渠道</button>
         </div>
       </div>
 
@@ -49,7 +49,7 @@ export default function ModelConfig({ onNavChannels }: Props) {
         <div className="trust-card"><strong>交付一致</strong><span>统一各阶段输出结构，便于版本回滚、导出和团队协作审查。</span></div>
       </div>
 
-      <div className="card prompt-channel-card" onClick={onNavChannels}>
+      <div className="card prompt-channel-card" onClick={() => navigate('/channels')}>
         <div>
           <div style={{fontWeight:600,marginBottom:4}}>模型与渠道配置</div>
           <div style={{fontSize:13,color:'#86909c'}}>管理 API 渠道、测试连接、发现可用模型，保障模板可稳定执行。</div>

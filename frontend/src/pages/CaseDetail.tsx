@@ -3,17 +3,19 @@ import Toaster from '../components/Toaster'
 import MaterialPreviewModal from '../components/MaterialPreviewModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
 import type { Case, Material, MaterialCatalogItem } from '../types'
 
-interface Props { caseId: string; nav: { cases: () => void; workflow: (id: string) => void } }
-
 const fileLabel = (type: string) => type === '.pdf' ? 'PDF' : type.startsWith('.doc') ? 'DOC' : 'IMG'
 const statusLabel = (status: string) => status === 'completed' ? '已解析' : '解析失败'
 
-export default function CaseDetail({ caseId, nav }: Props) {
+export default function CaseDetail() {
+  const { caseId: caseIdParam } = useParams<{ caseId: string }>()
+  const caseId = caseIdParam!
+  const navigate = useNavigate()
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [materialInsights, setMaterialInsights] = useState<{catalog:MaterialCatalogItem[];timeline:any[]}>({ catalog: [], timeline: [] })
@@ -80,7 +82,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
       showToast(`仍缺少 ${materialCompletion.missingRequired} 项必需材料：${missingNames}`, { type: 'err' })
       return
     }
-    nav.workflow(caseId)
+    navigate(`/cases/${caseId}/workflow`)
   }
 
   if (!caseData) return <LoadingSpinner text="加载案件信息..." />
@@ -104,7 +106,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
           </div>
         </div>
         <div className="case-detail-actions">
-          <button className="btn btn-o" onClick={nav.cases}>返回列表</button>
+          <button className="btn btn-o" onClick={() => navigate('/cases')}>返回列表</button>
           <button className="btn btn-p" onClick={handleEnterWorkflow}>进入工作流</button>
         </div>
       </div>

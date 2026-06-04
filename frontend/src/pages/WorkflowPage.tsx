@@ -1,12 +1,11 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api, quotaUpgradeMessage } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType } from '../types'
 import { STAGE_NAMES, STAGE_ORDER } from '../types'
-
-interface Props { caseId: string; onBack: () => void; onCaseNav: () => void }
 
 const stageGuides: Record<StageType, { input: string; output: string; action: string; review: string; risk: string }> = {
   fact_extraction: { input: '上传材料与案件基本信息', output: '当事人、关键事实、证据清单', action: '先确认合同、流水、通知、聊天记录等核心材料已经解析，再抽取事实。', review: '逐条核对主体、时间、金额和证据来源，缺依据的事实不要直接进入后续阶段。', risk: '核对事实是否均可追溯到材料' },
@@ -19,7 +18,10 @@ const stageGuides: Record<StageType, { input: string; output: string; action: st
 const statusLabel = (item?: StageProgress) => item?.has_output ? '已完成' : item?.status === 'running' ? '生成中' : '待处理'
 const statusClass = (item?: StageProgress) => item?.has_output ? 't-green' : item?.status === 'running' ? 't-orange' : 't-gray'
 
-export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
+export default function WorkflowPage() {
+  const { caseId: caseIdParam } = useParams<{ caseId: string }>()
+  const caseId = caseIdParam!
+  const navigate = useNavigate()
   const [progress, setProgress] = useState<StageProgress[]>([])
   const [activeStage, setActiveStage] = useState<StageType>('fact_extraction')
   const [node, setNode] = useState<WorkflowNode | null>(null)
@@ -170,8 +172,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   return (
     <div>
       <div className="breadcrumb mb-5">
-        <a onClick={onCaseNav}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
-        <a onClick={onBack}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={() => navigate('/cases')}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
         <span className="current">工作流</span>
       </div>
 
