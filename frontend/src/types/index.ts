@@ -90,6 +90,7 @@ export interface Case {
 }
 
 export interface Material {
+  category?: string
   id: string
   case_id: string
   filename: string

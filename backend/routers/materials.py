@@ -128,3 +128,77 @@ def delete_material(material_id: str, db: Session = Depends(get_db), current_use
     db.delete(material)
     db.commit()
     return {"message": "已删除"}
+
+
+@router.put("/{material_id}/category")
+def update_material_category(
+    material_id: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise NotFoundError(f"材料 {material_id} 不存在")
+    get_accessible_case(db, material.case_id, current_user)
+    
+    category = body.get("category", "other")
+    from backend.models.material import EVIDENCE_CATEGORIES
+    if category not in EVIDENCE_CATEGORIES:
+        raise ValidationError(f"无效的分类: {category}，可选值: {', '.join(EVIDENCE_CATEGORIES.keys())}")
+    
+    material.category = category
+    db.commit()
+    db.refresh(material)
+    return material
+
+
+@router.get("/case/{case_id}/search")
+def search_materials(
+    case_id: str,
+    q: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    get_accessible_case(db, case_id, current_user)
+    
+    if not q or len(q.strip()) < 2:
+        raise ValidationError("搜索关键词至少需要2个字符")
+    
+    keyword = q.strip()
+    materials = db.query(Material).filter(
+        Material.case_id == case_id,
+        Material.parsed_content.isnot(None),
+        Material.parsed_content != "",
+    ).all()
+    
+    results = []
+    for mat in materials:
+        content = mat.parsed_content or ""
+        idx = content.lower().find(keyword.lower())
+        if idx == -1:
+            continue
+        
+        context_start = max(0, idx - 80)
+        context_end = min(len(content), idx + len(keyword) + 80)
+        snippet = content[context_start:context_end]
+        
+        if context_start > 0:
+            snippet = "..." + snippet
+        if context_end < len(content):
+            snippet = snippet + "..."
+        
+        import re
+        page_matches = re.findall(r'\[第(\d+)页\]', content[:idx])
+        page_num = int(page_matches[-1]) if page_matches else None
+        
+        results.append({
+            "material_id": mat.id,
+            "filename": mat.filename,
+            "file_type": mat.file_type,
+            "snippet": snippet,
+            "page_num": page_num,
+            "position": idx,
+        })
+    
+    return {"query": keyword, "results": results[:20]}

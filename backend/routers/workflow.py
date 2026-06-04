@@ -332,3 +332,53 @@ def export_batch(req: BatchExportRequest, db: Session = Depends(get_db), current
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
+
+
+@router.get("/diff/{case_id}/{stage}")
+def get_version_diff(
+    case_id: str,
+    stage: str,
+    version1: int,
+    version2: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    get_accessible_case(db, case_id, current_user)
+    try:
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
+
+    engine = WorkflowEngine(db)
+    nodes = engine.get_version_history(case_id, stage_type)
+    
+    node1 = next((n for n in nodes if n.version == version1), None)
+    node2 = next((n for n in nodes if n.version == version2), None)
+    
+    if not node1 or not node2:
+        raise NotFoundError("指定版本不存在")
+    
+    import difflib
+    text1 = (node1.output or "").splitlines(keepends=True)
+    text2 = (node2.output or "").splitlines(keepends=True)
+    
+    diff = list(difflib.unified_diff(text1, text2, lineterm="", n=3))
+    
+    changes = []
+    for line in diff:
+        if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
+            continue
+        if line.startswith("+"):
+            changes.append({"type": "insert", "text": line[1:]})
+        elif line.startswith("-"):
+            changes.append({"type": "delete", "text": line[1:]})
+        else:
+            changes.append({"type": "equal", "text": line})
+    
+    return {
+        "version1": version1,
+        "version2": version2,
+        "changes": changes,
+        "node1_created_at": node1.created_at.isoformat() if node1.created_at else None,
+        "node2_created_at": node2.created_at.isoformat() if node2.created_at else None,
+    }

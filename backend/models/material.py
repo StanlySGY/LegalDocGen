@@ -5,6 +5,13 @@ import uuid
 
 from backend.database import Base
 
+EVIDENCE_CATEGORIES = {
+    "identity": "诉讼主体材料",
+    "contract": "核心法律依据",
+    "evidence": "履约与侵权事实",
+    "other": "辅助/其他程序材料",
+}
+
 
 class Material(Base):
     __tablename__ = "materials"
@@ -19,6 +26,7 @@ class Material(Base):
     structured_data = Column(Text, default="{}")
     parse_task_id = Column(String(36), nullable=True)
     parse_status = Column(String(50), default="pending")
+    category = Column(String(50), default="other")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     case = relationship("Case", back_populates="materials")

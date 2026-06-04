@@ -181,6 +181,8 @@ export const api = {
       return res.json()
     },
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
+    updateCategory: (id: string, category: string) => request<any>(`/materials/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }),
+    search: (caseId: string, query: string) => request<any>(`/materials/case/${caseId}/search?q=${encodeURIComponent(query)}`),
   },
   workflow: {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),
