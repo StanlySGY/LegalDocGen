@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api, quotaUpgradeMessage } from '../services/api'
 import TemplateSelector from './TemplateSelector'
+import { useToast } from '../hooks/useToast'
+import { validateCaseForm } from '../utils/validation'
+import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { Case } from '../types'
 
 interface Props { nav: { detail: (id: string) => void; workflow: (id: string) => void } }
@@ -32,9 +36,9 @@ export default function CaseList({ nav }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [editingCase, setEditingCase] = useState<Case | null>(null)
   const [editForm, setEditForm] = useState<CaseForm>(emptyForm)
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
-
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
+  const { toasts, showToast, removeToast } = useToast()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -42,7 +46,7 @@ export default function CaseList({ nav }: Props) {
       setCases(data)
       setSelectedIds([])
     } catch (e: any) {
-      showToast(e.message || '案件加载失败', 'err')
+      showToast(e.message || '案件加载失败', { type: 'err' })
     } finally {
       setLoading(false)
     }
@@ -50,7 +54,13 @@ export default function CaseList({ nav }: Props) {
   useEffect(() => { load() }, [load])
 
   const create = async () => {
-    if (!form.name.trim()) return showToast('请先填写案件名称', 'err')
+    const validation = validateCaseForm(form)
+    if (!validation.valid) {
+      setFormErrors(validation.errors)
+      showToast(Object.values(validation.errors)[0], { type: 'err' })
+      return
+    }
+    setFormErrors({})
     try {
       const c = await api.cases.create({ ...form, template_id: selectedTemplate?.id || '' })
       setForm(emptyForm)
@@ -58,7 +68,7 @@ export default function CaseList({ nav }: Props) {
       setSelectedTemplate(null)
       nav.detail(c.id)
     } catch (e: any) {
-      showToast(quotaUpgradeMessage(e) || e.message || '创建失败', 'err')
+      showToast(quotaUpgradeMessage(e) || e.message || '创建失败', { type: 'err' })
     }
   }
 
@@ -75,42 +85,60 @@ export default function CaseList({ nav }: Props) {
       load()
       showToast('已保存')
     } catch (e: any) {
-      showToast(e.message || '保存失败', 'err')
+      showToast(e.message || '保存失败', { type: 'err' })
     }
   }
 
   const deleteOne = async (id: string) => {
-    if (!window.confirm('确认删除该案件及其材料和工作流记录？')) return
+    const confirmed = await new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true,
+        title: '删除案件',
+        message: '确认删除该案件及其材料和工作流记录？',
+        variant: 'danger',
+        onConfirm: () => { resolve(true); setConfirmState(null) }
+      })
+    })
+    if (!confirmed) return
     try {
       await api.cases.delete(id)
       load()
       showToast('已删除')
     } catch (e: any) {
-      showToast(e.message || '删除失败', 'err')
+      showToast(e.message || '删除失败', { type: 'err' })
     }
   }
 
   const batchDelete = async () => {
-    if (loading) return showToast('案件加载中，请稍后操作', 'err')
-    if (!selectedIds.length) return showToast('请先选择案件', 'err')
-    if (!window.confirm(`确认删除选中的 ${selectedIds.length} 个案件？`)) return
+    if (loading) return showToast('案件加载中，请稍后操作', { type: 'err' })
+    if (!selectedIds.length) return showToast('请先选择案件', { type: 'err' })
+    const confirmed = await new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true,
+        title: '批量删除',
+        message: `确认删除选中的 ${selectedIds.length} 个案件？`,
+        variant: 'danger',
+        onConfirm: () => { resolve(true); setConfirmState(null) }
+      })
+    })
+    if (!confirmed) return
     try {
       await api.cases.batchDelete(selectedIds)
       load()
       showToast('批量删除完成')
     } catch (e: any) {
-      showToast(e.message || '批量删除失败', 'err')
+      showToast(e.message || '批量删除失败', { type: 'err' })
     }
   }
 
   const batchExport = async () => {
-    if (loading) return showToast('案件加载中，请稍后操作', 'err')
-    if (!selectedIds.length) return showToast('请先选择案件', 'err')
+    if (loading) return showToast('案件加载中，请稍后操作', { type: 'err' })
+    if (!selectedIds.length) return showToast('请先选择案件', { type: 'err' })
     try {
       await api.workflow.exportBatch(selectedIds)
       showToast('批量导出成功')
     } catch (e: any) {
-      showToast(e.message || '批量导出失败', 'err')
+      showToast(e.message || '批量导出失败', { type: 'err' })
     }
   }
 
@@ -172,7 +200,7 @@ export default function CaseList({ nav }: Props) {
         <div className="stat-card s-green"><div className="s-label">可交付</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成复核阶段占比</div></div>
       </div>
 
-      {!loading && cases.length === 0 && !toast && (
+      {!loading && cases.length === 0 && toasts.length === 0 && (
         <div className="notice-card notice-info">
           <div>
             <strong>当前为前端预览模式时，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。</strong>
@@ -320,7 +348,8 @@ export default function CaseList({ nav }: Props) {
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div>
                 <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件名称 *</label>
-                <input className="input" placeholder="输入案件名称" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+                <input className={`input${formErrors.name ? ' input-error' : ''}`} placeholder="输入案件名称" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setFormErrors(prev=>({...prev,name:''}))}}/>
+                {formErrors.name && <span className="field-error">{formErrors.name}</span>}
               </div>
               <div>
                 <label style={{fontSize:12,color:'#86909c',marginBottom:4,display:'block'}}>案件类型</label>
@@ -366,7 +395,17 @@ export default function CaseList({ nav }: Props) {
           </div>
         </div>
       )}
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
+      {confirmState && (
+        <ConfirmDialog
+          open={confirmState.open}
+          title={confirmState.title}
+          message={confirmState.message}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   )
 }

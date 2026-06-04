@@ -1,3 +1,6 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { Team, TeamMember } from '../types'
@@ -13,15 +16,15 @@ export default function TeamManagePage() {
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [newTeamName, setNewTeamName] = useState('')
   const [memberForm, setMemberForm] = useState({ user_id: '', role: 'member' })
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
+  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
 
   const loadMembers = async (teamId: string) => {
     try {
       setMembers(await api.teams.members(teamId))
     } catch (e: any) {
-      showToast(e.message || '成员加载失败', 'err')
+      showToast(e.message || '成员加载失败', { type: 'err' })
     }
   }
 
@@ -33,7 +36,7 @@ export default function TeamManagePage() {
       setSelectedTeamId(activeTeamId)
       if (activeTeamId) await loadMembers(activeTeamId)
     } catch (e: any) {
-      showToast(e.message || '团队加载失败', 'err')
+      showToast(e.message || '团队加载失败', { type: 'err' })
     }
   }
 
@@ -54,27 +57,27 @@ export default function TeamManagePage() {
 
   const createTeam = async () => {
     const name = newTeamName.trim()
-    if (!name) return showToast('请输入团队名称', 'err')
+    if (!name) return showToast('请输入团队名称', { type: 'err' })
     try {
       await api.teams.create({ name })
       setNewTeamName('')
       await loadTeams()
       showToast('团队已创建')
     } catch (e: any) {
-      showToast(e.message || '团队创建失败', 'err')
+      showToast(e.message || '团队创建失败', { type: 'err' })
     }
   }
 
   const addMember = async () => {
     if (!selectedTeamId) return
-    if (!memberForm.user_id) return showToast('请选择成员', 'err')
+    if (!memberForm.user_id) return showToast('请选择成员', { type: 'err' })
     try {
       await api.teams.addMember(selectedTeamId, memberForm)
       setMemberForm({ user_id: '', role: 'member' })
       await loadMembers(selectedTeamId)
       showToast('成员已添加')
     } catch (e: any) {
-      showToast(quotaUpgradeMessage(e) || e.message || '添加成员失败', 'err')
+      showToast(quotaUpgradeMessage(e) || e.message || '添加成员失败', { type: 'err' })
     }
   }
 
@@ -85,19 +88,28 @@ export default function TeamManagePage() {
       await loadMembers(selectedTeamId)
       showToast('角色已更新')
     } catch (e: any) {
-      showToast(e.message || '角色更新失败', 'err')
+      showToast(e.message || '角色更新失败', { type: 'err' })
     }
   }
 
   const removeMember = async (userId: string) => {
     if (!selectedTeamId) return
-    if (!window.confirm('确认移除该团队成员？')) return
+    const confirmed = await new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true,
+        title: '移除成员',
+        message: '确认移除该团队成员？移除后该成员将无法访问团队案件。',
+        variant: 'danger',
+        onConfirm: () => { resolve(true); setConfirmState(null) }
+      })
+    })
+    if (!confirmed) return
     try {
       await api.teams.removeMember(selectedTeamId, userId)
       await loadMembers(selectedTeamId)
       showToast('成员已移除')
     } catch (e: any) {
-      showToast(e.message || '移除失败', 'err')
+      showToast(e.message || '移除失败', { type: 'err' })
     }
   }
 
@@ -199,7 +211,17 @@ export default function TeamManagePage() {
           </div>
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
+      {confirmState && (
+        <ConfirmDialog
+          open={confirmState.open}
+          title={confirmState.title}
+          message={confirmState.message}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   )
 }

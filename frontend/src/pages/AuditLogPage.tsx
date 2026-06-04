@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 
@@ -12,11 +14,10 @@ export default function AuditLogPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [actionFilter, setActionFilter] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
+  const { toasts, showToast, removeToast } = useToast()
 
   const load = () => {
-    api.audit.list().then(setLogs).catch((e: any) => showToast(e.message || '审计日志加载失败', 'err'))
+    api.audit.list().then(setLogs).catch((e: any) => showToast(e.message || '审计日志加载失败', { type: 'err' }))
   }
 
   useEffect(() => { load() }, [])
@@ -99,7 +100,7 @@ export default function AuditLogPage() {
           </table>
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

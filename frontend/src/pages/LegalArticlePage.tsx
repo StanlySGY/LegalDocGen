@@ -1,3 +1,6 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 import type { LegalArticle } from '../types'
@@ -8,49 +11,58 @@ export default function LegalArticlePage() {
   const [verifyText, setVerifyText] = useState('')
   const [verifyResult, setVerifyResult] = useState<any[]>([])
   const [form, setForm] = useState({ law_name: '', article_no: '', title: '', content: '' })
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
+  const { toasts, showToast, removeToast } = useToast()
+  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
 
   const load = async () => {
     try {
       setArticles(await api.legalArticles.list(keyword.trim()))
     } catch (e: any) {
-      showToast(e.message || '法条加载失败', 'err')
+      showToast(e.message || '法条加载失败', { type: 'err' })
     }
   }
 
   useEffect(() => { load() }, [])
 
   const save = async () => {
-    if (!form.law_name.trim() || !form.article_no.trim()) return showToast('法律名称和条号不能为空', 'err')
+    if (!form.law_name.trim() || !form.article_no.trim()) return showToast('法律名称和条号不能为空', { type: 'err' })
     try {
       await api.legalArticles.create(form)
       setForm({ law_name: '', article_no: '', title: '', content: '' })
       await load()
       showToast('法条已保存')
     } catch (e: any) {
-      showToast(e.message || '保存失败', 'err')
+      showToast(e.message || '保存失败', { type: 'err' })
     }
   }
 
   const del = async (id: string) => {
-    if (!window.confirm('确认删除该法条？')) return
+    const confirmed = await new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true,
+        title: '删除法条',
+        message: '确认删除该法条？删除后无法恢复。',
+        variant: 'danger',
+        onConfirm: () => { resolve(true); setConfirmState(null) }
+      })
+    })
+    if (!confirmed) return
     try {
       await api.legalArticles.delete(id)
       await load()
       showToast('法条已删除')
     } catch (e: any) {
-      showToast(e.message || '删除失败', 'err')
+      showToast(e.message || '删除失败', { type: 'err' })
     }
   }
 
   const verify = async () => {
-    if (!verifyText.trim()) return showToast('请先粘贴需要核验的文本', 'err')
+    if (!verifyText.trim()) return showToast('请先粘贴需要核验的文本', { type: 'err' })
     try {
       const data = await api.legalArticles.verify(verifyText)
       setVerifyResult(data.references || [])
     } catch (e: any) {
-      showToast(e.message || '核验失败', 'err')
+      showToast(e.message || '核验失败', { type: 'err' })
     }
   }
 
@@ -157,7 +169,17 @@ export default function LegalArticlePage() {
           </table>
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
+      {confirmState && (
+        <ConfirmDialog
+          open={confirmState.open}
+          title={confirmState.title}
+          message={confirmState.message}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { api, quotaUpgradeMessage } from '../services/api'
@@ -37,9 +39,8 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   const [selChannelId, setSelChannelId] = useState('')
   const [selModel, setSelModel] = useState('')
   const [caseName, setCaseName] = useState('')
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const loadProgress = useCallback(async () => {
     setProgressLoading(true)
     try {
@@ -66,13 +67,13 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
   }, [caseId])
   const loadHistory = useCallback(async (s: StageType) => { setHistory(await api.workflow.history(caseId, s)) }, [caseId])
 
-  useEffect(() => { loadProgress().catch((e: any) => showToast(e.message || '工作流加载失败', 'err')) }, [loadProgress])
-  useEffect(() => { loadNode(activeStage).catch((e: any) => showToast(e.message || '阶段加载失败', 'err')) }, [activeStage, loadNode])
+  useEffect(() => { loadProgress().catch((e: any) => showToast(e.message || '工作流加载失败', { type: 'err' })) }, [loadProgress])
+  useEffect(() => { loadNode(activeStage).catch((e: any) => showToast(e.message || '阶段加载失败', { type: 'err' })) }, [activeStage, loadNode])
   useEffect(() => {
     setModelsLoading(true)
     api.config.getModels()
       .then(d => { setModels(d.available); if(d.available.length){setSelChannelId(d.available[0].channel_id);setSelModel(d.available[0].model)} })
-      .catch((e: any) => showToast(e.message || '模型加载失败', 'err'))
+      .catch((e: any) => showToast(e.message || '模型加载失败', { type: 'err' }))
       .finally(() => setModelsLoading(false))
   }, [])
 
@@ -95,10 +96,10 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
 
   const handleGenerate = async () => {
     if (!previousDone && previousStage) {
-      showToast(`请先完成「${STAGE_NAMES[previousStage]}」`, 'err')
+      showToast(`请先完成「${STAGE_NAMES[previousStage]}」`, { type: 'err' })
       return
     }
-    if(!selChannelId){showToast('请先在「渠道管理」中添加 API 渠道','err');return}
+    if(!selChannelId){showToast('请先在「渠道管理」中添加 API 渠道', { type: 'err' });return}
     const previousOutput = output
     setGenerating(true); setGenerationError(''); setStreamingText(''); setOutput('')
     let full = ''
@@ -115,7 +116,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       const msg = quotaUpgradeMessage(e) || e.message || '生成失败'
       setOutput(full || previousOutput)
       setGenerationError(msg)
-      showToast(full ? '生成中断，已保留部分内容' : previousOutput ? '生成失败，已保留原结果' : msg, 'err')
+      showToast(full ? '生成中断，已保留部分内容' : previousOutput ? '生成失败，已保留原结果' : msg, { type: 'err' })
     }
     finally { setGenerating(false); setStreamingText('') }
   }
@@ -127,19 +128,19 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
     try {
       await loadHistory(activeStage)
     } catch (e: any) {
-      showToast(e.message || '历史加载失败', 'err')
+      showToast(e.message || '历史加载失败', { type: 'err' })
     }
   }
 
   const handleExport = async () => {
     if (!canExport) {
-      showToast(`请先完成全部阶段，仍缺少：${missingStages.join('、')}`, 'err')
+      showToast(`请先完成全部阶段，仍缺少：${missingStages.join('、')}`, { type: 'err' })
       return
     }
     try {
       await api.workflow.export(caseId)
       showToast('导出成功')
-    } catch(e:any){showToast(e.message||'导出失败','err')}
+    } catch(e:any){showToast(e.message||'导出失败', { type: 'err' })}
   }
 
   const handleSave = async () => {
@@ -149,7 +150,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       setEditingOutput(false)
       showToast('已保存')
     } catch (e: any) {
-      showToast(e.message || '保存失败', 'err')
+      showToast(e.message || '保存失败', { type: 'err' })
     }
   }
 
@@ -162,7 +163,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
       await loadHistory(activeStage)
       showToast('已回滚')
     } catch (e: any) {
-      showToast(e.message || '回滚失败', 'err')
+      showToast(e.message || '回滚失败', { type: 'err' })
     }
   }
 
@@ -288,7 +289,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
               <span className={`tag ${statusClass(activeProgress)}`}>{statusLabel(activeProgress)}</span>
               {output&&!editingOutput && <>
                 <button className="btn btn-o btn-sm" onClick={()=>{setEditingOutput(true);setOutputDraft(output)}}>编辑</button>
-                <button className="btn btn-o btn-sm" onClick={async()=>{try{await navigator.clipboard.writeText(output);showToast('已复制')}catch{showToast('复制失败','err')}}}>复制</button>
+                <button className="btn btn-o btn-sm" onClick={async()=>{try{await navigator.clipboard.writeText(output);showToast('已复制')}catch{showToast('复制失败', { type: 'err' })}}}>复制</button>
               </>}
             </div>
           </div>
@@ -354,7 +355,7 @@ export default function WorkflowPage({ caseId, onBack, onCaseNav }: Props) {
         <button className="btn btn-p" onClick={handleExport} disabled={!canExport}>导出为 Word</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段</button>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

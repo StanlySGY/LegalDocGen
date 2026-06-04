@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
 import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { BillingStatus, Plan, UsageItem } from '../types'
@@ -52,9 +54,8 @@ export default function BillingUsagePage({ currentUser }: Props) {
   const [status, setStatus] = useState<BillingStatus | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = async () => {
     setLoading(true)
     try {
@@ -62,7 +63,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
       setPlans(nextPlans)
       setStatus(nextStatus)
     } catch (e: any) {
-      showToast(quotaUpgradeMessage(e) || e.message || '套餐信息加载失败', 'err')
+      showToast(quotaUpgradeMessage(e) || e.message || '套餐信息加载失败', { type: 'err' })
     } finally {
       setLoading(false)
     }
@@ -77,7 +78,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
       setStatus(next)
       showToast('套餐已切换')
     } catch (e: any) {
-      showToast(e.message || '套餐切换失败', 'err')
+      showToast(e.message || '套餐切换失败', { type: 'err' })
     }
   }
 
@@ -147,7 +148,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
           {plans.map(plan => <PlanCard key={plan.code} plan={plan} current={plan.code === status?.subscription.plan_code} admin={isAdmin} onSwitch={switchPlan} />)}
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

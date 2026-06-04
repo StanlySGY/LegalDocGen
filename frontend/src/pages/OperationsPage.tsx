@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
 import { api, type AuthUser } from '../services/api'
 import type { BillingOrder, BillingOrderStatus, OperationsSummary, Plan, Team } from '../types'
@@ -27,10 +29,9 @@ export default function OperationsPage({ currentUser }: Props) {
   const [plans, setPlans] = useState<Plan[]>([])
   const [statusFilter, setStatusFilter] = useState('')
   const [form, setForm] = useState({ team_id: '', plan_code: 'team', billing_period: 'monthly', amount: '299.00', external_reference: '', notes: '' })
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
   const [loading, setLoading] = useState(true)
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const isAdmin = currentUser?.role === 'admin'
 
   const load = async () => {
@@ -49,7 +50,7 @@ export default function OperationsPage({ currentUser }: Props) {
       setPlans(nextPlans)
       setForm(prev => ({ ...prev, team_id: prev.team_id || nextTeams[0]?.id || '', plan_code: prev.plan_code || nextPlans[0]?.code || 'team' }))
     } catch (e: any) {
-      showToast(e.message || '运营数据加载失败', 'err')
+      showToast(e.message || '运营数据加载失败', { type: 'err' })
     } finally {
       setLoading(false)
     }
@@ -58,9 +59,9 @@ export default function OperationsPage({ currentUser }: Props) {
   useEffect(() => { load() }, [statusFilter, isAdmin])
 
   const createOrder = async () => {
-    if (!form.team_id) return showToast('请选择团队', 'err')
+    if (!form.team_id) return showToast('请选择团队', { type: 'err' })
     const amount = Math.round(Number(form.amount || '0') * 100)
-    if (Number.isNaN(amount) || amount < 0) return showToast('请输入有效金额', 'err')
+    if (Number.isNaN(amount) || amount < 0) return showToast('请输入有效金额', { type: 'err' })
     try {
       await api.billing.createOrder({
         team_id: form.team_id,
@@ -75,7 +76,7 @@ export default function OperationsPage({ currentUser }: Props) {
       await load()
       showToast('订单已创建')
     } catch (e: any) {
-      showToast(e.message || '订单创建失败', 'err')
+      showToast(e.message || '订单创建失败', { type: 'err' })
     }
   }
 
@@ -85,7 +86,7 @@ export default function OperationsPage({ currentUser }: Props) {
       await load()
       showToast(`订单已更新为${statusText[status]}`)
     } catch (e: any) {
-      showToast(e.message || '订单更新失败', 'err')
+      showToast(e.message || '订单更新失败', { type: 'err' })
     }
   }
 
@@ -202,7 +203,7 @@ export default function OperationsPage({ currentUser }: Props) {
           </table>
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

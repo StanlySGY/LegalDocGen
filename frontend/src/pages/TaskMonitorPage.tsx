@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 import type { BackgroundTask } from '../types'
@@ -21,14 +23,13 @@ const handlingTip = (task: BackgroundTask) => {
 export default function TaskMonitorPage() {
   const [tasks, setTasks] = useState<BackgroundTask[]>([])
   const [statusFilter, setStatusFilter] = useState('')
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
+  const { toasts, showToast, removeToast } = useToast()
 
   const load = async () => {
     try {
       setTasks(await api.tasks.list({ limit: 100 }))
     } catch (e: any) {
-      showToast(e.message || '任务加载失败', 'err')
+      showToast(e.message || '任务加载失败', { type: 'err' })
     }
   }
 
@@ -103,7 +104,7 @@ export default function TaskMonitorPage() {
           </table>
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

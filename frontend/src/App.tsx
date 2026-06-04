@@ -11,6 +11,7 @@ import LegalArticlePage from './pages/LegalArticlePage'
 import BillingUsagePage from './pages/BillingUsagePage'
 import OperationsPage from './pages/OperationsPage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
+import ErrorBoundary from './components/ErrorBoundary'
 
 type Page =
   | { type: 'cases' }
@@ -173,6 +174,32 @@ export default function App() {
     </div>
   )
 
+  const renderPage = () => {
+    if (authLoading) return <div className="card auth-loading">正在检查登录状态...</div>
+    if (needsLogin) return authPanel
+    if (showAuthPanel) return authPanel
+
+    const pages: Record<string, React.ReactNode> = {
+      cases: <CaseList nav={nav} />,
+      detail: <CaseDetail caseId={(page as any).caseId} nav={nav} />,
+      workflow: <WorkflowPage caseId={(page as any).caseId} onBack={() => nav.detail((page as any).caseId)} onCaseNav={nav.cases} />,
+      channels: <ChannelManage onBack={nav.cases} />,
+      config: <ModelConfig onNavChannels={nav.channels} />,
+      audit: <AuditLogPage />,
+      teams: <TeamManagePage />,
+      billing: <BillingUsagePage currentUser={currentUser} />,
+      operations: <OperationsPage currentUser={currentUser} />,
+      tasks: <TaskMonitorPage />,
+      legalArticles: <LegalArticlePage />,
+    }
+
+    return (
+      <ErrorBoundary key={page.type}>
+        {pages[page.type]}
+      </ErrorBoundary>
+    )
+  }
+
   return (
     <>
       <div className="sidebar">
@@ -276,20 +303,7 @@ export default function App() {
               </div>
             </div>
           )}
-          {authLoading && <div className="card auth-loading">正在检查登录状态...</div>}
-          {!authLoading && needsLogin && authPanel}
-          {!authLoading && !needsLogin && showAuthPanel && authPanel}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'cases' && <CaseList nav={nav} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'detail' && <CaseDetail caseId={page.caseId} nav={nav} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'workflow' && <WorkflowPage caseId={page.caseId} onBack={() => nav.detail(page.caseId)} onCaseNav={nav.cases} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'channels' && <ChannelManage onBack={nav.cases} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'config' && <ModelConfig onNavChannels={nav.channels} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'audit' && <AuditLogPage />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'teams' && <TeamManagePage />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'billing' && <BillingUsagePage currentUser={currentUser} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'operations' && <OperationsPage currentUser={currentUser} />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'tasks' && <TaskMonitorPage />}
-          {!authLoading && !needsLogin && !showAuthPanel && page.type === 'legalArticles' && <LegalArticlePage />}
+          {renderPage()}
         </div>
       </div>
     </>

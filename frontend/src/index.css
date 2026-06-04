@@ -593,21 +593,64 @@ body {
 .empty p { font-size: 13px; }
 
 /* ===== Toast ===== */
-.toast {
+.toaster-container {
   position: fixed;
   top: 20px;
   right: 20px;
   z-index: 200;
-  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
   animation: slideIn 0.25s ease;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.toast:hover {
+  opacity: 0.9;
+}
+
+.toast-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0;
+  margin-left: 8px;
+  color: inherit;
+}
+
+.toast-close:hover {
+  opacity: 1;
 }
 
 .toast-ok { background: #e8f8ef; color: #00a854; border: 1px solid #b7eb8f; }
 .toast-err { background: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; }
+.toast-warning { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+.toast-info { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
 
 @keyframes slideIn {
   from { transform: translateX(120%); opacity: 0; }
@@ -1716,11 +1759,84 @@ body {
     border-radius: 16px 16px 0 0;
     padding: 22px;
   }
-  .toast {
+  .toaster-container {
     left: 16px;
     right: 16px;
     top: 16px;
   }
   .stepper-bar { padding: 12px; }
   .step { padding: 8px 12px; }
+}
+
+/* ===== ErrorBoundary ===== */
+.error-boundary-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px 20px;
+}
+
+.error-boundary-content {
+  text-align: center;
+  max-width: 360px;
+}
+
+.error-boundary-content svg {
+  width: 48px;
+  height: 48px;
+  color: #f5222d;
+  margin-bottom: 16px;
+}
+
+.error-boundary-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 8px;
+}
+
+.error-boundary-content p {
+  font-size: 13px;
+  color: #86909c;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* ===== ConfirmDialog ===== */
+.confirm-dialog {
+  max-width: 420px;
+}
+
+.confirm-dialog h3 {
+  margin-bottom: 12px;
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ===== Form Validation ===== */
+.input-error {
+  border-color: #f5222d !important;
+}
+
+.input-error:focus {
+  box-shadow: 0 0 0 2px rgba(245, 34, 45, 0.1) !important;
+}
+
+.field-error {
+  display: block;
+  font-size: 12px;
+  color: #f5222d;
+  margin-top: 4px;
 }

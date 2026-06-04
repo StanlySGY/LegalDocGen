@@ -1,3 +1,7 @@
+import { useToast } from '../hooks/useToast'
+import { validateChannelForm } from '../utils/validation'
+import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 
@@ -36,16 +40,15 @@ export default function ChannelManage({ onBack }: Props) {
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [loading, setLoading] = useState('')
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+  const { toasts, showToast, removeToast } = useToast()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
 
   const [form, setForm] = useState({
     name: '', type: 'openai', base_url: '', api_key: '', priority: 0
   })
 
-  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-    setToast({ msg, type }); setTimeout(() => setToast(null), 2500)
-  }
-  const load = () => api.channel.list().then(setChannels).catch((e: any) => showToast(e.message || '渠道加载失败', 'err'))
+  const load = () => api.channel.list().then(setChannels).catch((e: any) => showToast(e.message || '渠道加载失败', { type: 'err' }))
   useEffect(() => { load() }, [])
 
   const openAdd = () => {
@@ -61,7 +64,13 @@ export default function ChannelManage({ onBack }: Props) {
   }
 
   const saveChannel = async () => {
-    if (!form.name.trim() || !form.base_url.trim()) { showToast('名称和URL必填', 'err'); return }
+    const validation = validateChannelForm(form)
+    if (!validation.valid) {
+      setFormErrors(validation.errors)
+      showToast(Object.values(validation.errors)[0], { type: 'err' })
+      return
+    }
+    setFormErrors({})
     try {
       if (editingChannel) {
         const update: any = { ...form }
@@ -74,11 +83,20 @@ export default function ChannelManage({ onBack }: Props) {
       }
       setShowDrawer(false)
       load()
-    } catch (e: any) { showToast(e.message, 'err') }
+    } catch (e: any) { showToast(e.message, { type: 'err' }) }
   }
 
   const deleteChannel = async (id: string) => {
-    if (!confirm('确定删除？')) return
+    const confirmed = await new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true,
+        title: '删除渠道',
+        message: '确定删除该渠道？删除后无法恢复。',
+        variant: 'danger',
+        onConfirm: () => { resolve(true); setConfirmState(null) }
+      })
+    })
+    if (!confirmed) return
     await api.channel.delete(id)
     showToast('已删除')
     load()
@@ -88,9 +106,9 @@ export default function ChannelManage({ onBack }: Props) {
     setLoading('test-' + id)
     try {
       const r = await api.channel.test(id)
-      showToast(r.success ? '连接成功' : `连接失败: ${r.message}`, r.success ? 'ok' : 'err')
+      showToast(r.success ? '连接成功' : `连接失败: ${r.message}`, { type: r.success ? 'ok' : 'err' })
       load()
-    } catch (e: any) { showToast(e.message, 'err') }
+    } catch (e: any) { showToast(e.message, { type: 'err' }) }
     setLoading('')
   }
 
@@ -105,9 +123,9 @@ export default function ChannelManage({ onBack }: Props) {
         showToast(`发现 ${r.count} 个模型`)
       } else {
         setDiscoveredModels([])
-        showToast(`获取失败: ${r.message}`, 'err')
+        showToast(`获取失败: ${r.message}`, { type: 'err' })
       }
-    } catch (e: any) { showToast(e.message, 'err'); setDiscoveredModels([]) }
+    } catch (e: any) { showToast(e.message, { type: 'err' }); setDiscoveredModels([]) }
     setLoading('')
   }
 
@@ -298,7 +316,17 @@ export default function ChannelManage({ onBack }: Props) {
         </div>
       )}
 
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
+      {confirmState && (
+        <ConfirmDialog
+          open={confirmState.open}
+          title={confirmState.title}
+          message={confirmState.message}
+          variant={confirmState.variant}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   )
 }

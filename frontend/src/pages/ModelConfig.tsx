@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
 
@@ -7,11 +9,10 @@ export default function ModelConfig({ onNavChannels }: Props) {
   const [prompts, setPrompts] = useState<any[]>([])
   const [editingPrompt, setEditingPrompt] = useState<any>(null)
   const [stages, setStages] = useState<any[]>([])
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   useEffect(() => {
-    api.config.getPrompts().then(setPrompts).catch((e: any) => showToast(e.message || '模板加载失败', 'err'))
+    api.config.getPrompts().then(setPrompts).catch((e: any) => showToast(e.message || '模板加载失败', { type: 'err' }))
     api.config.getStages().then(setStages).catch(() => setStages([]))
   }, [])
   const savePrompt = async () => { if(!editingPrompt)return; if(editingPrompt.id) await api.config.updatePrompt(editingPrompt.id,editingPrompt); else await api.config.createPrompt(editingPrompt); setEditingPrompt(null); api.config.getPrompts().then(setPrompts); showToast('模板已保存') }
@@ -97,7 +98,7 @@ export default function ModelConfig({ onNavChannels }: Props) {
           </div>
         </div>
       )}
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

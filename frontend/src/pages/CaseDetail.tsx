@@ -1,3 +1,5 @@
+import { useToast } from '../hooks/useToast'
+import Toaster from '../components/Toaster'
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
@@ -15,10 +17,9 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const [materialInsights, setMaterialInsights] = useState<{catalog:MaterialCatalogItem[];timeline:any[]}>({ catalog: [], timeline: [] })
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploading, setUploading] = useState(false)
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null)
+  const { toasts, showToast, removeToast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
   const load = async () => {
     const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
     const tpl = c.template_id ? await api.templates.get(c.template_id) : null
@@ -39,7 +40,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
       showToast(`已上传并解析 ${files.length} 个文件`)
     } catch (e) {
       await load()
-      showToast(quotaUpgradeMessage(e) || (e instanceof Error ? e.message : '上传失败'), 'err')
+      showToast(quotaUpgradeMessage(e) || (e instanceof Error ? e.message : '上传失败'), { type: 'err' })
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -52,14 +53,14 @@ export default function CaseDetail({ caseId, nav }: Props) {
       await load()
       showToast('已删除')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : '删除失败', 'err')
+      showToast(e instanceof Error ? e.message : '删除失败', { type: 'err' })
     }
   }
 
   const previewMaterial = (content: string) => {
     const w = window.open('', '', 'width=760,height=640')
     if (!w) {
-      showToast('浏览器阻止了预览窗口', 'err')
+      showToast('浏览器阻止了预览窗口', { type: 'err' })
       return
     }
     w.document.title = '材料内容预览'
@@ -82,7 +83,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
   const handleEnterWorkflow = () => {
     if (caseData?.template_id && materialCompletion.missingRequired > 0) {
       const missingNames = materialCompletion.missingRequiredItems.slice(0, 3).map(({ item }) => item.name).join('、')
-      showToast(`仍缺少 ${materialCompletion.missingRequired} 项必需材料：${missingNames}`, 'err')
+      showToast(`仍缺少 ${materialCompletion.missingRequired} 项必需材料：${missingNames}`, { type: 'err' })
       return
     }
     nav.workflow(caseId)
@@ -223,7 +224,7 @@ export default function CaseDetail({ caseId, nav }: Props) {
           )}
         </div>
       </div>
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }
