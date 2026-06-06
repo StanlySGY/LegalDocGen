@@ -187,6 +187,72 @@ npm run dev
 
 本项目是 React 前端 + FastAPI 后端的全栈应用。
 
+### 阿里云一体化 Docker 部署
+
+适合把前端、后端、PostgreSQL 和上传材料存储全部放在一台阿里云服务器上。生产版 Compose 会启动：
+
+- `web`：Nginx，提供前端静态页面，并将 `/api` 反向代理到后端
+- `backend`：FastAPI，启动时自动执行 Alembic 迁移
+- `db`：PostgreSQL 16
+- `uploads` / `postgres_data`：Docker volume，用于持久化材料和数据库
+
+服务器准备：
+
+1. 安装 Docker 和 Docker Compose。
+2. 阿里云安全组至少开放 `80` 端口；如配置 HTTPS，还需开放 `443`。
+3. 将域名解析到服务器公网 IP。
+
+部署步骤：
+
+```bash
+git clone https://github.com/StanlySGY/LegalDocGen.git
+cd LegalDocGen
+cp .env.production.example .env.production
+```
+
+编辑 `.env.production`，至少替换这些值：
+
+```env
+POSTGRES_PASSWORD=replace-with-a-strong-db-password
+DATABASE_URL=postgresql+psycopg://legaldocgen:replace-with-a-strong-db-password@db:5432/legaldocgen
+DEFAULT_ADMIN_PASSWORD=replace-with-a-strong-initial-admin-password
+ADMIN_TOKEN=replace-with-a-long-random-admin-token
+API_KEY_SECRET=replace-with-a-long-random-api-key-secret
+AUTH_SECRET=replace-with-a-long-random-auth-secret
+CORS_ORIGINS=https://your-domain.example.com
+OPENAI_API_KEY=your-openai-compatible-api-key
+```
+
+启动：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+访问：
+
+- 前端：`http://你的服务器IP` 或 `https://你的域名`
+- 健康检查：`http://你的服务器IP/api/health`
+- API 文档：`http://你的服务器IP/docs`
+
+常用运维命令：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f backend
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f web
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+```
+
+更新部署：
+
+```bash
+git pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+> 生产环境建议在 Nginx 前面接入 HTTPS。可以使用阿里云证书 + 负载均衡，也可以后续把 `web` 替换为 Caddy 自动签发证书。
+
 ### 前端
 可部署到 Vercel、Netlify 等静态托管平台。当前线上预览地址：
 
