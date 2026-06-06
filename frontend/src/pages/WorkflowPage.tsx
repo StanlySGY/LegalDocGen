@@ -21,6 +21,13 @@ const stageGuides: Record<StageType, { input: string; output: string; action: st
 
 const statusLabel = (item?: StageProgress) => item?.has_output ? '已完成' : item?.status === 'running' ? '生成中' : '待处理'
 const statusClass = (item?: StageProgress) => item?.has_output ? 't-green' : item?.status === 'running' ? 't-orange' : 't-gray'
+const finalReviewItems = [
+  { id: 'parties', label: '当事人身份信息已核对', hint: '姓名、主体资格、联系方式、代理关系与送达信息无误。' },
+  { id: 'claims', label: '诉请、金额和计算依据已核对', hint: '本金、利息、违约金、期间和计算口径已人工确认。' },
+  { id: 'evidence', label: '证据引用和页码来源已核对', hint: '关键事实均能追溯到材料、证据目录或事实时间线。' },
+  { id: 'law', label: '法条依据和诉讼策略已核对', hint: '引用法条现行有效，管辖、时效和风险提示已复核。' },
+  { id: 'wording', label: '文书表达和提交风险已核对', hint: '最终措辞、遗漏事项和需当事人确认内容已检查。' },
+]
 
 export default function WorkflowPage() {
   const { caseId: caseIdParam } = useParams<{ caseId: string }>()
@@ -48,6 +55,9 @@ export default function WorkflowPage() {
   const { toasts, showToast, removeToast } = useToast()
   const { confirm, dialogProps } = useConfirmDialog()
   const [showExportModal, setShowExportModal] = useState(false)
+  const reviewStorageKey = `legaldocgen_final_review_${caseId}`
+  const [finalReviewChecked, setFinalReviewChecked] = useState<string[]>([])
+  const [finalReviewedAt, setFinalReviewedAt] = useState('')
 
   const loadProgress = useCallback(async () => {
     setProgressLoading(true)
@@ -85,6 +95,18 @@ export default function WorkflowPage() {
       .finally(() => setModelsLoading(false))
   }, [])
 
+  useEffect(() => {
+    const stored = localStorage.getItem(reviewStorageKey)
+    if (!stored) return
+    try {
+      const data = JSON.parse(stored)
+      setFinalReviewChecked(Array.isArray(data.checked) ? data.checked : [])
+      setFinalReviewedAt(typeof data.reviewedAt === 'string' ? data.reviewedAt : '')
+    } catch {
+      localStorage.removeItem(reviewStorageKey)
+    }
+  }, [reviewStorageKey])
+
   const idx = STAGE_ORDER.indexOf(activeStage)
   const previousStage = idx > 0 ? STAGE_ORDER[idx - 1] : null
   const nextStage = idx < STAGE_ORDER.length - 1 ? STAGE_ORDER[idx + 1] : null
@@ -93,8 +115,39 @@ export default function WorkflowPage() {
   const completedCount = progress.filter(item => item.has_output).length
   const missingStages = progress.filter(item => !item.has_output).map(item => item.name)
   const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
+  const finalReviewComplete = finalReviewItems.every(item => finalReviewChecked.includes(item.id))
   const guide = stageGuides[activeStage]
   const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading
+
+  const resetFinalReview = () => {
+    setFinalReviewChecked([])
+    setFinalReviewedAt('')
+    localStorage.removeItem(reviewStorageKey)
+  }
+
+  const toggleFinalReviewItem = (id: string) => {
+    setFinalReviewChecked(prev => {
+      const next = prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+      setFinalReviewedAt('')
+      localStorage.removeItem(reviewStorageKey)
+      return next
+    })
+  }
+
+  const confirmFinalReview = () => {
+    if (!canExport) {
+      showToast('请先完成全部五个阶段，再进行律师最终复核', { type: 'err' })
+      return
+    }
+    if (!finalReviewComplete) {
+      showToast('请逐项勾选最终复核清单', { type: 'err' })
+      return
+    }
+    const reviewedAt = new Date().toISOString()
+    setFinalReviewedAt(reviewedAt)
+    localStorage.setItem(reviewStorageKey, JSON.stringify({ checked: finalReviewChecked, reviewedAt }))
+    showToast('已确认律师最终复核')
+  }
 
   useKeyboardShortcut({ key: 'Enter', ctrlKey: true }, () => {
     // 忽略 textarea 中的 Ctrl+Enter，避免编辑内容时误触发生成
@@ -110,6 +163,7 @@ export default function WorkflowPage() {
     { label: '五阶段内容齐备', done: canExport, hint: canExport ? '可进入最终导出' : '仍需完成剩余阶段' },
     { label: '证据引用复核', done: completedCount >= 1, hint: '检查事实是否能追溯到材料页码' },
     { label: '法条金额复核', done: completedCount >= 4, hint: '导出前人工核对法条、金额与诉请' },
+    { label: '律师最终定稿', done: Boolean(finalReviewedAt), hint: finalReviewedAt ? '已完成导出前人工确认' : '导出前需逐项确认最终复核清单' },
   ]
 
   const handleGenerate = async () => {
@@ -128,6 +182,7 @@ export default function WorkflowPage() {
       if (!confirmed) return
     }
     const previousOutput = output
+    resetFinalReview()
     setGenerating(true); setGenerationError(''); setStreamingText(''); setOutput('')
     let full = ''
     try {
@@ -164,6 +219,10 @@ export default function WorkflowPage() {
       showToast(`请先完成全部阶段，仍缺少：${missingStages.join('、')}`, { type: 'err' })
       return
     }
+    if (!finalReviewComplete || !finalReviewedAt) {
+      showToast('导出前请完成律师最终复核清单并确认定稿', { type: 'err' })
+      return
+    }
     setShowExportModal(true)
   }
 
@@ -178,6 +237,7 @@ export default function WorkflowPage() {
   const handleSave = async () => {
     try {
       await api.workflow.saveOutput(caseId, activeStage, outputDraft)
+      resetFinalReview()
       setOutput(outputDraft)
       setEditingOutput(false)
       showToast('已保存')
@@ -210,6 +270,7 @@ export default function WorkflowPage() {
     if (!confirmed) return
     try {
       const r = await api.workflow.rollback(caseId, id)
+      resetFinalReview()
       setOutput(r.output)
       setNode({...node!, output: r.output, version: r.version})
       await loadProgress()
@@ -223,7 +284,7 @@ export default function WorkflowPage() {
   return (
     <div>
       <div className="breadcrumb mb-5">
-        <a onClick={() => navigate('/cases')}>案件管理</a><span style={{color:'#d1d5db'}}>/</span>
+        <a onClick={() => navigate('/cases')}>案件工作台</a><span style={{color:'#d1d5db'}}>/</span>
         <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
         <span className="current">工作流</span>
       </div>
@@ -280,6 +341,44 @@ export default function WorkflowPage() {
             <span>{check.hint}</span>
           </div>
         ))}
+      </div>
+
+      <div className={`card final-review-card ${finalReviewedAt ? 'confirmed' : ''}`}>
+        <div className="final-review-head">
+          <div>
+            <span className={`tag ${finalReviewedAt ? 't-green' : 't-orange'}`}>律师最终复核</span>
+            <h3>导出前定稿确认</h3>
+            <p>AI 输出只能作为草稿和审查辅助。导出正式 Word 前，请律师逐项核对主体、诉请、证据、法条和提交风险。</p>
+          </div>
+          <div className="final-review-status">
+            <strong>{finalReviewedAt ? '已确认定稿' : `${finalReviewChecked.length}/${finalReviewItems.length} 已核对`}</strong>
+            <span>{finalReviewedAt ? new Date(finalReviewedAt).toLocaleString('zh-CN') : '内容变化后需重新确认'}</span>
+          </div>
+        </div>
+        <div className="final-review-list">
+          {finalReviewItems.map(item => {
+            const checked = finalReviewChecked.includes(item.id)
+            return (
+              <label key={item.id} className={`final-review-item ${checked ? 'checked' : ''}`}>
+                <input type="checkbox" checked={checked} onChange={() => toggleFinalReviewItem(item.id)} disabled={!canExport} />
+                <span className="final-review-check">{checked ? '✓' : ''}</span>
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.hint}</small>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+        <div className="final-review-actions">
+          <span>{canExport ? '确认后才允许打开导出选项。重新生成、编辑保存或回滚版本后，确认状态会自动撤销。' : '请先完成全部五个阶段，再进行最终复核。'}</span>
+          <div>
+            {finalReviewedAt && <button className="btn btn-o btn-sm" onClick={resetFinalReview}>撤销确认</button>}
+            <button className="btn btn-p btn-sm" onClick={confirmFinalReview} disabled={!canExport || !finalReviewComplete}>
+              {finalReviewedAt ? '重新确认定稿' : '确认已最终复核'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="workflow-grid">
@@ -405,7 +504,7 @@ export default function WorkflowPage() {
 
       <div className="flex justify-between" style={{marginTop:20}}>
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>上一阶段</button>
-        <button className="btn btn-p" onClick={handleExportClick} disabled={!canExport}>导出为 Word</button>
+        <button className="btn btn-p" onClick={handleExportClick} disabled={!canExport || !finalReviewedAt}>导出为 Word</button>
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段</button>
       </div>
       <ExportOptionsModal
