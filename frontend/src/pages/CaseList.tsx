@@ -14,11 +14,11 @@ type CaseForm = { name: string; description: string; case_type: string }
 
 const emptyForm: CaseForm = { name: '', description: '', case_type: '' }
 const statusText: Record<string, string> = { draft: '草稿', in_progress: '进行中', completed: '已完成' }
-const caseTypePresets = ['合同纠纷', '劳动争议', '房产纠纷', '侵权纠纷']
+const caseTypePresets = ['民间借贷', '合同纠纷', '劳动争议', '婚姻家事', '侵权纠纷']
 const onboardingSteps = [
-  { title: '1. 建立案件', text: '先写清案件名称、类型和目标文书，避免后续 Prompt 过散。' },
+  { title: '1. 建立案件', text: '先写清案由、委托目标和目标文书，避免后续分析发散。' },
   { title: '2. 上传材料', text: '合同、流水、聊天记录、通知书等材料建议按类型命名。' },
-  { title: '3. 五阶段生成', text: '按顺序生成事实、法律关系、争议焦点、初稿和审查意见。' },
+  { title: '3. 生成并复核', text: '按阶段生成事实、法律关系、争议焦点、初稿和审查意见。' },
 ]
 
 const statusTag = (status: string) => status === 'completed' ? 't-green' : status === 'in_progress' ? 't-orange' : 't-gray'
@@ -189,9 +189,9 @@ export default function CaseList() {
     <div>
       <div className="dashboard-hero">
         <div>
-          <div className="eyebrow">CASE WORKBENCH</div>
-          <h2>案件工作台</h2>
-          <p>聚合个人案件进度、材料状态和下一步写作动作，帮助你快速从材料进入可复核的法律文书初稿。</p>
+          <div className="eyebrow">LAWYER DESK</div>
+          <h2>个人律师办案工作台</h2>
+          <p>聚合最近案件、材料缺口和下一步写作动作，让你从案件信息、证据材料一路推进到可复核的文书初稿。</p>
           {primaryCase && (
             <div className="hero-action-card">
               <div>
@@ -211,16 +211,16 @@ export default function CaseList() {
 
       <div className="stat-row dashboard-stats">
         <div className="stat-card s-purple"><div className="s-label">我的案件</div><div className="s-value">{total}</div><div className="s-hint">当前筛选结果</div></div>
-        <div className="stat-card s-orange"><div className="s-label">待补材料</div><div className="s-value">{draftCount}</div><div className="s-hint">先上传关键证据</div></div>
+        <div className="stat-card s-orange"><div className="s-label">待补材料</div><div className="s-value">{draftCount}</div><div className="s-hint">先补齐关键证据</div></div>
         <div className="stat-card s-blue"><div className="s-label">写作中</div><div className="s-value">{activeCount}</div><div className="s-hint">继续生成或编辑</div></div>
-        <div className="stat-card s-green"><div className="s-label">可交付</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">已完成复核阶段占比</div></div>
+        <div className="stat-card s-green"><div className="s-label">已完成</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">完成审查阶段占比</div></div>
       </div>
 
       {!loading && cases.length === 0 && toasts.length === 0 && (
         <div className="notice-card notice-info">
           <div>
-            <strong>当前为前端预览模式时，案件数据、材料解析和 AI 生成需要连接独立 FastAPI 后端。</strong>
-            <span>如果只是体验界面，可以先新建示例案件；如需完整能力，请在部署环境配置后端 API。</span>
+            <strong>还没有案件，从第一个真实案件开始。</strong>
+            <span>建议先选择常见案由模板，填写目标文书和委托目标，再上传关键材料进入 AI 分析。</span>
           </div>
         </div>
       )}
@@ -307,8 +307,8 @@ export default function CaseList() {
                   <tr><td colSpan={6}>
                     <div className="empty refined-empty case-empty-state" style={{padding:'56px 16px'}}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                      <p>{hasActiveFilters ? '没有匹配当前筛选条件的案件' : '暂无案件，按三步开始个人文书写作'}</p>
-                      <span>{hasActiveFilters ? '可以调整关键词、状态或案件类型后再试。' : '先建立案件，再补材料，最后进入五阶段生成。'}</span>
+                      <p>{hasActiveFilters ? '没有匹配当前筛选条件的案件' : '还没有案件，先建立一个办案档案'}</p>
+                      <span>{hasActiveFilters ? '可以调整关键词、状态或案件类型后再试。' : '填写案由和目标文书后，上传材料即可进入证据整理和文书生成。'}</span>
                       {!hasActiveFilters && (
                         <div className="onboarding-grid compact">
                           {onboardingSteps.map(step => (
@@ -343,8 +343,8 @@ export default function CaseList() {
             {recentCases.length === 0 && <div className="empty" style={{padding:'38px 0'}}><p>暂无最近案件</p></div>}
           </div>
           <div className="process-hint">
-            <strong>推荐办案顺序</strong>
-            <span>先补齐关键材料，再完成五阶段生成，最后核验法条、金额、证据引用并导出 Word。</span>
+            <strong>个人办案顺序</strong>
+            <span>先确认委托目标和目标文书，再补齐关键材料；生成后逐项核验法条、金额、证据引用并导出 Word。</span>
           </div>
           <div className="onboarding-grid vertical">
             {onboardingSteps.map(step => (
@@ -369,7 +369,7 @@ export default function CaseList() {
               </div>
               <div>
                 <label className="text-xs-label">案件类型</label>
-                <input className="input" placeholder="如：合同纠纷、劳动争议" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}/>
+                <input className="input" placeholder="如：民间借贷、合同纠纷、劳动争议" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}/>
                 <div className="quick-type-row">
                   {caseTypePresets.map(type => (
                     <button key={type} type="button" className={`chip-btn ${form.case_type === type ? 'on' : ''}`} onClick={() => setForm({...form, case_type: type})}>{type}</button>
@@ -377,8 +377,8 @@ export default function CaseList() {
                 </div>
               </div>
               <div>
-                <label className="text-xs-label">案件描述</label>
-                <textarea className="textarea" style={{height:80}} placeholder="简要描述" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
+                <label className="text-xs-label">办案目标与目标文书</label>
+                <textarea className="textarea" style={{height:96}} placeholder="例如：为原告起草民间借贷起诉状；争议金额、关键事实、已掌握证据和待补材料可以一并写入。" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
               </div>
               {selectedTemplate && (
                 <div style={{padding:10,background:'#f0fdf4',borderRadius:8,border:'1px solid #d1fae5',fontSize:12,color:'#10b981'}}>
@@ -386,9 +386,9 @@ export default function CaseList() {
                 </div>
               )}
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
-                <button className="btn btn-o" onClick={()=>setShowTemplateSelector(true)}>选择模板</button>
+                <button className="btn btn-o" onClick={()=>setShowTemplateSelector(true)}>选择案由模板</button>
                 <button className="btn btn-o" onClick={()=>setShowCreate(false)}>取消</button>
-                <button className="btn btn-p" onClick={create}>创建</button>
+                <button className="btn btn-p" onClick={create}>创建并上传材料</button>
               </div>
             </div>
           </div>
