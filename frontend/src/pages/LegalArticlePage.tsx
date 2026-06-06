@@ -4,6 +4,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 import type { LegalArticle } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 export default function LegalArticlePage() {
   const [articles, setArticles] = useState<LegalArticle[]>([])
@@ -12,7 +13,7 @@ export default function LegalArticlePage() {
   const [verifyResult, setVerifyResult] = useState<any[]>([])
   const [form, setForm] = useState({ law_name: '', article_no: '', title: '', content: '' })
   const { toasts, showToast, removeToast } = useToast()
-  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
+  const { confirm, dialogProps } = useConfirmDialog()
 
   const load = async () => {
     try {
@@ -37,14 +38,12 @@ export default function LegalArticlePage() {
   }
 
   const del = async (id: string) => {
-    const confirmed = await new Promise<boolean>(resolve => {
-      setConfirmState({
-        open: true,
-        title: '删除法条',
-        message: '确认删除该法条？删除后无法恢复。',
-        variant: 'danger',
-        onConfirm: () => { resolve(true); setConfirmState(null) }
-      })
+    const article = articles.find(item => item.id === id)
+    const confirmed = await confirm({
+      title: '删除法条',
+      message: `确认删除${article ? `《${article.law_name}》第${article.article_no}条` : '该法条'}？删除后引用核验将无法匹配该条文。`,
+      variant: 'danger',
+      confirmText: '删除'
     })
     if (!confirmed) return
     try {
@@ -170,16 +169,7 @@ export default function LegalArticlePage() {
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />
-      {confirmState && (
-        <ConfirmDialog
-          open={confirmState.open}
-          title={confirmState.title}
-          message={confirmState.message}
-          variant={confirmState.variant}
-          onConfirm={confirmState.onConfirm}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

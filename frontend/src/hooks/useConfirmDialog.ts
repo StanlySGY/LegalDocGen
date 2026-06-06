@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
 interface ConfirmOptions {
   title?: string
@@ -15,11 +15,9 @@ interface ConfirmState extends ConfirmOptions {
 
 export function useConfirmDialog() {
   const [state, setState] = useState<ConfirmState | null>(null)
-  const resolveRef = useRef<(value: boolean) => void>()
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
-      resolveRef.current = resolve
       setState({
         ...options,
         open: true,

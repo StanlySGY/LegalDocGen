@@ -125,6 +125,67 @@ def test_paid_order_activates_target_team_subscription(db_session):
     assert status["plan"]["case_limit"] == 500
 
 
+def test_refunded_paid_order_reverts_team_to_free_subscription(db_session):
+    admin = _user("admin", UserRole.ADMIN)
+    owner = _user("owner")
+    db_session.add_all([admin, owner])
+    db_session.flush()
+    team = ensure_default_team(db_session, owner)
+    seed_default_plans(db_session)
+    db_session.commit()
+
+    order = create_billing_order(db_session, team.id, "business", "yearly", 199900, "CNY", admin)
+    update_billing_order_status(db_session, order.id, BillingOrderStatus.PAID, admin)
+
+    refunded = update_billing_order_status(db_session, order.id, BillingOrderStatus.REFUNDED, admin, "客户退款")
+    status = billing_status_for_team(db_session, team.id, admin)
+
+    assert refunded.status == BillingOrderStatus.REFUNDED
+    assert status["subscription"]["plan_code"] == "free"
+    assert status["subscription"]["status"] == SubscriptionStatus.TRIALING
+    assert status["plan"]["case_limit"] == 5
+
+
+def test_refunded_latest_paid_order_reverts_to_previous_paid_plan(db_session):
+    admin = _user("admin", UserRole.ADMIN)
+    owner = _user("owner")
+    db_session.add_all([admin, owner])
+    db_session.flush()
+    team = ensure_default_team(db_session, owner)
+    seed_default_plans(db_session)
+    db_session.commit()
+
+    first_order = create_billing_order(db_session, team.id, "team", "monthly", 29900, "CNY", admin)
+    update_billing_order_status(db_session, first_order.id, BillingOrderStatus.PAID, admin)
+    second_order = create_billing_order(db_session, team.id, "business", "yearly", 199900, "CNY", admin)
+    update_billing_order_status(db_session, second_order.id, BillingOrderStatus.PAID, admin)
+
+    update_billing_order_status(db_session, second_order.id, BillingOrderStatus.REFUNDED, admin, "较新订单退款")
+    status = billing_status_for_team(db_session, team.id, admin)
+
+    assert status["subscription"]["plan_code"] == "team"
+    assert status["subscription"]["status"] == SubscriptionStatus.ACTIVE
+    assert status["plan"]["case_limit"] == 50
+
+
+def test_cancelled_pending_order_does_not_change_manual_subscription(db_session):
+    admin = _user("admin", UserRole.ADMIN)
+    owner = _user("owner")
+    db_session.add_all([admin, owner])
+    db_session.flush()
+    team = ensure_default_team(db_session, owner)
+    seed_default_plans(db_session)
+    update_team_subscription(db_session, team.id, "business", SubscriptionStatus.ACTIVE, admin)
+    order = create_billing_order(db_session, team.id, "team", "monthly", 29900, "CNY", admin)
+    db_session.commit()
+
+    update_billing_order_status(db_session, order.id, BillingOrderStatus.CANCELLED, admin, "未到账取消")
+    status = billing_status_for_team(db_session, team.id, admin)
+
+    assert status["subscription"]["plan_code"] == "business"
+    assert status["subscription"]["status"] == SubscriptionStatus.ACTIVE
+
+
 def test_member_cannot_create_billing_order(db_session):
     owner = _user("owner")
     db_session.add(owner)

@@ -7,6 +7,7 @@ import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { validateCaseForm } from '../utils/validation'
 import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 import type { Case } from '../types'
 
 type CaseForm = { name: string; description: string; case_type: string }
@@ -41,8 +42,8 @@ export default function CaseList() {
   const [editingCase, setEditingCase] = useState<Case | null>(null)
   const [editForm, setEditForm] = useState<CaseForm>(emptyForm)
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
@@ -111,14 +112,11 @@ export default function CaseList() {
   }
 
   const deleteOne = async (id: string) => {
-    const confirmed = await new Promise<boolean>(resolve => {
-      setConfirmState({
-        open: true,
-        title: '删除案件',
-        message: '确认删除该案件及其材料和工作流记录？',
-        variant: 'danger',
-        onConfirm: () => { resolve(true); setConfirmState(null) }
-      })
+    const confirmed = await confirm({
+      title: '删除案件',
+      message: '确认删除该案件及其材料和工作流记录？',
+      variant: 'danger',
+      confirmText: '删除'
     })
     if (!confirmed) return
     try {
@@ -133,14 +131,11 @@ export default function CaseList() {
   const batchDelete = async () => {
     if (loading) return showToast('案件加载中，请稍后操作', { type: 'err' })
     if (!selectedIds.length) return showToast('请先选择案件', { type: 'err' })
-    const confirmed = await new Promise<boolean>(resolve => {
-      setConfirmState({
-        open: true,
-        title: '批量删除',
-        message: `确认删除选中的 ${selectedIds.length} 个案件？`,
-        variant: 'danger',
-        onConfirm: () => { resolve(true); setConfirmState(null) }
-      })
+    const confirmed = await confirm({
+      title: '批量删除',
+      message: `确认删除选中的 ${selectedIds.length} 个案件？删除后将同时移除相关材料和工作流记录。`,
+      variant: 'danger',
+      confirmText: '批量删除'
     })
     if (!confirmed) return
     try {
@@ -417,16 +412,7 @@ export default function CaseList() {
         </div>
       )}
       <Toaster toasts={toasts} onRemove={removeToast} />
-      {confirmState && (
-        <ConfirmDialog
-          open={confirmState.open}
-          title={confirmState.title}
-          message={confirmState.message}
-          variant={confirmState.variant}
-          onConfirm={confirmState.onConfirm}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

@@ -15,6 +15,7 @@ interface ToastOptions {
 }
 
 const DEFAULT_DURATION = 3000
+const ERROR_DURATION = 8000
 
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -25,7 +26,7 @@ export function useToast() {
   }, [])
 
   const showToast = useCallback((msg: string, options: ToastOptions = {}) => {
-    const { type = 'ok', duration = DEFAULT_DURATION } = options
+    const { type = 'ok', duration = type === 'err' ? ERROR_DURATION : DEFAULT_DURATION } = options
     const id = `toast-${++counterRef.current}-${Date.now()}`
     
     const newToast: Toast = { id, msg, type, duration }

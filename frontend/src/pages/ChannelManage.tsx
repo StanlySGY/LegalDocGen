@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 interface Channel {
   id: string
@@ -41,8 +42,8 @@ export default function ChannelManage() {
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [loading, setLoading] = useState('')
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
 
   const [form, setForm] = useState({
     name: '', type: 'openai', base_url: '', api_key: '', priority: 0
@@ -87,19 +88,21 @@ export default function ChannelManage() {
   }
 
   const deleteChannel = async (id: string) => {
-    const confirmed = await new Promise<boolean>(resolve => {
-      setConfirmState({
-        open: true,
-        title: '删除渠道',
-        message: '确定删除该渠道？删除后无法恢复。',
-        variant: 'danger',
-        onConfirm: () => { resolve(true); setConfirmState(null) }
-      })
+    const channel = channels.find(item => item.id === id)
+    const confirmed = await confirm({
+      title: '删除渠道',
+      message: `确定删除${channel ? `「${channel.name}」` : '该渠道'}？删除后工作流将无法再使用该模型渠道。`,
+      variant: 'danger',
+      confirmText: '删除'
     })
     if (!confirmed) return
-    await api.channel.delete(id)
-    showToast('已删除')
-    load()
+    try {
+      await api.channel.delete(id)
+      showToast('已删除')
+      load()
+    } catch (e: any) {
+      showToast(e.message || '删除失败', { type: 'err' })
+    }
   }
 
   const testChannel = async (id: string) => {
@@ -317,16 +320,7 @@ export default function ChannelManage() {
       )}
 
       <Toaster toasts={toasts} onRemove={removeToast} />
-      {confirmState && (
-        <ConfirmDialog
-          open={confirmState.open}
-          title={confirmState.title}
-          message={confirmState.message}
-          variant={confirmState.variant}
-          onConfirm={confirmState.onConfirm}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

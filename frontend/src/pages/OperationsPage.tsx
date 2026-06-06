@@ -1,9 +1,11 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { api, type AuthUser } from '../services/api'
 import type { BillingOrder, BillingOrderStatus, OperationsSummary, Plan, Team } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 interface Props { currentUser: AuthUser | null }
 
@@ -31,6 +33,7 @@ export default function OperationsPage({ currentUser }: Props) {
   const [statusFilter, setStatusFilter] = useState('')
   const [form, setForm] = useState({ team_id: '', plan_code: 'team', billing_period: 'monthly', amount: '299.00', external_reference: '', notes: '' })
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [loading, setLoading] = useState(true)
 
   const isAdmin = currentUser?.role === 'admin'
@@ -82,6 +85,14 @@ export default function OperationsPage({ currentUser }: Props) {
   }
 
   const updateOrder = async (order: BillingOrder, status: BillingOrderStatus) => {
+    const actionText = statusText[status]
+    const confirmed = await confirm({
+      title: actionText,
+      message: `确认将「${order.team.name} / ${order.plan_name} / ${formatMoney(order.amount_cents, order.currency)}」更新为「${actionText}」？${status === 'paid' ? '确认后会立即开通目标套餐。' : status === 'refunded' ? '退款后会重新计算团队当前有效套餐。' : ''}`,
+      confirmText: actionText,
+      variant: status === 'paid' ? 'default' : 'danger'
+    })
+    if (!confirmed) return
     try {
       await api.billing.updateOrder(order.id, { status })
       await load()
@@ -205,6 +216,7 @@ export default function OperationsPage({ currentUser }: Props) {
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

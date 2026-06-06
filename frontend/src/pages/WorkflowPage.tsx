@@ -1,6 +1,7 @@
 import { useToast } from '../hooks/useToast'
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import ExportOptionsModal from '../components/ExportOptionsModal'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -8,6 +9,7 @@ import ReactMarkdown from 'react-markdown'
 import { api, quotaUpgradeMessage } from '../services/api'
 import type { StageProgress, WorkflowNode, StageType } from '../types'
 import { STAGE_NAMES, STAGE_ORDER } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 const stageGuides: Record<StageType, { input: string; output: string; action: string; review: string; risk: string }> = {
   fact_extraction: { input: '上传材料与案件基本信息', output: '当事人、关键事实、证据清单', action: '先确认合同、流水、通知、聊天记录等核心材料已经解析，再抽取事实。', review: '逐条核对主体、时间、金额和证据来源，缺依据的事实不要直接进入后续阶段。', risk: '核对事实是否均可追溯到材料' },
@@ -44,6 +46,7 @@ export default function WorkflowPage() {
   const [selModel, setSelModel] = useState('')
   const [caseName, setCaseName] = useState('')
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
   const [showExportModal, setShowExportModal] = useState(false)
 
   const loadProgress = useCallback(async () => {
@@ -94,6 +97,9 @@ export default function WorkflowPage() {
   const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading
 
   useKeyboardShortcut({ key: 'Enter', ctrlKey: true }, () => {
+    // 忽略 textarea 中的 Ctrl+Enter，避免编辑内容时误触发生成
+    const activeEl = document.activeElement
+    if (activeEl && activeEl.tagName === 'TEXTAREA') return
     if (canGenerate && !generating) {
       handleGenerate()
     }
@@ -112,6 +118,15 @@ export default function WorkflowPage() {
       return
     }
     if(!selChannelId){showToast('请先在「渠道管理」中添加 API 渠道', { type: 'err' });return}
+    if (output && !generating) {
+      const confirmed = await confirm({
+        title: '重新生成当前阶段',
+        message: '当前阶段已有结果。重新生成会替换当前页面显示内容，但历史版本仍可在版本历史中查看。',
+        confirmText: '重新生成',
+        variant: 'danger'
+      })
+      if (!confirmed) return
+    }
     const previousOutput = output
     setGenerating(true); setGenerationError(''); setStreamingText(''); setOutput('')
     let full = ''
@@ -155,7 +170,7 @@ export default function WorkflowPage() {
   const handleExportConfirm = async (selectedOptions: string[]) => {
     setShowExportModal(false)
     try {
-      await api.workflow.export(caseId)
+      await api.workflow.export(caseId, selectedOptions)
       showToast('导出成功')
     } catch(e:any){showToast(e.message||'导出失败', { type: 'err' })}
   }
@@ -171,7 +186,28 @@ export default function WorkflowPage() {
     }
   }
 
+  const cancelEditing = async () => {
+    if (outputDraft !== output) {
+      const confirmed = await confirm({
+        title: '放弃未保存修改',
+        message: '当前编辑内容尚未保存，取消后将丢失本次修改。',
+        confirmText: '放弃修改',
+        variant: 'danger'
+      })
+      if (!confirmed) return
+    }
+    setEditingOutput(false)
+  }
+
   const handleRollback = async (id:string) => {
+    const target = history.find(h => h.id === id)
+    const confirmed = await confirm({
+      title: '回滚版本',
+      message: `确认回滚到 ${target ? `v${target.version}` : '所选版本'}？当前结果会被替换，回滚前请确认已保存需要保留的内容。`,
+      confirmText: '确认回滚',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       const r = await api.workflow.rollback(caseId, id)
       setOutput(r.output)
@@ -339,7 +375,7 @@ export default function WorkflowPage() {
               <textarea className="textarea" style={{height:400}} value={outputDraft} onChange={e=>setOutputDraft(e.target.value)}/>
               <div style={{display:'flex',gap:8,marginTop:12}}>
                 <button className="btn btn-p btn-sm" onClick={handleSave}>保存</button>
-                <button className="btn btn-o btn-sm" onClick={()=>setEditingOutput(false)}>取消</button>
+                <button className="btn btn-o btn-sm" onClick={cancelEditing}>取消</button>
               </div>
             </div>
           ) : generating && streamingText ? (
@@ -378,6 +414,7 @@ export default function WorkflowPage() {
         onCancel={() => setShowExportModal(false)}
       />
       <Toaster toasts={toasts} onRemove={removeToast} />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

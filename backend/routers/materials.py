@@ -63,7 +63,7 @@ async def upload_material(
             parsed_content=parsed_text,
             structured_data=json.dumps({"pages": parsed["pages"]}, ensure_ascii=False),
             parse_task_id=task.id,
-            parse_status="completed" if parsed_text and not parsed_text.startswith("[") else "error",
+            parse_status="completed" if parsed_text and not parsed_text.startswith("[") else "failed",
         )
         db.add(material)
         db.flush()

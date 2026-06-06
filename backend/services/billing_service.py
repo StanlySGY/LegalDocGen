@@ -269,6 +269,27 @@ def update_team_subscription(db: Session, team_id: str, plan_code: str, status: 
     return subscription
 
 
+def _sync_subscription_from_paid_orders(db: Session, team_id: str, operator: User) -> TeamSubscription:
+    latest_paid_order = (
+        db.query(BillingOrder)
+        .filter(BillingOrder.team_id == team_id, BillingOrder.status == BillingOrderStatus.PAID)
+        .order_by(BillingOrder.paid_at.desc(), BillingOrder.updated_at.desc(), BillingOrder.created_at.desc())
+        .first()
+    )
+    if latest_paid_order:
+        return update_team_subscription(db, team_id, latest_paid_order.plan_code, SubscriptionStatus.ACTIVE, operator)
+
+    seed_default_plans(db)
+    _ensure_team(db, team_id)
+    subscription = ensure_team_subscription(db, team_id)
+    subscription.plan_code = "free"
+    subscription.status = SubscriptionStatus.TRIALING
+    subscription.updated_at = datetime.utcnow()
+    record_audit(db, "billing.subscription.reverted", "team", team_id, "无有效已支付订单，套餐回退为免费体验版")
+    db.flush()
+    return subscription
+
+
 def create_billing_order(db: Session, team_id: str, plan_code: str, billing_period: str, amount_cents: int, currency: str, operator: User, external_reference: str = "", notes: str = "") -> BillingOrder:
     require_billing_admin(operator)
     _ensure_team(db, team_id)
@@ -300,6 +321,7 @@ def update_billing_order_status(db: Session, order_id: str, status: str, operato
         raise HTTPException(status_code=404, detail="订单不存在")
     if order.status == status and not notes:
         return order
+    previous_status = order.status
     order.status = status
     order.operator_id = operator.id
     order.notes = notes.strip() or order.notes
@@ -307,6 +329,8 @@ def update_billing_order_status(db: Session, order_id: str, status: str, operato
     if status == BillingOrderStatus.PAID:
         order.paid_at = order.paid_at or datetime.utcnow()
         update_team_subscription(db, order.team_id, order.plan_code, SubscriptionStatus.ACTIVE, operator)
+    elif previous_status == BillingOrderStatus.PAID and status in (BillingOrderStatus.CANCELLED, BillingOrderStatus.REFUNDED):
+        _sync_subscription_from_paid_orders(db, order.team_id, operator)
     record_audit(db, f"billing.order.{status}", "billing_order", order.id, f"订单状态更新为：{status}")
     db.flush()
     return order

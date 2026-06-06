@@ -219,17 +219,20 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
-    export: async (caseId: string) => {
-      const res = await fetch(`${BASE}/workflow/export/${caseId}`, { headers: authHeaders() })
+    export: async (caseId: string, modules?: string[]) => {
+      const exportUrl = modules && modules.length > 0
+        ? `${BASE}/workflow/export/${caseId}?modules=${modules.map(encodeURIComponent).join(',')}`
+        : `${BASE}/workflow/export/${caseId}`
+      const res = await fetch(exportUrl, { headers: authHeaders() })
       if (!res.ok) throw await createApiError(res, '导出失败')
       const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
+      const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = downloadUrl
       a.download = `case_${caseId}.docx`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(downloadUrl)
       document.body.removeChild(a)
     },
     exportBatch: async (caseIds: string[]) => {
@@ -328,4 +331,3 @@ export const getCachedCaseDetail = (caseId: string) => {
 export const clearPrefetchCache = () => {
   prefetchCache.clear()
 }
-

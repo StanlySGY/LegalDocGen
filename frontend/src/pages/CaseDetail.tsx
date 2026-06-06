@@ -1,5 +1,6 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import MaterialPreviewModal from '../components/MaterialPreviewModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react'
@@ -8,9 +9,16 @@ import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
 import type { Case, Material, MaterialCatalogItem } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 const fileLabel = (type: string) => type === '.pdf' ? 'PDF' : type.startsWith('.doc') ? 'DOC' : 'IMG'
-const statusLabel = (status: string) => status === 'completed' ? '已解析' : '解析失败'
+const isFailedStatus = (status: string) => status === 'failed' || status === 'error'
+const statusLabel = (status: string) => {
+  if (status === 'completed') return '已解析'
+  if (status === 'pending' || status === 'parsing') return '解析中'
+  return '解析失败'
+}
+const statusTag = (status: string) => status === 'completed' ? 't-green' : isFailedStatus(status) ? 't-red' : 't-orange'
 
 export default function CaseDetail() {
   const { caseId: caseIdParam } = useParams<{ caseId: string }>()
@@ -20,20 +28,33 @@ export default function CaseDetail() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [materialInsights, setMaterialInsights] = useState<{catalog:MaterialCatalogItem[];timeline:any[]}>({ catalog: [], timeline: [] })
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
+  const [loadingCase, setLoadingCase] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [uploading, setUploading] = useState(false)
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
   const fileRef = useRef<HTMLInputElement>(null)
   const [previewMaterial, setPreviewMaterial] = useState<{open:boolean;filename:string;content:string}|null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
 
-  const load = useCallback(async () => {
-    const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
-    const tpl = c.template_id ? await api.templates.get(c.template_id) : null
-    setChecklist(tpl?.materials_checklist || [])
-    setCaseData(c)
-    setMaterials(m)
-    setMaterialInsights({ catalog: insights.catalog || [], timeline: insights.timeline || [] })
-  }, [caseId])
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCase(true)
+    try {
+      const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
+      const tpl = c.template_id ? await api.templates.get(c.template_id) : null
+      setChecklist(tpl?.materials_checklist || [])
+      setCaseData(c)
+      setMaterials(m)
+      setMaterialInsights({ catalog: insights.catalog || [], timeline: insights.timeline || [] })
+      setLoadError('')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '案件加载失败'
+      if (!silent) setLoadError(message)
+      showToast(message, { type: 'err' })
+    } finally {
+      if (!silent) setLoadingCase(false)
+    }
+  }, [caseId, showToast])
 
   useEffect(() => { load() }, [load])
 
@@ -42,7 +63,7 @@ export default function CaseDetail() {
     
     if (hasParsingMaterials) {
       pollTimerRef.current = setInterval(() => {
-        load()
+        load(true)
       }, 5000)
     }
 
@@ -59,10 +80,10 @@ export default function CaseDetail() {
     setUploading(true)
     try {
       for (const f of files) await api.materials.upload(caseId, f)
-      await load()
+      await load(true)
       showToast(`已上传并解析 ${files.length} 个文件`)
     } catch (e) {
-      await load()
+      await load(true)
       showToast(quotaUpgradeMessage(e) || (e instanceof Error ? e.message : '上传失败'), { type: 'err' })
     } finally {
       setUploading(false)
@@ -71,9 +92,16 @@ export default function CaseDetail() {
   }
 
   const del = async (id: string) => {
+    const confirmed = await confirm({
+      title: '删除材料',
+      message: '确认删除该材料？删除后无法恢复。',
+      variant: 'danger',
+      confirmText: '删除'
+    })
+    if (!confirmed) return
     try {
       await api.materials.delete(id)
-      await load()
+      await load(true)
       showToast('已删除')
     } catch (e) {
       showToast(e instanceof Error ? e.message : '删除失败', { type: 'err' })
@@ -90,7 +118,7 @@ export default function CaseDetail() {
 
   const materialCompletion = getMaterialCompletion(checklist, materials)
   const parsedCount = materials.filter(m=>m.parse_status==='completed').length
-  const failedCount = materials.filter(m=>m.parse_status!=='completed').length
+  const failedCount = materials.filter(m=>isFailedStatus(m.parse_status)).length
   const parsingCount = materials.filter(m=>m.parse_status==='parsing' || m.parse_status==='pending').length
   const hasTemplateGate = Boolean(caseData?.template_id && checklist.length > 0)
   const missingMaterialNames = materialCompletion.missingRequiredItems.slice(0, 4).map(({ item }) => item.name)
@@ -104,7 +132,22 @@ export default function CaseDetail() {
     navigate(`/cases/${caseId}/workflow`)
   }
 
-  if (!caseData) return <LoadingSpinner text="加载案件信息..." />
+  if (loadingCase && !caseData) return <LoadingSpinner text="加载案件信息..." />
+
+  if (loadError && !caseData) {
+    return (
+      <div className="card auth-loading">
+        <strong>案件加载失败</strong>
+        <p style={{fontSize:12,color:'#86909c',marginTop:8}}>{loadError}</p>
+        <div style={{display:'flex',gap:8,justifyContent:'center',marginTop:14}}>
+          <button className="btn btn-o btn-sm" onClick={() => navigate('/cases')}>返回案件列表</button>
+          <button className="btn btn-p btn-sm" onClick={() => load()}>重试加载</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!caseData) return null
 
   return (
     <div>
@@ -166,7 +209,7 @@ export default function CaseDetail() {
               <div key={item.id || index} style={{border:'1px solid #e5e7eb',borderRadius:10,padding:12,background:'#fafbfc'}}>
                 <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
                   <strong className="text-sm">{index + 1}. {item.filename}</strong>
-                  <span className={`tag ${item.parse_status==='completed'?'t-green':'t-red'}`}>{statusLabel(item.parse_status)}</span>
+                  <span className={`tag ${statusTag(item.parse_status)}`}>{statusLabel(item.parse_status)}</span>
                 </div>
                 <div style={{fontSize:11,color:'#4f46e5',marginTop:7,fontWeight:600}}>{item.citation || '页码未识别'}</div>
                 <div style={{fontSize:12,color:'#64748b',marginTop:6,lineHeight:1.7}}>{item.excerpt || '暂无可解析内容'}</div>
@@ -214,14 +257,14 @@ export default function CaseDetail() {
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {materials.map(m => (
-            <div key={m.id} className={`material-card ${m.parse_status==='completed' ? '' : 'failed'}`}>
+            <div key={m.id} className={`material-card ${isFailedStatus(m.parse_status) ? 'failed' : ''}`}>
               <div className="material-card-main">
                 <span className="file-icon">{fileLabel(m.file_type)}</span>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.filename}</div>
                   <div className="flex items-center gap-2" style={{marginTop:5,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,color:'#86909c'}}>{(m.file_size/1024).toFixed(1)} KB</span>
-                    <span className={`tag ${m.parse_status==='completed'?'t-green':'t-red'}`}>{statusLabel(m.parse_status)}</span>
+                    <span className={`tag ${statusTag(m.parse_status)}`}>{statusLabel(m.parse_status)}</span>
                     {m.parse_task_id && <span className="tag t-gray">任务 {m.parse_task_id.slice(0, 8)}</span>}
                   </div>
                 </div>
@@ -230,7 +273,7 @@ export default function CaseDetail() {
                 <button className="btn btn-o btn-sm" onClick={()=>openPreview(m.filename, m.parsed_content)}>查看</button>
                 <button className="btn btn-d btn-sm" onClick={()=>del(m.id)}>删除</button>
               </div>
-              {m.parse_status !== 'completed' && (
+              {isFailedStatus(m.parse_status) && (
                 <div className="material-fix-hint">解析失败时可先查看任务号，删除后重新上传清晰 PDF/Word，或改传可复制文字版本。</div>
               )}
             </div>
@@ -252,6 +295,7 @@ export default function CaseDetail() {
         content={previewMaterial?.content || ''}
         onClose={closePreview}
       />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

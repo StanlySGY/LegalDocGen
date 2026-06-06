@@ -1,9 +1,11 @@
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { BillingStatus, Plan, UsageItem } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 interface Props { currentUser: AuthUser | null }
 
@@ -56,6 +58,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
 
   const load = async () => {
     setLoading(true)
@@ -74,6 +77,14 @@ export default function BillingUsagePage({ currentUser }: Props) {
 
   const switchPlan = async (planCode: string) => {
     if (!status) return
+    const targetPlan = plans.find(plan => plan.code === planCode)
+    const confirmed = await confirm({
+      title: '手动切换套餐',
+      message: `确认将「${status.team.name}」从「${status.plan.name}」切换为「${targetPlan?.name || planCode}」？此操作会立即影响案件、材料、AI 生成和成员配额。`,
+      confirmText: '确认切换',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       const next = await api.billing.updateSubscription(status.team.id, { plan_code: planCode, status: 'active' })
       setStatus(next)
@@ -150,6 +161,7 @@ export default function BillingUsagePage({ currentUser }: Props) {
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

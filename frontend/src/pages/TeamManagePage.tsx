@@ -4,6 +4,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useEffect, useState } from 'react'
 import { api, quotaUpgradeMessage, type AuthUser } from '../services/api'
 import type { Team, TeamMember } from '../types'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 const roleText: Record<string, string> = { owner: '所有者', admin: '管理员', member: '成员' }
 const roleClass = (role: string) => role === 'owner' ? 't-purple' : role === 'admin' ? 't-blue' : 't-gray'
@@ -17,7 +18,7 @@ export default function TeamManagePage() {
   const [newTeamName, setNewTeamName] = useState('')
   const [memberForm, setMemberForm] = useState({ user_id: '', role: 'member' })
   const { toasts, showToast, removeToast } = useToast()
-  const [confirmState, setConfirmState] = useState<{open:boolean;title:string;message:string;onConfirm:()=>void;variant?:'default'|'danger'}|null>(null)
+  const { confirm, dialogProps } = useConfirmDialog()
 
 
   const loadMembers = async (teamId: string) => {
@@ -83,6 +84,16 @@ export default function TeamManagePage() {
 
   const updateRole = async (userId: string, role: string) => {
     if (!selectedTeamId) return
+    const member = members.find(item => item.user_id === userId)
+    if (member && member.role !== role) {
+      const confirmed = await confirm({
+        title: '调整成员角色',
+        message: `确认将「${displayName(member)}」从「${roleText[member.role]}」调整为「${roleText[role]}」？角色变更会立即影响团队案件访问与成员管理权限。`,
+        confirmText: '确认调整',
+        variant: role === 'owner' || member.role === 'owner' ? 'danger' : 'default'
+      })
+      if (!confirmed) return
+    }
     try {
       await api.teams.updateMember(selectedTeamId, userId, { role })
       await loadMembers(selectedTeamId)
@@ -94,14 +105,12 @@ export default function TeamManagePage() {
 
   const removeMember = async (userId: string) => {
     if (!selectedTeamId) return
-    const confirmed = await new Promise<boolean>(resolve => {
-      setConfirmState({
-        open: true,
-        title: '移除成员',
-        message: '确认移除该团队成员？移除后该成员将无法访问团队案件。',
-        variant: 'danger',
-        onConfirm: () => { resolve(true); setConfirmState(null) }
-      })
+    const member = members.find(item => item.user_id === userId)
+    const confirmed = await confirm({
+      title: '移除成员',
+      message: `确认移除${member ? `「${displayName(member)}」` : '该成员'}？移除后该成员将无法访问团队案件。`,
+      variant: 'danger',
+      confirmText: '移除'
     })
     if (!confirmed) return
     try {
@@ -212,16 +221,7 @@ export default function TeamManagePage() {
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />
-      {confirmState && (
-        <ConfirmDialog
-          open={confirmState.open}
-          title={confirmState.title}
-          message={confirmState.message}
-          variant={confirmState.variant}
-          onConfirm={confirmState.onConfirm}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }
