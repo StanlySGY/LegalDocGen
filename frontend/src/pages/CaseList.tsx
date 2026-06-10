@@ -8,12 +8,13 @@ import { validateCaseForm } from '../utils/validation'
 import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfirmDialog } from '../hooks/useConfirmDialog'
-import type { Case } from '../types'
+import type { Case, CaseDeadline } from '../types'
+import { DOCUMENT_TYPES } from '../types'
 
-type CaseForm = { name: string; description: string; case_type: string }
+type CaseForm = { name: string; description: string; case_type: string; document_type: string }
 
-const emptyForm: CaseForm = { name: '', description: '', case_type: '' }
-const statusText: Record<string, string> = { draft: '草稿', in_progress: '进行中', completed: '已完成' }
+const emptyForm: CaseForm = { name: '', description: '', case_type: '', document_type: '' }
+const statusText: Record<string, string> = { draft: '草稿', in_progress: '进行中', completed: '已完成', archived: '已归档' }
 const caseTypePresets = ['民间借贷', '合同纠纷', '劳动争议', '婚姻家事', '侵权纠纷']
 const onboardingSteps = [
   { title: '1. 建立案件', text: '先写清案由、委托目标和目标文书，避免后续分析发散。' },
@@ -41,6 +42,7 @@ export default function CaseList() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [editingCase, setEditingCase] = useState<Case | null>(null)
   const [editForm, setEditForm] = useState<CaseForm>(emptyForm)
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<CaseDeadline[]>([])
   const { toasts, showToast, removeToast } = useToast()
   const { confirm, dialogProps } = useConfirmDialog()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -75,6 +77,10 @@ export default function CaseList() {
   }, [filters])
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    api.cases.upcomingDeadlines().then(setUpcomingDeadlines).catch(() => {})
+  }, [])
+
   const create = async () => {
     const validation = validateCaseForm(form)
     if (!validation.valid) {
@@ -96,7 +102,7 @@ export default function CaseList() {
 
   const openEdit = (item: Case) => {
     setEditingCase(item)
-    setEditForm({ name: item.name, description: item.description || '', case_type: item.case_type || '' })
+    setEditForm({ name: item.name, description: item.description || '', case_type: item.case_type || '', document_type: item.document_type || '' })
   }
 
   const saveEdit = async () => {
@@ -216,6 +222,21 @@ export default function CaseList() {
         <div className="stat-card s-green"><div className="s-label">已完成</div><div className="s-value">{deliveryRate}%</div><div className="s-hint">完成审查阶段占比</div></div>
       </div>
 
+      {upcomingDeadlines.length > 0 && (
+        <div className="notice-card notice-warn" style={{marginBottom:16}}>
+          <div>
+            <strong>即将到期 ({upcomingDeadlines.length})</strong>
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:6}}>
+              {upcomingDeadlines.slice(0, 5).map(d => (
+                <span key={d.id} style={{fontSize:13,cursor:'pointer'}} onClick={()=>navigate(`/cases/${d.case_id}`)}>
+                  {d.days_left !== undefined && d.days_left <= 0 ? '⚠ 已逾期' : `剩余 ${d.days_left} 天`} — {d.case_name} · {d.title}（{d.due_date}）
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {!loading && cases.length === 0 && toasts.length === 0 && (
         <div className="notice-card notice-info">
           <div>
@@ -245,6 +266,7 @@ export default function CaseList() {
               <option value="draft">草稿</option>
               <option value="in_progress">进行中</option>
               <option value="completed">已完成</option>
+              <option value="archived">已归档</option>
             </select>
             <select className="select" value={filters.case_type} onChange={e=>setFilters({...filters,case_type:e.target.value})}>
               <option value="">全部类型</option>
@@ -373,6 +395,14 @@ export default function CaseList() {
                 <div className="quick-type-row">
                   {caseTypePresets.map(type => (
                     <button key={type} type="button" className={`chip-btn ${form.case_type === type ? 'on' : ''}`} onClick={() => setForm({...form, case_type: type})}>{type}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs-label">目标文书</label>
+                <div className="quick-type-row">
+                  {Object.entries(DOCUMENT_TYPES).map(([key, label]) => (
+                    <button key={key} type="button" className={`chip-btn ${form.document_type === key ? 'on' : ''}`} onClick={() => setForm({...form, document_type: form.document_type === key ? '' : key})}>{label}</button>
                   ))}
                 </div>
               </div>

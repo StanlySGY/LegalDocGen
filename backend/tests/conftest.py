@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.database import Base
-from backend.models import audit, billing, case, case_template, channel, document, legal_article, material, prompt, task, team, user, workflow  # noqa
+from backend.models import audit, billing, case, case_note, case_template, channel, deadline, document, legal_article, material, prompt, task, team, user, workflow  # noqa
 
 
 @pytest.fixture

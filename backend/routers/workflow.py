@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.dependencies import case_query_for_user, get_accessible_case, get_current_user
-from backend.exceptions import NotFoundError, ValidationError, InternalServerError
+from backend.exceptions import NotFoundError, ValidationError, InternalServerError, ForbiddenError
 from backend.models.billing import UsageMetric
-from backend.models.case import Case
+from backend.models.case import Case, CaseStatus
 from backend.models.user import User
 from backend.models.workflow import StageType, WorkflowNode
 from backend.services.audit_service import record_audit
@@ -23,6 +23,7 @@ from backend.services.export_service import ExportService
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
 from backend.services.workflow_engine.engine import WorkflowEngine
+from backend.services.workflow_engine.stages import get_draft_prompt
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 
@@ -93,6 +94,11 @@ def _ensure_stage_ready(engine: WorkflowEngine, case_id: str, stage: StageType):
         raise ValidationError(f"请先完成前序阶段：{'、'.join(missing)}")
 
 
+def _ensure_not_archived(case: Case):
+    if case.status == CaseStatus.ARCHIVED:
+        raise ForbiddenError("案件已归档，无法修改。如需编辑请先解归档。")
+
+
 def _ensure_export_ready(engine: WorkflowEngine, case_id: str):
     missing = engine.get_missing_output_stages(case_id)
     if missing:
@@ -141,6 +147,7 @@ def get_node(case_id: str, stage: str, db: Session = Depends(get_db), current_us
 @router.post("/generate/{case_id}")
 async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
     enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
@@ -153,7 +160,14 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
     try:
         _ensure_stage_ready(engine, case_id, stage)
         template_id = _get_case_template_id(case_id, req.template_id, db)
-        prompt_template = req.prompt or pm.get_prompt(stage, template_id)
+
+        if req.prompt:
+            prompt_template = req.prompt
+        elif stage == StageType.DRAFT_GENERATION and case.document_type:
+            prompt_template = get_draft_prompt(case.document_type)
+        else:
+            prompt_template = pm.get_prompt(stage, template_id)
+
         materials_context = engine.get_case_context(case_id)
         previous_context = engine.get_previous_stages_output(case_id, stage)
 
@@ -180,6 +194,7 @@ async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get
 @router.post("/generate-stream/{case_id}")
 async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
     enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
     engine = WorkflowEngine(db)
     pm = PromptManager(db)
@@ -192,7 +207,14 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
     try:
         _ensure_stage_ready(engine, case_id, stage)
         template_id = _get_case_template_id(case_id, req.template_id, db)
-        prompt_template = req.prompt or pm.get_prompt(stage, template_id)
+
+        if req.prompt:
+            prompt_template = req.prompt
+        elif stage == StageType.DRAFT_GENERATION and case.document_type:
+            prompt_template = get_draft_prompt(case.document_type)
+        else:
+            prompt_template = pm.get_prompt(stage, template_id)
+
         materials_context = engine.get_case_context(case_id)
         previous_context = engine.get_previous_stages_output(case_id, stage)
 
@@ -227,7 +249,8 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
 
 @router.post("/rollback/{case_id}")
 def rollback(case_id: str, req: RollbackRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
-    get_accessible_case(db, case_id, current_user)
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
     _ensure_node_belongs_to_case(db, req.node_id, case_id)
     engine = WorkflowEngine(db)
     try:
@@ -261,7 +284,8 @@ def get_history(case_id: str, stage: str, db: Session = Depends(get_db), current
 
 @router.post("/save-output/{case_id}/{stage}")
 def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
-    get_accessible_case(db, case_id, current_user)
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
     try:
         stage_type = StageType(stage)
     except ValueError:
@@ -289,6 +313,30 @@ def export_case(case_id: str, db: Session = Depends(get_db), current_user: Optio
         record_audit(db, "workflow.export", "case", case_id, f"导出案件：{case.name}")
         db.commit()
         return _build_docx_response(content, f"{_safe_filename(case.name)}.docx")
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        if isinstance(e, (NotFoundError, ValidationError)):
+            raise e
+        raise HTTPException(500, f"导出失败: {str(e)}")
+
+
+@router.get("/export-package/{case_id}")
+def export_case_package(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    try:
+        engine = WorkflowEngine(db)
+        _ensure_export_ready(engine, case_id)
+        export_service = ExportService(db)
+        content = export_service.export_case_package(case_id)
+        record_audit(db, "workflow.export_package", "case", case_id, f"导出案件包：{case.name}")
+        db.commit()
+        filename = f"{_safe_filename(case.name)}_案件包.zip"
+        return Response(
+            content=content,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+        )
     except ValueError as e:
         raise HTTPException(404, str(e))
     except Exception as e:

@@ -3,12 +3,14 @@ import Toaster from '../components/Toaster'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MaterialPreviewModal from '../components/MaterialPreviewModal'
 import LoadingSpinner from '../components/LoadingSpinner'
+import ReactMarkdown from 'react-markdown'
 import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
-import type { Case, Material, MaterialCatalogItem } from '../types'
+import type { Case, Material, MaterialCatalogItem, CaseDeadline, CaseNote } from '../types'
+import { DOCUMENT_TYPES } from '../types'
 import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 const fileLabel = (type: string) => type === '.pdf' ? 'PDF' : type.startsWith('.doc') ? 'DOC' : 'IMG'
@@ -35,17 +37,30 @@ export default function CaseDetail() {
   const { confirm, dialogProps } = useConfirmDialog()
   const fileRef = useRef<HTMLInputElement>(null)
   const [previewMaterial, setPreviewMaterial] = useState<{open:boolean;filename:string;content:string}|null>(null)
+  const [deadlines, setDeadlines] = useState<CaseDeadline[]>([])
+  const [notes, setNotes] = useState<CaseNote[]>([])
+  const [showDeadlineForm, setShowDeadlineForm] = useState(false)
+  const [deadlineForm, setDeadlineForm] = useState({ title: '', due_date: '', note: '' })
+  const [showNoteForm, setShowNoteForm] = useState(false)
+  const [noteForm, setNoteForm] = useState({ title: '', content: '' })
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editNoteForm, setEditNoteForm] = useState({ title: '', content: '' })
   const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoadingCase(true)
     try {
-      const [c, m, insights] = await Promise.all([api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId)])
+      const [c, m, insights, dl, nt] = await Promise.all([
+        api.cases.get(caseId), api.materials.list(caseId), api.materials.catalog(caseId),
+        api.cases.deadlines(caseId), api.cases.notes(caseId),
+      ])
       const tpl = c.template_id ? await api.templates.get(c.template_id) : null
       setChecklist(tpl?.materials_checklist || [])
       setCaseData(c)
       setMaterials(m)
       setMaterialInsights({ catalog: insights.catalog || [], timeline: insights.timeline || [] })
+      setDeadlines(dl)
+      setNotes(nt)
       setLoadError('')
     } catch (e) {
       const message = e instanceof Error ? e.message : '案件加载失败'
@@ -116,6 +131,93 @@ export default function CaseDetail() {
     setPreviewMaterial(null)
   }
 
+  const createDeadline = async () => {
+    if (!deadlineForm.title.trim() || !deadlineForm.due_date) return showToast('请填写标题和截止日期', { type: 'err' })
+    try {
+      await api.cases.createDeadline(caseId, deadlineForm)
+      setDeadlineForm({ title: '', due_date: '', note: '' })
+      setShowDeadlineForm(false)
+      await load(true)
+      showToast('期限已添加')
+    } catch (e: any) {
+      showToast(e.message || '添加失败', { type: 'err' })
+    }
+  }
+
+  const toggleDeadlineComplete = async (id: string, completed: boolean) => {
+    try {
+      await api.cases.updateDeadline(caseId, id, { is_completed: !completed })
+      await load(true)
+    } catch (e: any) {
+      showToast(e.message || '更新失败', { type: 'err' })
+    }
+  }
+
+  const deleteDeadline = async (id: string) => {
+    try {
+      await api.cases.deleteDeadline(caseId, id)
+      await load(true)
+      showToast('已删除')
+    } catch (e: any) {
+      showToast(e.message || '删除失败', { type: 'err' })
+    }
+  }
+
+  const createNote = async () => {
+    if (!noteForm.title.trim() && !noteForm.content.trim()) return showToast('请填写标题或内容', { type: 'err' })
+    try {
+      await api.cases.createNote(caseId, noteForm)
+      setNoteForm({ title: '', content: '' })
+      setShowNoteForm(false)
+      await load(true)
+      showToast('笔记已添加')
+    } catch (e: any) {
+      showToast(e.message || '添加失败', { type: 'err' })
+    }
+  }
+
+  const toggleNotePin = async (id: string, pinned: boolean) => {
+    try {
+      await api.cases.updateNote(caseId, id, { pinned: !pinned })
+      await load(true)
+    } catch (e: any) {
+      showToast(e.message || '更新失败', { type: 'err' })
+    }
+  }
+
+  const deleteNote = async (id: string) => {
+    try {
+      await api.cases.deleteNote(caseId, id)
+      await load(true)
+      showToast('已删除')
+    } catch (e: any) {
+      showToast(e.message || '删除失败', { type: 'err' })
+    }
+  }
+
+  const startEditNote = (n: CaseNote) => {
+    setEditingNoteId(n.id)
+    setEditNoteForm({ title: n.title, content: n.content })
+  }
+
+  const saveEditNote = async () => {
+    if (!editingNoteId) return
+    try {
+      await api.cases.updateNote(caseId, editingNoteId, editNoteForm)
+      setEditingNoteId(null)
+      await load(true)
+      showToast('笔记已更新')
+    } catch (e: any) {
+      showToast(e.message || '更新失败', { type: 'err' })
+    }
+  }
+
+  const sortedNotes = [...notes].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1
+    if (!a.pinned && b.pinned) return 1
+    return 0
+  })
+
   const materialCompletion = getMaterialCompletion(checklist, materials)
   const parsedCount = materials.filter(m=>m.parse_status==='completed').length
   const failedCount = materials.filter(m=>isFailedStatus(m.parse_status)).length
@@ -156,10 +258,11 @@ export default function CaseDetail() {
           <div className="eyebrow">CASE MATERIAL CENTER</div>
           <div className="flex items-center gap-3" style={{flexWrap:'wrap'}}>
             <h2>{caseData.name}</h2>
-            <span className={`tag ${caseData.status==='completed'?'t-green':caseData.status==='in_progress'?'t-orange':'t-gray'}`}>
-              {caseData.status==='completed'?'已完成':caseData.status==='in_progress'?'进行中':'草稿'}
+            <span className={`tag ${caseData.status==='completed'?'t-green':caseData.status==='in_progress'?'t-orange':caseData.status==='archived'?'t-gray':'t-gray'}`}>
+              {caseData.status==='completed'?'已完成':caseData.status==='in_progress'?'进行中':caseData.status==='archived'?'已归档':'草稿'}
             </span>
             {caseData.case_type && <span className="tag t-blue">{caseData.case_type}</span>}
+            {caseData.document_type && <span className="tag t-purple">{DOCUMENT_TYPES[caseData.document_type] || caseData.document_type}</span>}
           </div>
           {caseData.description && <p className="text-sm-muted" style={{marginTop:8,lineHeight:1.8}}>{caseData.description}</p>}
           {parsingCount > 0 && (
@@ -175,9 +278,28 @@ export default function CaseDetail() {
         </div>
         <div className="case-detail-actions">
           <button className="btn btn-o" onClick={() => navigate('/cases')}>返回列表</button>
-          <button className="btn btn-p" onClick={handleEnterWorkflow}>进入工作流</button>
+          {caseData.status === 'archived' ? (
+            <button className="btn btn-o" onClick={async () => { await api.cases.unarchive(caseId); load() }}>解除归档</button>
+          ) : (
+            <>
+              {(caseData.status === 'completed' || caseData.status === 'in_progress') && (
+                <button className="btn btn-o" onClick={async () => { await api.cases.archive(caseId); load() }}>归档案件</button>
+              )}
+            </>
+          )}
+          <button className="btn btn-p" onClick={handleEnterWorkflow} disabled={caseData.status === 'archived'}>进入工作流</button>
         </div>
       </div>
+
+      {caseData.status === 'archived' && (
+        <div className="notice-card notice-info" style={{marginBottom:16}}>
+          <div>
+            <strong>案件已归档，处于只读模式</strong>
+            <span>归档案件无法修改材料或生成内容。如需编辑，请先点击「解除归档」。</span>
+            {caseData.archive_note && <span style={{marginTop:4,display:'block',fontSize:12}}>归档备注：{caseData.archive_note}</span>}
+          </div>
+        </div>
+      )}
 
       <div className="stat-row">
         <div className="stat-card s-purple"><div className="s-label">材料数量</div><div className="s-value">{materials.length}</div><div className="s-hint">已上传证据材料</div></div>
@@ -286,6 +408,90 @@ export default function CaseDetail() {
               <button className="btn btn-p btn-sm" onClick={() => fileRef.current?.click()}>上传第一份材料</button>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-hd">
+          <span className="card-title">关键期限</span>
+          <button className="btn btn-p btn-sm" onClick={() => setShowDeadlineForm(true)} disabled={caseData.status === 'archived'}>+ 添加期限</button>
+        </div>
+        {showDeadlineForm && (
+          <div style={{padding:'12px 16px',background:'#f8fafc',borderRadius:8,marginBottom:12}}>
+            <input className="input" placeholder="期限标题（如：提交答辩状）" value={deadlineForm.title} onChange={e => setDeadlineForm({ ...deadlineForm, title: e.target.value })} style={{marginBottom:8}} />
+            <input className="input" type="date" value={deadlineForm.due_date} onChange={e => setDeadlineForm({ ...deadlineForm, due_date: e.target.value })} style={{marginBottom:8}} />
+            <textarea className="textarea" placeholder="备注（可选）" value={deadlineForm.note} onChange={e => setDeadlineForm({ ...deadlineForm, note: e.target.value })} style={{height:60,marginBottom:8}} />
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-p btn-sm" onClick={createDeadline}>确认</button>
+              <button className="btn btn-o btn-sm" onClick={() => setShowDeadlineForm(false)}>取消</button>
+            </div>
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {deadlines.map(d => (
+            <div key={d.id} style={{padding:12,border:'1px solid #e5e7eb',borderRadius:8,background:d.is_completed?'#f0fdf4':'#fff'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <input type="checkbox" checked={d.is_completed} onChange={() => toggleDeadlineComplete(d.id, d.is_completed)} />
+                    <strong style={{textDecoration:d.is_completed?'line-through':'none',fontSize:13}}>{d.title}</strong>
+                  </div>
+                  <div style={{fontSize:12,color:'#64748b',marginTop:4}}>截止：{d.due_date}</div>
+                  {d.note && <div style={{fontSize:12,color:'#86909c',marginTop:4}}>{d.note}</div>}
+                </div>
+                <button className="btn btn-d btn-sm" onClick={() => deleteDeadline(d.id)}>删除</button>
+              </div>
+            </div>
+          ))}
+          {deadlines.length === 0 && <div className="empty refined-empty p-md"><p>暂无期限提醒</p></div>}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-hd">
+          <span className="card-title">办案笔记</span>
+          <button className="btn btn-p btn-sm" onClick={() => setShowNoteForm(true)} disabled={caseData.status === 'archived'}>+ 添加笔记</button>
+        </div>
+        {showNoteForm && (
+          <div style={{padding:'12px 16px',background:'#f8fafc',borderRadius:8,marginBottom:12}}>
+            <input className="input" placeholder="笔记标题" value={noteForm.title} onChange={e => setNoteForm({ ...noteForm, title: e.target.value })} style={{marginBottom:8}} />
+            <textarea className="textarea" placeholder="笔记内容（支持 Markdown 格式）" value={noteForm.content} onChange={e => setNoteForm({ ...noteForm, content: e.target.value })} style={{height:120,marginBottom:8}} />
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <button className="btn btn-p btn-sm" onClick={createNote}>确认</button>
+              <button className="btn btn-o btn-sm" onClick={() => setShowNoteForm(false)}>取消</button>
+              <span style={{fontSize:11,color:'#94a3b8'}}>支持 Markdown</span>
+            </div>
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {sortedNotes.map(n => (
+            <div key={n.id} style={{padding:12,border:'1px solid #e5e7eb',borderRadius:8,background:n.pinned?'#fef3c7':'#fff'}}>
+              {editingNoteId === n.id ? (
+                <div>
+                  <input className="input" value={editNoteForm.title} onChange={e => setEditNoteForm({ ...editNoteForm, title: e.target.value })} placeholder="标题" style={{marginBottom:8}} />
+                  <textarea className="textarea" value={editNoteForm.content} onChange={e => setEditNoteForm({ ...editNoteForm, content: e.target.value })} style={{height:120,marginBottom:8}} />
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn btn-p btn-sm" onClick={saveEditNote}>保存</button>
+                    <button className="btn btn-o btn-sm" onClick={() => setEditingNoteId(null)}>取消</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    {n.title && <strong style={{fontSize:13,display:'block',marginBottom:6}}>{n.pinned && '📌 '}{n.title}</strong>}
+                    <div className="md" style={{fontSize:12,color:'#334155',lineHeight:1.7}}><ReactMarkdown>{n.content}</ReactMarkdown></div>
+                    {n.updated_at && <div style={{fontSize:11,color:'#94a3b8',marginTop:6}}>{new Date(n.updated_at).toLocaleString('zh-CN')}</div>}
+                  </div>
+                  <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    <button className="btn btn-o btn-sm" onClick={() => startEditNote(n)}>编辑</button>
+                    <button className="btn btn-o btn-sm" onClick={() => toggleNotePin(n.id, n.pinned)}>{n.pinned ? '取消置顶' : '置顶'}</button>
+                    <button className="btn btn-d btn-sm" onClick={() => deleteNote(n.id)}>删除</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {notes.length === 0 && <div className="empty refined-empty p-md"><p>暂无办案笔记，记录策略要点、沟通内容或庭审记录</p></div>}
         </div>
       </div>
       <Toaster toasts={toasts} onRemove={removeToast} />

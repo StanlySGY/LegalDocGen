@@ -11,6 +11,7 @@ class CaseStatus(str, enum.Enum):
     DRAFT = "draft"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    ARCHIVED = "archived"
 
 
 class Case(Base):
@@ -24,6 +25,9 @@ class Case(Base):
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     team_id = Column(String(36), ForeignKey("teams.id"), nullable=True)
     status = Column(SAEnum(CaseStatus), default=CaseStatus.DRAFT)
+    document_type = Column(String(50), default="")
+    archived_at = Column(DateTime, nullable=True)
+    archive_note = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

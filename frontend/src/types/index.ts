@@ -81,12 +81,45 @@ export interface Case {
   name: string
   description: string
   case_type: string
+  document_type?: string
   template_id?: string | null
   owner_id?: string | null
   team_id?: string | null
   status: string
+  archived_at?: string | null
+  archive_note?: string
   created_at: string
   updated_at: string
+}
+
+export interface CaseDeadline {
+  id: string
+  case_id: string
+  case_name?: string
+  title: string
+  due_date: string
+  reminder_days: number
+  note: string
+  is_completed: boolean
+  days_left?: number
+  created_at?: string
+}
+
+export interface CaseNote {
+  id: string
+  case_id: string
+  title: string
+  content: string
+  pinned: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export const DOCUMENT_TYPES: Record<string, string> = {
+  complaint: '起诉状',
+  defense: '答辩状/反驳意见',
+  representation: '代理词',
+  lawyer_letter: '律师函/催告函',
 }
 
 export interface Material {

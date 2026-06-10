@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.database import get_db
 from backend.dependencies import get_accessible_case, get_current_user
-from backend.exceptions import InternalServerError, NotFoundError, ValidationError
+from backend.exceptions import ForbiddenError, InternalServerError, NotFoundError, ValidationError
 from backend.models.billing import UsageMetric
+from backend.models.case import CaseStatus
 from backend.models.material import Material
 from backend.models.task import BackgroundTask
 from backend.models.user import User
@@ -31,6 +32,8 @@ async def upload_material(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     case = get_accessible_case(db, case_id, current_user)
+    if case.status == CaseStatus.ARCHIVED:
+        raise ForbiddenError("案件已归档，无法上传材料。如需编辑请先解归档。")
     enforce_quota(db, case.team_id, UsageMetric.MATERIALS)
     safe_name = Path(file.filename or "").name
     if not safe_name:
@@ -122,7 +125,9 @@ def delete_material(material_id: str, db: Session = Depends(get_db), current_use
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise NotFoundError(f"材料 {material_id} 不存在")
-    get_accessible_case(db, material.case_id, current_user)
+    case = get_accessible_case(db, material.case_id, current_user)
+    if case.status == CaseStatus.ARCHIVED:
+        raise ForbiddenError("案件已归档，无法删除材料。如需编辑请先解归档。")
     get_storage().delete(material.file_path)
     record_audit(db, "material.delete", "case", material.case_id, f"删除材料：{material.filename}")
     db.delete(material)

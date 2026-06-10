@@ -169,6 +169,23 @@ export const api = {
     update: (id: string, data: any) => request<any>(`/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/cases/${id}`, { method: 'DELETE' }),
     batchDelete: (caseIds: string[]) => request<any>('/cases/batch-delete', { method: 'POST', body: JSON.stringify({ case_ids: caseIds }) }),
+    archive: (id: string, note?: string) => request<any>(`/cases/${id}/archive`, { method: 'POST', body: JSON.stringify({ note: note || '' }) }),
+    unarchive: (id: string) => request<any>(`/cases/${id}/unarchive`, { method: 'POST' }),
+    upcomingDeadlines: () => request<any[]>('/cases/upcoming-deadlines'),
+    deadlines: (caseId: string) => request<any[]>(`/cases/${caseId}/deadlines`),
+    createDeadline: (caseId: string, data: { title: string; due_date: string; reminder_days?: number; note?: string }) =>
+      request<any>(`/cases/${caseId}/deadlines`, { method: 'POST', body: JSON.stringify(data) }),
+    updateDeadline: (caseId: string, deadlineId: string, data: any) =>
+      request<any>(`/cases/${caseId}/deadlines/${deadlineId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteDeadline: (caseId: string, deadlineId: string) =>
+      request<any>(`/cases/${caseId}/deadlines/${deadlineId}`, { method: 'DELETE' }),
+    notes: (caseId: string) => request<any[]>(`/cases/${caseId}/notes`),
+    createNote: (caseId: string, data: { title?: string; content?: string; pinned?: boolean }) =>
+      request<any>(`/cases/${caseId}/notes`, { method: 'POST', body: JSON.stringify(data) }),
+    updateNote: (caseId: string, noteId: string, data: any) =>
+      request<any>(`/cases/${caseId}/notes/${noteId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteNote: (caseId: string, noteId: string) =>
+      request<any>(`/cases/${caseId}/notes/${noteId}`, { method: 'DELETE' }),
   },
   materials: {
     list: (caseId: string) => request<any[]>(`/materials/case/${caseId}`),
@@ -233,6 +250,19 @@ export const api = {
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+    },
+    exportPackage: async (caseId: string) => {
+      const res = await fetch(`${BASE}/workflow/export-package/${caseId}`, { headers: authHeaders() })
+      if (!res.ok) throw await createApiError(res, '导出案件包失败')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `case_package_${caseId}.zip`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     },
     exportBatch: async (caseIds: string[]) => {

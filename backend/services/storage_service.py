@@ -14,6 +14,9 @@ class LocalStorage:
         path.write_bytes(content)
         return str(path)
 
+    def read(self, path: str) -> bytes:
+        return Path(path).read_bytes()
+
     def delete(self, path: str):
         Path(path).unlink(missing_ok=True)
 

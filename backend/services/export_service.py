@@ -4,10 +4,15 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
+from io import BytesIO
+import zipfile
+import re
 
 from backend.models.case import Case
+from backend.models.material import Material
 from backend.models.workflow import StageType, STAGE_NAMES
 from backend.services.workflow_engine.engine import WorkflowEngine
+from backend.services.storage_service import get_storage
 
 
 class ExportService:
@@ -60,6 +65,86 @@ class ExportService:
         doc.save(output)
         output.seek(0)
         return output.getvalue()
+
+    def export_case_package(self, case_id: str) -> bytes:
+        case = self.db.query(Case).filter(Case.id == case_id).first()
+        if not case:
+            raise ValueError(f"Case {case_id} not found")
+
+        buffer = BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
+            # 原始材料
+            materials = self.db.query(Material).filter(Material.case_id == case_id).all()
+            storage = get_storage()
+            for m in materials:
+                try:
+                    content = storage.read(m.file_path)
+                    archive.writestr(f"materials/{m.filename}", content)
+                except Exception:
+                    archive.writestr(f"materials/_缺失_{m.filename}.txt", f"原始材料读取失败：{m.file_path}")
+
+            # 各阶段分析文档
+            for stage_type in [StageType.FACT_EXTRACTION, StageType.LEGAL_ANALYSIS, StageType.DISPUTE_FOCUS]:
+                node = self.engine.get_stage_node(case_id, stage_type)
+                if node and node.output:
+                    doc = Document()
+                    doc.add_heading(STAGE_NAMES.get(stage_type, stage_type.value), level=1)
+                    self._add_text_block(doc, node.output)
+                    self._add_metadata(doc, node)
+                    out = BytesIO()
+                    doc.save(out)
+                    archive.writestr(f"analysis/{STAGE_NAMES[stage_type]}.docx", out.getvalue())
+
+            # 最终文书
+            final_doc = self.export_to_word(case_id)
+            archive.writestr("document.docx", final_doc)
+
+            # 证据目录
+            catalog = self.engine.get_material_catalog(case_id)
+            if catalog:
+                doc = Document()
+                doc.add_heading("证据目录", level=1)
+                self._add_material_catalog(doc, case_id)
+                out = BytesIO()
+                doc.save(out)
+                archive.writestr("evidence_catalog.docx", out.getvalue())
+
+            # 事实时间线
+            timeline = self.engine.get_fact_timeline(case_id)
+            if timeline:
+                doc = Document()
+                doc.add_heading("事实时间线", level=1)
+                self._add_fact_timeline(doc, case_id)
+                out = BytesIO()
+                doc.save(out)
+                archive.writestr("timeline.docx", out.getvalue())
+
+            # 法条引用清单
+            legal_refs = self._extract_legal_references(case_id)
+            if legal_refs:
+                archive.writestr("法条引用清单.txt", "\n".join(legal_refs))
+
+            # 案件信息
+            meta = f"""案件名称：{case.name}
+案件类型：{case.case_type or '未设置'}
+文书类型：{case.document_type or '未设置'}
+案件状态：{self._get_status_text(case.status)}
+创建时间：{case.created_at.strftime('%Y-%m-%d %H:%M:%S') if case.created_at else '未记录'}
+导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            archive.writestr("案件信息.txt", meta)
+
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    def _extract_legal_references(self, case_id: str) -> list[str]:
+        refs = set()
+        pattern = re.compile(r'《[^》]+》第\s*\d+\s*条')
+        for stage_type in StageType:
+            node = self.engine.get_stage_node(case_id, stage_type)
+            if node and node.output:
+                refs.update(pattern.findall(node.output))
+        return sorted(refs)
 
     def _add_review_notice(self, doc: Document):
         doc.add_heading("使用提示", level=2)

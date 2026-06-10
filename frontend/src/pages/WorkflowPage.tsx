@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api, quotaUpgradeMessage } from '../services/api'
-import type { StageProgress, WorkflowNode, StageType } from '../types'
-import { STAGE_NAMES, STAGE_ORDER } from '../types'
+import type { StageProgress, WorkflowNode, StageType, Case } from '../types'
+import { STAGE_NAMES, STAGE_ORDER, DOCUMENT_TYPES } from '../types'
 import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 const stageGuides: Record<StageType, { input: string; output: string; action: string; review: string; risk: string }> = {
@@ -52,12 +52,15 @@ export default function WorkflowPage() {
   const [selChannelId, setSelChannelId] = useState('')
   const [selModel, setSelModel] = useState('')
   const [caseName, setCaseName] = useState('')
+  const [caseData, setCaseData] = useState<Case | null>(null)
   const { toasts, showToast, removeToast } = useToast()
   const { confirm, dialogProps } = useConfirmDialog()
   const [showExportModal, setShowExportModal] = useState(false)
   const reviewStorageKey = `legaldocgen_final_review_${caseId}`
   const [finalReviewChecked, setFinalReviewChecked] = useState<string[]>([])
   const [finalReviewedAt, setFinalReviewedAt] = useState('')
+  const [verifyingLegal, setVerifyingLegal] = useState(false)
+  const [legalVerifyResult, setLegalVerifyResult] = useState<any>(null)
 
   const loadProgress = useCallback(async () => {
     setProgressLoading(true)
@@ -65,6 +68,7 @@ export default function WorkflowPage() {
       const [p,c] = await Promise.all([api.workflow.progress(caseId), api.cases.get(caseId)])
       setProgress(p)
       setCaseName(c.name)
+      setCaseData(c)
     } finally {
       setProgressLoading(false)
     }
@@ -117,7 +121,8 @@ export default function WorkflowPage() {
   const canExport = progress.length === STAGE_ORDER.length && missingStages.length === 0
   const finalReviewComplete = finalReviewItems.every(item => finalReviewChecked.includes(item.id))
   const guide = stageGuides[activeStage]
-  const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading
+  const isArchived = caseData?.status === 'archived'
+  const canGenerate = Boolean(selChannelId) && previousDone && !generating && !nodeLoading && !modelsLoading && !isArchived
 
   const resetFinalReview = () => {
     setFinalReviewChecked([])
@@ -226,11 +231,16 @@ export default function WorkflowPage() {
     setShowExportModal(true)
   }
 
-  const handleExportConfirm = async (selectedOptions: string[]) => {
+  const handleExportConfirm = async (exportType: 'standard' | 'package') => {
     setShowExportModal(false)
     try {
-      await api.workflow.export(caseId, selectedOptions)
-      showToast('导出成功')
+      if (exportType === 'package') {
+        await api.workflow.exportPackage(caseId)
+        showToast('案件包导出成功')
+      } else {
+        await api.workflow.export(caseId)
+        showToast('文档导出成功')
+      }
     } catch(e:any){showToast(e.message||'导出失败', { type: 'err' })}
   }
 
@@ -281,6 +291,20 @@ export default function WorkflowPage() {
     }
   }
 
+  const handleVerifyLegal = async () => {
+    if (!output) return
+    setVerifyingLegal(true)
+    try {
+      const result = await api.legalArticles.verify(output)
+      setLegalVerifyResult(result)
+      showToast('法条核验完成')
+    } catch (e: any) {
+      showToast(e.message || '核验失败', { type: 'err' })
+    } finally {
+      setVerifyingLegal(false)
+    }
+  }
+
   return (
     <div>
       <div className="breadcrumb mb-5">
@@ -288,6 +312,15 @@ export default function WorkflowPage() {
         <a onClick={() => navigate(`/cases/${caseId}`)}>{caseName||'案件'}</a><span style={{color:'#d1d5db'}}>/</span>
         <span className="current">工作流</span>
       </div>
+
+      {caseData?.status === 'archived' && (
+        <div className="notice-card notice-warn" style={{marginBottom:16}}>
+          <div>
+            <strong>案件已归档，工作流处于只读模式</strong>
+            <span>归档案件无法生成、编辑或回滚。如需继续编辑，请返回案件详情页解除归档。</span>
+          </div>
+        </div>
+      )}
 
       {workflowLoading && (
         <div className="notice-card notice-info workflow-loading-notice">
@@ -315,6 +348,9 @@ export default function WorkflowPage() {
 
       <div className="stage-guide">
         <div className="trust-card accent"><strong>当前阶段</strong><span>{STAGE_NAMES[activeStage]} · {statusLabel(activeProgress)}</span></div>
+        {activeStage === 'draft_generation' && caseData?.document_type && (
+          <div className="trust-card success"><strong>目标文书</strong><span>{DOCUMENT_TYPES[caseData.document_type] || caseData.document_type}</span></div>
+        )}
         <div className="trust-card"><strong>输入来源</strong><span>{guide.input}</span></div>
         <div className={`trust-card ${previousDone ? 'success' : 'warn'}`}><strong>前置条件</strong><span>{previousDone ? '可生成当前阶段内容' : `需先完成 ${previousStage ? STAGE_NAMES[previousStage] : ''}`}</span></div>
       </div>
@@ -410,7 +446,7 @@ export default function WorkflowPage() {
               <span className="skeleton-block tall"/>
             </div>
           ) : (
-            <textarea className="textarea" style={{height:246}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..."/>
+            <textarea className="textarea" style={{height:246}} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="编辑 Prompt..." disabled={isArchived}/>
           )}
           <div className="prompt-meta"><span>{prompt.length} 字</span><span>{modelsLoading ? '模型渠道加载中' : selChannelId ? '模型渠道已选择' : '未配置模型渠道'}</span></div>
           <button className="btn btn-p btn-lg" style={{width:'100%',marginTop:12}} onClick={handleGenerate} disabled={!canGenerate}>
@@ -426,7 +462,7 @@ export default function WorkflowPage() {
                       <span className="tag t-purple">v{h.version}</span>
                       <span style={{fontSize:11,color:'#86909c'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
                     </div>
-                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)}>回滚</button>
+                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)} disabled={isArchived}>回滚</button>
                   </div>
                 ))}
               </div>
@@ -440,7 +476,7 @@ export default function WorkflowPage() {
             <div className="flex gap-2">
               <span className={`tag ${statusClass(activeProgress)}`}>{statusLabel(activeProgress)}</span>
               {output&&!editingOutput && <>
-                <button className="btn btn-o btn-sm" onClick={()=>{setEditingOutput(true);setOutputDraft(output)}}>编辑</button>
+                <button className="btn btn-o btn-sm" onClick={()=>{setEditingOutput(true);setOutputDraft(output)}} disabled={isArchived}>编辑</button>
                 <button className="btn btn-o btn-sm" onClick={async()=>{try{await navigator.clipboard.writeText(output);showToast('已复制')}catch{showToast('复制失败', { type: 'err' })}}}>复制</button>
               </>}
             </div>
@@ -490,8 +526,39 @@ export default function WorkflowPage() {
               <span className="skeleton-line short"/>
             </div>
           ) : output ? (
-            <div className="workflow-output-shell">
-              <div className="md legal-prose"><ReactMarkdown>{output}</ReactMarkdown></div>
+            <div>
+              <div className="workflow-output-shell">
+                <div className="md legal-prose"><ReactMarkdown>{output}</ReactMarkdown></div>
+              </div>
+              <div style={{marginTop:12,display:'flex',gap:8,alignItems:'center'}}>
+                <button className="btn btn-o btn-sm" onClick={handleVerifyLegal} disabled={verifyingLegal}>
+                  {verifyingLegal ? '核验中...' : '核验法条引用'}
+                </button>
+                {legalVerifyResult && (
+                  <span style={{fontSize:12,color:'#64748b'}}>
+                    发现 {legalVerifyResult.articles?.length || 0} 条法条引用
+                  </span>
+                )}
+              </div>
+              {legalVerifyResult && (
+                <div style={{marginTop:12,padding:12,background:'#f8fafc',borderRadius:8,border:'1px solid #e5e7eb'}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>法条核验结果</div>
+                  {legalVerifyResult.articles && legalVerifyResult.articles.length > 0 ? (
+                    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                      {legalVerifyResult.articles.map((art: any, i: number) => (
+                        <div key={i} style={{fontSize:12,display:'flex',alignItems:'start',gap:8}}>
+                          <span className={`tag ${art.exists ? 't-green' : 't-red'}`} style={{flexShrink:0}}>
+                            {art.exists ? '✓ 通过' : '✗ 未收录'}
+                          </span>
+                          <span style={{color:'#334155'}}>{art.citation}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{fontSize:12,color:'#86909c'}}>未识别到法条引用</div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="empty refined-empty" style={{height:500}}>
