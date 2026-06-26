@@ -50,6 +50,8 @@ export default function WorkflowPage() {
   const [showHistory, setShowHistory] = useState(false)
   const [diffResult, setDiffResult] = useState<any>(null)
   const [diffLoading, setDiffLoading] = useState(false)
+  const [opponentReview, setOpponentReview] = useState('')
+  const [opponentLoading, setOpponentLoading] = useState(false)
   const [models, setModels] = useState<any[]>([])
   const [selChannelId, setSelChannelId] = useState('')
   const [selModel, setSelModel] = useState('')
@@ -297,6 +299,16 @@ export default function WorkflowPage() {
     } catch (e: any) {
       showToast(e.message || '回滚失败', { type: 'err' })
     }
+  }
+
+  const handleOpponentReview = async () => {
+    if (!output) return
+    setOpponentLoading(true); setOpponentReview('')
+    try {
+      const result = await api.workflow.aiEdit({ text: output, instruction: '你是对方律师，请从对方视角挑刺：找出这份文书的逻辑漏洞、证据短板、法律依据不足之处，并给出对方可能的抗辩策略。用中文回答。' })
+      setOpponentReview(result.result)
+    } catch (e: any) { showToast(e.message || '审查失败', { type: 'err' }) }
+    setOpponentLoading(false)
   }
 
   const handleVerifyLegal = async () => {
@@ -552,12 +564,18 @@ export default function WorkflowPage() {
             </div>
           ) : output ? (
             <div>
+              <div style={{padding:'8px 12px',background:'#fffbeb',border:'1px solid #fbbf24',borderRadius:8,fontSize:12,color:'#92400e',marginBottom:12}}>
+                ⚠️ <strong>防幻觉提醒</strong>：以下内容由 AI 生成，法条引用、金额计算、诉讼策略等关键事项请务必人工复核后使用。
+              </div>
               <div className="workflow-output-shell">
                 <div className="md legal-prose"><ReactMarkdown>{output}</ReactMarkdown></div>
               </div>
-              <div style={{marginTop:12,display:'flex',gap:8,alignItems:'center'}}>
+              <div style={{marginTop:12,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                 <button className="btn btn-o btn-sm" onClick={handleVerifyLegal} disabled={verifyingLegal}>
                   {verifyingLegal ? '核验中...' : '核验法条引用'}
+                </button>
+                <button className="btn btn-o btn-sm" onClick={handleOpponentReview} disabled={opponentLoading}>
+                  {opponentLoading ? '审查中...' : '⚔️ 对方律师挑刺'}
                 </button>
                 {legalVerifyResult && (
                   <span style={{fontSize:12,color:'#64748b'}}>
@@ -582,6 +600,12 @@ export default function WorkflowPage() {
                   ) : (
                     <div style={{fontSize:12,color:'#86909c'}}>未识别到法条引用</div>
                   )}
+                </div>
+              )}
+              {opponentReview && (
+                <div style={{marginTop:12,padding:12,background:'#fef2f2',borderRadius:8,border:'1px solid #fecaca'}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'#991b1b'}}>⚔️ 对方律师视角审查</div>
+                  <div style={{fontSize:13,lineHeight:1.8,color:'#7f1d1d',whiteSpace:'pre-wrap'}}>{opponentReview}</div>
                 </div>
               )}
             </div>
