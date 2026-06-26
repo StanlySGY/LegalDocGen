@@ -682,3 +682,57 @@ body {
 [data-theme="dark"] .step-line.done { background: var(--success); }
 [data-theme="dark"] .doc-type-card.selected { box-shadow: 0 2px 8px rgba(129,140,248,0.2); }
 [data-theme="dark"] .btn-p:disabled { background: #4338ca; opacity: 0.5; }
+
+.auth-panel { max-width: 400px; margin: 60px auto; padding: 32px; }
+.auth-copy { margin-bottom: 20px; }
+.auth-copy h2 { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
+.auth-copy p { font-size: 13px; color: var(--text-muted); }
+.auth-form { display: flex; flex-direction: column; gap: 12px; }
+.auth-error { color: var(--danger); font-size: 13px; }
+.auth-loading { padding: 24px; text-align: center; }
+
+.health-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer;
+}
+.health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.health-ok .health-dot { background: var(--success); }
+.health-offline .health-dot { background: var(--danger); }
+.health-degraded .health-dot { background: var(--warning); }
+.health-checking .health-dot { background: #94a3b8; }
+
+.user-chip {
+  font-size: 12px; color: var(--text-muted);
+  padding: 4px 10px; border-radius: 8px; background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.admin-token-input { max-width: 160px; font-size: 12px; padding: 4px 8px; }
+
+.connection-banner {
+  padding: 16px 20px; border-radius: 12px; margin-bottom: 20px;
+  background: var(--warning-bg); border: 1px solid var(--warning);
+}
+.connection-banner.connection-ok { display: none; }
+.connection-banner strong { font-size: 14px; }
+.connection-copy { margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+.connection-copy span { display: block; margin-top: 4px; }
+
+.network-offline-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--danger); padding: 2px 8px;
+  border-radius: 8px; background: var(--danger-bg);
+}
+.offline-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); display: inline-block; }
+
+.t-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+}
+.t-green { background: var(--success-bg); color: var(--success); }
+.t-orange { background: var(--warning-bg); color: var(--warning); }
+.t-red { background: var(--danger-bg); color: var(--danger); }
+.t-gray { background: #f3f4f6; color: #9ca3af; }
+.t-purple { background: #eef2ff; color: #6366f1; }
+.t-blue { background: #eff6ff; color: #3b82f6; }
+
+.btn-sm { padding: 5px 12px; font-size: 12px; }
