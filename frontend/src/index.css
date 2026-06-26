@@ -3019,3 +3019,56 @@ body {
   font-size: 12px;
   color: var(--danger);
 }
+
+/* ===== Theme Toggle ===== */
+.theme-toggle {
+  background: none; border: none; cursor: pointer; font-size: 18px;
+  padding: 4px 8px; border-radius: 8px; transition: background 0.2s;
+}
+.theme-toggle:hover { background: rgba(0,0,0,0.05); }
+
+/* ===== Dark Mode ===== */
+[data-theme="dark"] { color-scheme: dark; }
+[data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .sidebar { background: linear-gradient(195deg, #0a0a1a 0%, #0f172a 50%, #1a1a3e 100%); }
+[data-theme="dark"] .main-wrap { background: #0f172a; }
+[data-theme="dark"] .top-bar { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .page-body { background: #0f172a; }
+[data-theme="dark"] .input, [data-theme="dark"] .select, [data-theme="dark"] .textarea { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+[data-theme="dark"] .btn-o { background: #1e293b; border-color: #475569; color: #e2e8f0; }
+[data-theme="dark"] .auth-panel { background: #1e293b; }
+[data-theme="dark"] .stat-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .nav-item { color: rgba(255,255,255,0.6); }
+[data-theme="dark"] .nav-item:hover { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .nav-item.active { background: rgba(99,102,241,0.2); color: #818cf8; }
+[data-theme="dark"] .connection-banner { background: #1e293b; border-color: #475569; }
+[data-theme="dark"] .user-chip { background: #1e293b; border-color: #475569; color: #94a3b8; }
+[data-theme="dark"] .health-chip { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .notice-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .modal-mask { background: rgba(0,0,0,0.6); }
+[data-theme="dark"] .modal-box { background: #1e293b; border-color: #475569; }
+[data-theme="dark"] table { color: #e2e8f0; }
+[data-theme="dark"] th { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] td { border-color: #334155; }
+[data-theme="dark"] .theme-toggle:hover { background: rgba(255,255,255,0.1); }
+
+/* ===== Mobile Responsive ===== */
+.mobile-toggle { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: var(--text-main); }
+.mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90; }
+.mobile-overlay.show { display: block; }
+@media (max-width: 768px) {
+  .mobile-toggle { display: flex; }
+  .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; width: 260px; z-index: 100; transition: left 0.3s; }
+  .sidebar.open { left: 0; }
+  .main-wrap { margin-left: 0 !important; }
+  .top-bar { padding-left: 50px; }
+  .stat-row { flex-wrap: wrap; }
+  .stat-card { min-width: calc(50% - 8px); }
+}
+
+/* ===== Stage Guide Hints ===== */
+.stage-guide { padding: 12px 16px; background: var(--info-bg); border-radius: 8px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+.stage-guide strong { color: var(--primary); }
+.ai-assist-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; border-radius: 6px; background: var(--primary-light, #eef2ff); color: var(--primary); border: 1px solid var(--primary); cursor: pointer; transition: all 0.2s; }
+.ai-assist-btn:hover { background: var(--primary); color: #fff; }

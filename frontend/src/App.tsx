@@ -11,6 +11,7 @@ import TaskMonitorPage from './pages/TaskMonitorPage'
 import LegalArticlePage from './pages/LegalArticlePage'
 import BillingUsagePage from './pages/BillingUsagePage'
 import OperationsPage from './pages/OperationsPage'
+import DocumentEditor from './pages/DocumentEditor'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useNetworkStatus } from './hooks/useNetworkStatus'
@@ -26,6 +27,7 @@ const productMode = import.meta.env.VITE_PRODUCT_MODE || 'personal_lawyer'
 const isPersonalLawyerMode = productMode === 'personal_lawyer'
 
 export default function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [adminToken, setAdminTokenState] = useState(getAdminToken())
   const [health, setHealth] = useState<HealthState>({ status: 'checking', message: '正在检测后端连接' })
   const [authLoading, setAuthLoading] = useState(true)
@@ -69,6 +71,7 @@ export default function App() {
     const timer = window.setInterval(checkHealth, 60000)
     return () => window.clearInterval(timer)
   }, [])
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
 
   const saveAdminToken = (token: string) => {
     setAdminToken(token)
@@ -144,12 +147,15 @@ export default function App() {
         showAuthPanel={showAuthPanel}
         setShowAuthPanel={setShowAuthPanel}
         logout={logout}
+        theme={theme}
+        setTheme={setTheme}
       >
         <Routes>
           <Route path="/" element={<Navigate to="/cases" replace />} />
           <Route path="/cases" element={<ProtectedRoute><CaseList /></ProtectedRoute>} />
           <Route path="/cases/:caseId" element={<ProtectedRoute><CaseDetail /></ProtectedRoute>} />
           <Route path="/cases/:caseId/workflow" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
+          <Route path="/cases/:caseId/editor" element={<ProtectedRoute><DocumentEditor /></ProtectedRoute>} />
           <Route path="/channels" element={<ProtectedRoute><ChannelManage /></ProtectedRoute>} />
           <Route path="/config" element={<ProtectedRoute><ModelConfig /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
@@ -179,6 +185,8 @@ interface AppLayoutProps {
   showAuthPanel: boolean
   setShowAuthPanel: (show: boolean) => void
   logout: () => void
+  theme: string
+  setTheme: (t: string) => void
 }
 
 function AppLayout({
@@ -192,10 +200,14 @@ function AppLayout({
   authRequired,
   showAuthPanel,
   setShowAuthPanel,
-  logout
+  logout,
+  theme,
+  setTheme
 }: AppLayoutProps) {
   const location = useLocation()
   const isOnline = useNetworkStatus()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
   const isCases = location.pathname.startsWith('/cases')
   const isChannels = location.pathname === '/channels'
   const isConfig = location.pathname === '/config'
@@ -237,7 +249,7 @@ function AppLayout({
 
   return (
     <>
-      <div className="sidebar">
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <h1><span>⚖️</span> LegalDocGen</h1>
           <p>{isPersonalLawyerMode ? '个人律师办案工作台' : '法律文书智能生成系统'}</p>
@@ -318,8 +330,14 @@ function AppLayout({
 
       <div className="main-wrap">
         <div className="top-bar">
-          <div className="breadcrumb">{breadcrumb()}</div>
           <div className="top-actions">
+            <button className="mobile-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
+            <div className="breadcrumb">{breadcrumb()}</div>
+            <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title={theme === 'light' ? '切换暗色模式' : '切换亮色模式'}>
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
             <button
               className={`health-chip health-${health.status}`}
               onClick={checkHealth}
