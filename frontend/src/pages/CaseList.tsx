@@ -41,7 +41,7 @@ export default function CaseList() {
   const [quickStage, setQuickStage] = useState('')
 
   const showToast = (msg:string,type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),2500) }
-  const load = () => api.cases.list({status:filterStatus, search:debouncedSearch, case_type:filterType}).then(setCases)
+  const load = () => api.cases.list({status:filterStatus, keyword:debouncedSearch, case_type:filterType}).then(setCases)
   useEffect(() => { load() }, [debouncedSearch, filterStatus, filterType])
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)

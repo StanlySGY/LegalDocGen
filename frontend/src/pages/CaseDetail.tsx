@@ -114,7 +114,7 @@ export default function CaseDetail() {
   }
 
   const handleEditParty = (p: Party) => {
-    setPartyForm({name:p.name,role:p.role,id_number:p.id_number,address:p.address,phone:p.phone,legal_representative:p.legal_representative,notes:p.notes})
+    setPartyForm({name:p.name,role:p.role,id_number:p.id_number||'',address:p.address||'',phone:p.phone||'',legal_representative:p.legal_representative||'',notes:p.notes||''})
     setEditingPartyId(p.id)
     setShowPartyForm(true)
   }
@@ -358,7 +358,7 @@ export default function CaseDetail() {
           </div>
           <div style={{paddingLeft:20}}>
             {materials.filter(m => { try { return !!JSON.parse(m.structured_data||'{}').timeline } catch { return false } }).map(m => {
-              const sd = JSON.parse(m.structured_data)
+              const sd = JSON.parse(m.structured_data||'{}')
               const events = sd.timeline.split('\\n').filter((s:string)=>s.trim())
               return events.map((ev:string, i:number) => {
                 const match = ev.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*(.*)/)
