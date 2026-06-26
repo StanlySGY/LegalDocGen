@@ -1,9 +1,9 @@
 import json
 import httpx
 from typing import AsyncIterator
+from sqlalchemy.orm import Session, make_transient
 from backend.database import SessionLocal
 from backend.models.channel import Channel
-from backend.services.secret_service import decrypt_secret
 
 
 class ChannelDispatcher:
@@ -14,23 +14,34 @@ class ChannelDispatcher:
             if not channels:
                 return None, ""
 
+            target = None
             if provider:
+                target = next((ch for ch in channels if ch.id == provider or ch.name == provider), None)
+
+            if not target:
                 for ch in channels:
-                    if ch.id == provider or ch.name == provider:
-                        models = json.loads(ch.models) if ch.models else []
-                        m = model or ch.default_model or (models[0] if models else "")
-                        return ch, m
+                    models = json.loads(ch.models) if ch.models else []
+                    if model and model in models:
+                        target = ch
+                        break
+                    if not model and (ch.default_model or models):
+                        target = ch
+                        break
+                if not target:
+                    target = channels[0]
 
-            for ch in channels:
-                models = json.loads(ch.models) if ch.models else []
-                if model and model in models:
-                    return ch, model
-                if not model:
-                    m = ch.default_model or (models[0] if models else "")
-                    if m:
-                        return ch, m
+            models = json.loads(target.models) if target.models else []
+            if model:
+                m = model
+            elif target.default_model:
+                m = target.default_model
+            else:
+                m = models[0] if models else ""
 
-            return channels[0], model or ""
+            # Detach from session so it can be used after close
+            db.expunge(target)
+            make_transient(target)
+            return target, m
         finally:
             db.close()
 
@@ -58,7 +69,7 @@ class ChannelDispatcher:
             raise ValueError("没有可用渠道，请先在「渠道管理」中添加API渠道")
         if not m:
             raise ValueError(f"渠道「{ch.name}」未配置模型，请先获取模型列表并启用")
-        return await self._call_api(ch, m, prompt, stream=False)
+        return await self._call_api(ch, m, prompt)
 
     async def generate_stream(self, prompt: str, provider: str = "", model: str = "") -> AsyncIterator[str]:
         ch, m = self._get_channel(provider, model)
@@ -71,12 +82,12 @@ class ChannelDispatcher:
 
     def _build_headers(self, ch: Channel) -> dict:
         headers = {"Content-Type": "application/json"}
-        api_key = decrypt_secret(ch.api_key)
+        api_key = ch.api_key  # Access while session still valid or detached
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
-    async def _call_api(self, ch: Channel, model: str, prompt: str, stream: bool = False) -> str:
+    async def _call_api(self, ch: Channel, model: str, prompt: str) -> str:
         url = f"{ch.base_url.rstrip('/')}/chat/completions"
         headers = self._build_headers(ch)
         body = {
@@ -88,7 +99,10 @@ class ChannelDispatcher:
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(url, headers=headers, json=body)
             if resp.status_code != 200:
-                raise ValueError(f"API调用失败 ({resp.status_code}): {resp.text[:300]}")
+                error_text = resp.text[:500]
+                if "context" in error_text.lower() and ("length" in error_text.lower() or "exceed" in error_text.lower()):
+                    raise ValueError("案件材料过长，超出了当前AI引擎的单次阅读上限。请尝试：1) 拆分材料分批上传；2) 在「助手配置」中更换支持长文本的模型")
+                raise ValueError(f"API调用失败 ({resp.status_code}): {error_text[:300]}")
             data = resp.json()
             return data["choices"][0]["message"]["content"]
 
@@ -107,6 +121,8 @@ class ChannelDispatcher:
                     text = ""
                     async for chunk in resp.aiter_text():
                         text += chunk
+                    if "context" in text.lower() and ("length" in text.lower() or "exceed" in text.lower()):
+                        raise ValueError("案件材料过长，超出了当前AI引擎的单次阅读上限。请尝试：1) 拆分材料分批上传；2) 在「助手配置」中更换支持长文本的模型")
                     raise ValueError(f"API调用失败 ({resp.status_code}): {text[:300]}")
                 buffer = ""
                 async for chunk in resp.aiter_text():

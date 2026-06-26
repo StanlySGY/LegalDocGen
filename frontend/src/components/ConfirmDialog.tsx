@@ -1,70 +1,24 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 
-interface ConfirmDialogProps {
-  open: boolean
-  title: string
+interface Props {
   message: string
-  confirmText?: string
-  cancelText?: string
-  variant?: 'default' | 'danger'
   onConfirm: () => void
   onCancel: () => void
 }
 
-export default function ConfirmDialog({
-  open,
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  variant = 'default',
-  onConfirm,
-  onCancel
-}: ConfirmDialogProps) {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onCancel()
-    if (e.key === 'Enter') onConfirm()
-  }, [onCancel, onConfirm])
-
-  useEffect(() => {
-    if (open) {
-      document.addEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
-    }
-  }, [open, handleKeyDown])
-
-  if (!open) return null
+export default function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
+  const confirmRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { confirmRef.current?.focus() }, [])
 
   return (
     <div className="modal-mask" onClick={onCancel}>
-      <div className="modal-box confirm-dialog" onClick={e => e.stopPropagation()}>
-        <h3>{title}</h3>
-        <p className="confirm-message">{message}</p>
-        <div className="confirm-actions">
-          <button className="btn btn-o" onClick={onCancel}>{cancelText}</button>
-          <button
-            className={`btn ${variant === 'danger' ? 'btn-d' : 'btn-p'}`}
-            onClick={onConfirm}
-          >
-            {confirmText}
-          </button>
+      <div className="modal-box" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>{message}</p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn btn-o" onClick={onCancel}>取消</button>
+          <button ref={confirmRef} className="btn btn-d" onClick={onConfirm}>确认删除</button>
         </div>
       </div>
     </div>
   )
-}
-
-export function useConfirm() {
-  const confirm = (message: string, title = '确认操作'): Promise<boolean> => {
-    return new Promise(resolve => {
-      const result = window.confirm(message)
-      resolve(result)
-    })
-  }
-
-  return { confirm }
 }

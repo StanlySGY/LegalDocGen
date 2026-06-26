@@ -22,6 +22,8 @@ class Material(Base):
     file_type = Column(String(50), nullable=False)
     file_size = Column(Integer, default=0)
     parsed_content = Column(Text, default="")
+    parsed_content_masked = Column(Text, default="")  # Anonymized version of content
+    anonymize_mapping = Column(Text, default="{}")     # JSON mapping for de-anonymization
     structured_data = Column(Text, default="{}")
     parse_task_id = Column(String(36), nullable=True)
     parse_status = Column(String(50), default="pending")
