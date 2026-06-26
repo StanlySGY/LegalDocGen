@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'reac
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, quotaUpgradeMessage } from '../services/api'
 import MaterialChecklist from './MaterialChecklist'
+import Drawer from '../components/Drawer'
 import { getMaterialCompletion, type ChecklistItem } from '../services/materialMatcher'
 import type { Case, Material, MaterialCatalogItem, CaseDeadline, CaseNote } from '../types'
 import { DOCUMENT_TYPES } from '../types'
@@ -37,6 +38,9 @@ export default function CaseDetail() {
   const { confirm, dialogProps } = useConfirmDialog()
   const fileRef = useRef<HTMLInputElement>(null)
   const [previewMaterial, setPreviewMaterial] = useState<{open:boolean;filename:string;content:string}|null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerTitle, setDrawerTitle] = useState('')
+  const [drawerContent, setDrawerContent] = useState('')
   const [deadlines, setDeadlines] = useState<CaseDeadline[]>([])
   const [notes, setNotes] = useState<CaseNote[]>([])
   const [showDeadlineForm, setShowDeadlineForm] = useState(false)
@@ -103,6 +107,17 @@ export default function CaseDetail() {
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const openMaterialDrawer = async (materialId: string, filename: string) => {
+    try {
+      const preview = await api.materials.preview(materialId)
+      setDrawerTitle(filename)
+      setDrawerContent(preview.parsed_content || '（该文件暂无解析内容）')
+      setDrawerOpen(true)
+    } catch (e: any) {
+      showToast(e.message || '加载预览失败', { type: 'err' })
     }
   }
 
@@ -330,7 +345,7 @@ export default function CaseDetail() {
             {materialInsights.catalog.map((item, index) => (
               <div key={item.id || index} style={{border:'1px solid #e5e7eb',borderRadius:10,padding:12,background:'#fafbfc'}}>
                 <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-                  <strong className="text-sm">{index + 1}. {item.filename}</strong>
+                  <strong className="text-sm" style={{cursor:'pointer',color:'var(--primary)'}} onClick={()=>openMaterialDrawer(item.id, item.filename)}>{index + 1}. {item.filename}</strong>
                   <span className={`tag ${statusTag(item.parse_status)}`}>{statusLabel(item.parse_status)}</span>
                 </div>
                 <div style={{fontSize:11,color:'#4f46e5',marginTop:7,fontWeight:600}}>{item.citation || '页码未识别'}</div>
@@ -501,6 +516,9 @@ export default function CaseDetail() {
         content={previewMaterial?.content || ''}
         onClose={closePreview}
       />
+      <Drawer open={drawerOpen} title={drawerTitle} onClose={() => setDrawerOpen(false)}>
+        <div style={{ fontSize: 13, lineHeight: 2, whiteSpace: 'pre-wrap', color: 'var(--text-main)' }}>{drawerContent}</div>
+      </Drawer>
       {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )

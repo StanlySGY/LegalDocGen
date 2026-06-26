@@ -414,6 +414,18 @@ export const api = {
     delete: (id: string) => request<any>(`/documents/${id}`, { method: 'DELETE' }),
     getTypes: () => request<any>('/documents/types'),
   },
+  referenceDocs: {
+    list: () => request<any[]>('/reference-docs'),
+    get: (id: string) => request<any>(`/reference-docs/${id}`),
+    create: (data: { name: string; doc_type: string; content: string }) =>
+      request<any>('/reference-docs', { method: 'POST', body: JSON.stringify(data) }),
+    upload: async (file: File) => {
+      const form = new FormData(); form.append('file', file)
+      const res = await fetch(`${BASE}/reference-docs/upload`, { method: 'POST', headers: authHeaders(), body: form })
+      if (!res.ok) throw new Error('上传失败'); return res.json()
+    },
+    delete: (id: string) => request<any>(`/reference-docs/${id}`, { method: 'DELETE' }),
+  },
 }
 
 // ===== Prefetch Cache =====

@@ -12,19 +12,41 @@ export default function ModelConfig() {
   const [stages, setStages] = useState<any[]>([])
   const { toasts, showToast, removeToast } = useToast()
   const [loading, setLoading] = useState(true)
+  const [refDocs, setRefDocs] = useState<any[]>([])
+  const [showRefDocForm, setShowRefDocForm] = useState(false)
+  const [refDocForm, setRefDocForm] = useState({ name: '', doc_type: 'complaint', content: '' })
+  const [refDocFile, setRefDocFile] = useState<File | null>(null)
 
   useEffect(() => {
     setLoading(true)
     Promise.all([
       api.config.getPrompts().then(setPrompts),
-      api.config.getStages().then(setStages).catch(() => setStages([]))
+      api.config.getStages().then(setStages).catch(() => setStages([])),
+      api.referenceDocs.list().then(setRefDocs).catch(() => setRefDocs([]))
     ]).catch((e: any) => {
       showToast(e.message || '模板加载失败', { type: 'err' })
     }).finally(() => {
       setLoading(false)
     })
   }, [])
+
   const savePrompt = async () => { if(!editingPrompt)return; if(editingPrompt.id) await api.config.updatePrompt(editingPrompt.id,editingPrompt); else await api.config.createPrompt(editingPrompt); setEditingPrompt(null); api.config.getPrompts().then(setPrompts); showToast('模板已保存') }
+
+  const saveRefDoc = async () => {
+    if (!refDocForm.name.trim()) return showToast('请输入文书名称', { type: 'err' })
+    try {
+      if (refDocFile) { await api.referenceDocs.upload(refDocFile) }
+      else { await api.referenceDocs.create(refDocForm) }
+      setRefDocForm({ name: '', doc_type: 'complaint', content: '' }); setRefDocFile(null); setShowRefDocForm(false)
+      api.referenceDocs.list().then(setRefDocs)
+      showToast('文书已保存')
+    } catch (e: any) { showToast(e.message || '保存失败', { type: 'err' }) }
+  }
+
+  const deleteRefDoc = async (id: string) => {
+    try { await api.referenceDocs.delete(id); setRefDocs(refDocs.filter(d => d.id !== id)); showToast('已删除') }
+    catch (e: any) { showToast(e.message || '删除失败', { type: 'err' }) }
+  }
 
   if (loading) return <LoadingSpinner text="正在加载 Prompt 模板..." />
 
@@ -109,6 +131,55 @@ export default function ModelConfig() {
           </div>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="card-hd">
+          <div>
+            <span className="card-title">过往文书库</span>
+            <p className="text-xs-desc">上传参考文书，AI 生成时可学习写作风格和表达习惯。</p>
+          </div>
+          <button className="btn btn-p btn-sm" onClick={() => setShowRefDocForm(true)}>+ 添加文书</button>
+        </div>
+        {refDocs.length === 0 ? (
+          <div className="empty refined-empty" style={{ padding: 32 }}><p>暂无参考文书，添加后 AI 可学习您的写作风格</p></div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {refDocs.map(doc => (
+              <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f7f8fa', borderRadius: 8 }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{doc.name}</span>
+                  <span className="tag t-purple" style={{ marginLeft: 8 }}>{doc.doc_type || '通用'}</span>
+                  <span style={{ fontSize: 11, color: '#86909c', marginLeft: 8 }}>{doc.content ? doc.content.length + '字' : ''}</span>
+                </div>
+                <button className="btn btn-d btn-sm" onClick={() => deleteRefDoc(doc.id)}>删除</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showRefDocForm && (
+        <div className="modal-mask" onClick={() => setShowRefDocForm(false)}>
+          <div className="modal-box" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <h3>添加参考文书</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div><label className="text-xs-label">文书名称</label><input className="input" value={refDocForm.name} onChange={e => setRefDocForm({ ...refDocForm, name: e.target.value })} placeholder="例如：民事起诉状范本" /></div>
+              <div><label className="text-xs-label">文书类型</label>
+                <select className="select" value={refDocForm.doc_type} onChange={e => setRefDocForm({ ...refDocForm, doc_type: e.target.value })}>
+                  <option value="complaint">起诉状</option><option value="defense">答辩状</option><option value="representation">代理词</option><option value="lawyer_letter">律师函</option><option value="other">其他</option>
+                </select>
+              </div>
+              <div><label className="text-xs-label">或上传文件</label><input type="file" accept=".txt,.md,.doc,.docx" onChange={e => setRefDocFile(e.target.files?.[0] || null)} style={{ fontSize: 13 }} /></div>
+              {!refDocFile && <div><label className="text-xs-label">文书内容</label><textarea className="textarea" style={{ height: 200 }} value={refDocForm.content} onChange={e => setRefDocForm({ ...refDocForm, content: e.target.value })} placeholder="粘贴文书全文..." /></div>}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+                <button className="btn btn-o" onClick={() => setShowRefDocForm(false)}>取消</button>
+                <button className="btn btn-p" onClick={saveRefDoc}>保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toaster toasts={toasts} onRemove={removeToast} />
     </div>
   )
