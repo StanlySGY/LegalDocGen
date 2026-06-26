@@ -1,8 +1,9 @@
+from datetime import datetime
 import uuid
 
 from sqlalchemy import Column, DateTime, String, Text
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 
 class AuditLog(Base):
@@ -13,4 +14,4 @@ class AuditLog(Base):
     resource_type = Column(String(80), default="")
     resource_id = Column(String, default="")
     summary = Column(Text, default="")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

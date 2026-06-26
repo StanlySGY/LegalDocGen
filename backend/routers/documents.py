@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -5,7 +6,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.database import get_db, utcnow
+from backend.database import get_db
 from backend.dependencies import get_accessible_case, get_current_user
 from backend.exceptions import NotFoundError, ValidationError
 from backend.models.case import Case
@@ -171,7 +172,7 @@ async def upload_final_version(
     
     doc.final_file_path = file_path
     doc.final_file_name = safe_name
-    doc.final_uploaded_at = utcnow()
+    doc.final_uploaded_at = datetime.utcnow()
     doc.status = "finalized"
     
     record_audit(db, "document.upload_final", "case", doc.case_id, f"上传终版文书: {doc.name}")

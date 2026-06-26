@@ -1,9 +1,10 @@
+from datetime import datetime
 import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy.orm import relationship
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 
 class UserRole:
@@ -20,8 +21,8 @@ class User(Base):
     password_hash = Column(String(300), nullable=False)
     role = Column(String(30), default=UserRole.MEMBER)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     cases = relationship("Case", back_populates="owner")
     team_members = relationship("TeamMember", back_populates="user", cascade="all, delete-orphan")

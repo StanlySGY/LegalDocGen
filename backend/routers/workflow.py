@@ -1,17 +1,29 @@
 import json
+import re
+import zipfile
+from io import BytesIO
+from typing import Optional
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, Response
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.workflow import StageType, STAGE_NAMES, STAGE_ORDER
-from backend.models.material import Material
-from backend.services.workflow_engine.engine import WorkflowEngine
-from backend.services.workflow_engine.stages import STAGE_PROMPTS
+from backend.dependencies import case_query_for_user, get_accessible_case, get_current_user
+from backend.exceptions import NotFoundError, ValidationError, InternalServerError, ForbiddenError
+from backend.models.billing import UsageMetric
+from backend.models.case import Case, CaseStatus
+from backend.models.user import User
+from backend.models.workflow import StageType, WorkflowNode
+from backend.services.audit_service import record_audit
+from backend.services.billing_service import enforce_quota, record_usage
+from backend.services.export_service import ExportService
 from backend.services.model_dispatcher.dispatcher import dispatcher
 from backend.services.prompt_manager.manager import PromptManager
+from backend.services.workflow_engine.engine import WorkflowEngine
+from backend.services.workflow_engine.stages import get_draft_prompt
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
 
@@ -22,60 +34,104 @@ class GenerateRequest(BaseModel):
     provider: str = ""
     model: str = ""
     template_id: str = ""
-    document_type: str = ""
-
-def _prepare_generation(case_id: str, req: GenerateRequest, db: Session):
-    """Common preparation for generation endpoints.
-    Returns (engine, pm, stage, final_prompt).
-    Validates lock status and builds the final prompt with materials/previous context.
-    """
-    engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    stage = StageType(req.stage)
-
-    progress = engine.get_stage_progress(case_id)
-    stage_info = next((s for s in progress if s["stage"] == req.stage), None)
-    if stage_info and stage_info.get("locked"):
-        raise HTTPException(400, stage_info.get("locked_reason"))
-
-    prompt_template = req.prompt or pm.get_prompt(stage, req.template_id, req.document_type)
-    materials_context = engine.get_case_context(case_id)
-    previous_context = engine.get_previous_stages_output(case_id, stage)
-
-    final_prompt = prompt_template.format(
-        materials=materials_context["materials"],
-        previous_context=previous_context,
-    )
-    return engine, pm, stage, final_prompt
-
-
-def _structure_and_save(case_id: str, stage: StageType, output: str, db: Session):
-    """Structure extracted facts and save into Materials if needed."""
-    if stage == StageType.FACT_EXTRACTION:
-        from backend.services.structurer.structurer import structure_facts
-        structured = structure_facts(output)
-        for m in db.query(Material).filter(Material.case_id == case_id).all():
-            m.structured_data = json.dumps(structured, ensure_ascii=False)
-        db.commit()
-
 
 
 class RollbackRequest(BaseModel):
     node_id: str
 
 
+class SaveOutputRequest(BaseModel):
+    output: str = ""
+
+
+class BatchExportRequest(BaseModel):
+    case_ids: list[str]
+
+
+TRUSTED_OUTPUT_RULES = """
+
+---
+输出可信度要求：
+1. 仅基于已上传案件材料和前序阶段内容作答，不得编造材料中不存在的事实、证据或程序进展。
+2. 涉及事实判断时，尽量标注依据材料或证据来源；无法确认的内容请列入“需人工核验事项”。
+3. 涉及法律条文、金额计算或诉讼策略时，如材料不足或准确性不确定，必须明确提示需由律师复核。
+4. 输出末尾请保留“需人工核验事项”小节，列明不确定信息和建议补充材料。
+"""
+
+
+def _build_final_prompt(prompt_template: str, materials: str, previous_context: str) -> str:
+    return prompt_template.format(
+        materials=materials,
+        previous_context=previous_context,
+    ) + TRUSTED_OUTPUT_RULES
+
+
+def _get_case_template_id(case_id: str, request_template_id: str, db: Session) -> str:
+    if request_template_id:
+        return request_template_id
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise NotFoundError("案件不存在")
+    return case.template_id or ""
+
+
+def _safe_filename(value: str) -> str:
+    name = re.sub(r"[^\w一-鿿.-]+", "_", value).strip("._")
+    return name or "case"
+
+
+def _build_docx_response(content: bytes, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+def _ensure_stage_ready(engine: WorkflowEngine, case_id: str, stage: StageType):
+    missing = engine.get_missing_previous_stages(case_id, stage)
+    if missing:
+        raise ValidationError(f"请先完成前序阶段：{'、'.join(missing)}")
+
+
+def _ensure_not_archived(case: Case):
+    if case.status == CaseStatus.ARCHIVED:
+        raise ForbiddenError("案件已归档，无法修改。如需编辑请先解归档。")
+
+
+def _ensure_export_ready(engine: WorkflowEngine, case_id: str):
+    missing = engine.get_missing_output_stages(case_id)
+    if missing:
+        raise ValidationError(f"请先完成全部工作流阶段，仍缺少：{'、'.join(missing)}")
+
+
+def _ensure_node_belongs_to_case(db: Session, node_id: str, case_id: str):
+    node = db.query(WorkflowNode).filter(WorkflowNode.id == node_id).first()
+    if not node or node.case_id != case_id:
+        raise NotFoundError("工作流节点不存在")
+
+
 @router.get("/progress/{case_id}")
-def get_progress(case_id: str, db: Session = Depends(get_db)):
+def get_progress(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
     engine = WorkflowEngine(db)
     return engine.get_stage_progress(case_id)
 
 
 @router.get("/node/{case_id}/{stage}")
-def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
+def get_node(case_id: str, stage: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
+    try:
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
+
     engine = WorkflowEngine(db)
-    node = engine.get_stage_node(case_id, StageType(stage))
+    node = engine.get_stage_node(case_id, stage_type)
     if not node:
-        return {"stage": stage, "output": "", "prompt": STAGE_PROMPTS.get(StageType(stage), ""), "version": 0}
+        pm = PromptManager(db)
+        template_id = _get_case_template_id(case_id, "", db)
+        return {"stage": stage, "output": "", "prompt": pm.get_prompt(stage_type, template_id), "version": 0}
     return {
         "id": node.id,
         "stage": node.stage,
@@ -89,26 +145,87 @@ def get_node(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 
 @router.post("/generate/{case_id}")
-async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
-    engine, pm, stage, final_prompt = _prepare_generation(case_id, req, db)
+async def generate(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
+    enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+
     try:
+        stage = StageType(req.stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {req.stage}")
+
+    try:
+        _ensure_stage_ready(engine, case_id, stage)
+        template_id = _get_case_template_id(case_id, req.template_id, db)
+
+        if req.prompt:
+            prompt_template = req.prompt
+        elif stage == StageType.DRAFT_GENERATION and case.document_type:
+            prompt_template = get_draft_prompt(case.document_type)
+        else:
+            prompt_template = pm.get_prompt(stage, template_id)
+
+        materials_context = engine.get_case_context(case_id)
+        previous_context = engine.get_previous_stages_output(case_id, stage)
+
+        final_prompt = _build_final_prompt(
+            prompt_template,
+            materials_context["materials"],
+            previous_context,
+        )
+
         output = await dispatcher.generate(final_prompt, req.provider, req.model)
-    except Exception as e:
-        raise HTTPException(500, f"生成失败: {e}")
+    except ValueError as e:
+        raise ValidationError(str(e))
 
     node = engine.create_or_update_node(
-        case_id=case_id, stage=stage, prompt=req.prompt or final_prompt,
+        case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
         output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
     )
-
-    _structure_and_save(case_id, stage, output, db)
-
+    record_usage(db, case.team_id, UsageMetric.AI_TASKS, "workflow", node.id)
+    record_audit(db, "workflow.generate", "case", case_id, f"生成阶段：{stage.value}")
+    db.commit()
     return {"node_id": node.id, "output": output, "version": node.version}
 
 
 @router.post("/generate-stream/{case_id}")
-async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db)):
-    engine, pm, stage, final_prompt = _prepare_generation(case_id, req, db)
+async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
+    enforce_quota(db, case.team_id, UsageMetric.AI_TASKS)
+    engine = WorkflowEngine(db)
+    pm = PromptManager(db)
+
+    try:
+        stage = StageType(req.stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {req.stage}")
+
+    try:
+        _ensure_stage_ready(engine, case_id, stage)
+        template_id = _get_case_template_id(case_id, req.template_id, db)
+
+        if req.prompt:
+            prompt_template = req.prompt
+        elif stage == StageType.DRAFT_GENERATION and case.document_type:
+            prompt_template = get_draft_prompt(case.document_type)
+        else:
+            prompt_template = pm.get_prompt(stage, template_id)
+
+        materials_context = engine.get_case_context(case_id)
+        previous_context = engine.get_previous_stages_output(case_id, stage)
+
+        final_prompt = _build_final_prompt(
+            prompt_template,
+            materials_context["materials"],
+            previous_context,
+        )
+    except ValueError as e:
+        raise ValidationError(str(e))
+
     async def stream_generator():
         try:
             full_output = []
@@ -116,29 +233,45 @@ async def generate_stream(case_id: str, req: GenerateRequest, db: Session = Depe
                 full_output.append(chunk)
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
             output = "".join(full_output)
-            engine.create_or_update_node(
-                case_id=case_id, stage=stage, prompt=req.prompt or final_prompt,
+            node = engine.create_or_update_node(
+                case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
                 output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "default",
             )
-            _structure_and_save(case_id, stage, output, db)
+            record_usage(db, case.team_id, UsageMetric.AI_TASKS, "workflow", node.id)
+            record_audit(db, "workflow.generate_stream", "case", case_id, f"流式生成阶段：{stage.value}")
+            db.commit()
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': f'生成失败: {str(e)}'})}\n\n"
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
 
 @router.post("/rollback/{case_id}")
-def rollback(case_id: str, req: RollbackRequest, db: Session = Depends(get_db)):
+def rollback(case_id: str, req: RollbackRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
+    _ensure_node_belongs_to_case(db, req.node_id, case_id)
     engine = WorkflowEngine(db)
-    node = engine.rollback_to_version(req.node_id)
-    return {"stage": node.stage, "version": node.version, "output": node.output}
+    try:
+        node = engine.rollback_to_version(req.node_id)
+        record_audit(db, "workflow.rollback", "case", case_id, f"回滚阶段：{node.stage}")
+        db.commit()
+        return {"stage": node.stage, "version": node.version, "output": node.output}
+    except Exception as e:
+        raise InternalServerError(f"回滚失败: {str(e)}")
 
 
 @router.get("/history/{case_id}/{stage}")
-def get_history(case_id: str, stage: str, db: Session = Depends(get_db)):
+def get_history(case_id: str, stage: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    get_accessible_case(db, case_id, current_user)
+    try:
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
+
     engine = WorkflowEngine(db)
-    nodes = engine.get_version_history(case_id, StageType(stage))
+    nodes = engine.get_version_history(case_id, stage_type)
     return [
         {
             "id": n.id, "version": n.version, "output": n.output,
@@ -150,532 +283,150 @@ def get_history(case_id: str, stage: str, db: Session = Depends(get_db)):
 
 
 @router.post("/save-output/{case_id}/{stage}")
-def save_output(case_id: str, stage: str, output: str = "", db: Session = Depends(get_db)):
+def save_output(case_id: str, stage: str, req: SaveOutputRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    _ensure_not_archived(case)
+    try:
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
+
     engine = WorkflowEngine(db)
-    node = engine.get_stage_node(case_id, StageType(stage))
+    node = engine.get_stage_node(case_id, stage_type)
     if not node:
-        raise HTTPException(404, "节点不存在")
-    node.output = output
+        raise NotFoundError("工作流节点不存在")
+    node.output = req.output
+    engine.sync_case_status(case_id)
+    record_audit(db, "workflow.save_output", "case", case_id, f"保存阶段输出：{stage_type.value}")
     db.commit()
     return {"message": "已保存"}
 
 
-class ReviewChainRequest(BaseModel):
-    models: list[dict]
-    prompt: str = ""
-
-
-class MultiCompareRequest(BaseModel):
-    models: list[dict]
-    prompt: str = ""
-
-
-@router.post("/review-chain/{case_id}")
-async def review_chain(case_id: str, req: ReviewChainRequest, db: Session = Depends(get_db)):
-    if len(req.models) != 3:
-        raise HTTPException(400, "链式审查需要3个模型（生成/审查/优化）")
-
-    engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    stage = StageType.REVIEW_OPTIMIZATION
-    prompt_template = req.prompt or pm.get_prompt(stage)
-    materials_context = engine.get_case_context(case_id)
-    previous_context = engine.get_previous_stages_output(case_id, stage)
-    context_prompt = prompt_template.format(
-        materials=materials_context["materials"],
-        previous_context=previous_context,
-    )
-
-    from backend.services.review_orchestrator.orchestrator import ReviewOrchestrator
-    orchestrator = ReviewOrchestrator()
-
-    async def stream():
-        step_outputs = {}
-        final_output = ""
-        try:
-            async for event in orchestrator.review_chain(case_id, req.models, context_prompt):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-                if event.get("step") and event.get("status") == "done":
-                    step_outputs[event["step"]] = event["output"]
-                if event.get("final"):
-                    final_output = event.get("output", "")
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            return
-
-        engine.create_or_update_node(
-            case_id=case_id, stage=stage, prompt=req.prompt or prompt_template,
-            output=final_output, model_used="review_chain",
-        )
-        from backend.models.review import ReviewResult
-        db.add(ReviewResult(
-            case_id=case_id, review_mode="chain",
-            step_outputs=json.dumps(step_outputs, ensure_ascii=False),
-            final_output=final_output, status="completed",
-        ))
+@router.get("/export/{case_id}")
+def export_case(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    try:
+        engine = WorkflowEngine(db)
+        _ensure_export_ready(engine, case_id)
+        export_service = ExportService(db)
+        content = export_service.export_to_word(case_id)
+        record_audit(db, "workflow.export", "case", case_id, f"导出案件：{case.name}")
         db.commit()
-        yield f"data: {json.dumps({'all_done': True})}\n\n"
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
-
-
-@router.post("/multi-compare/{case_id}")
-async def multi_compare(case_id: str, req: MultiCompareRequest, db: Session = Depends(get_db)):
-    if len(req.models) < 2:
-        raise HTTPException(400, "多版本对比需要至少2个模型")
-
-    engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    stage = StageType.REVIEW_OPTIMIZATION
-    prompt_template = req.prompt or pm.get_prompt(stage)
-    materials_context = engine.get_case_context(case_id)
-    previous_context = engine.get_previous_stages_output(case_id, stage)
-    context_prompt = prompt_template.format(
-        materials=materials_context["materials"],
-        previous_context=previous_context,
-    )
-
-    from backend.services.review_orchestrator.orchestrator import ReviewOrchestrator
-    orchestrator = ReviewOrchestrator()
-
-    async def stream():
-        try:
-            async for event in orchestrator.multi_compare(case_id, req.models, context_prompt):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-                if event.get("final"):
-                    model_outputs = event.get("outputs", {})
-                    from backend.models.review import ReviewResult
-                    db.add(ReviewResult(
-                        case_id=case_id, review_mode="compare",
-                        model_outputs=json.dumps(model_outputs, ensure_ascii=False),
-                        status="completed",
-                    ))
-                    db.commit()
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
+        return _build_docx_response(content, f"{_safe_filename(case.name)}.docx")
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        if isinstance(e, (NotFoundError, ValidationError)):
+            raise e
+        raise HTTPException(500, f"导出失败: {str(e)}")
 
 
-@router.post("/review-select/{case_id}")
-def review_select(case_id: str, data: dict, db: Session = Depends(get_db)):
-    review_id = data.get("review_id")
-    selected_model = data.get("selected_model", "")
-    if not review_id:
-        raise HTTPException(400, "review_id 必填")
+@router.get("/export-package/{case_id}")
+def export_case_package(case_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    case = get_accessible_case(db, case_id, current_user)
+    try:
+        engine = WorkflowEngine(db)
+        _ensure_export_ready(engine, case_id)
+        export_service = ExportService(db)
+        content = export_service.export_case_package(case_id)
+        record_audit(db, "workflow.export_package", "case", case_id, f"导出案件包：{case.name}")
+        db.commit()
+        filename = f"{_safe_filename(case.name)}_案件包.zip"
+        return Response(
+            content=content,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+        )
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        if isinstance(e, (NotFoundError, ValidationError)):
+            raise e
+        raise HTTPException(500, f"导出失败: {str(e)}")
 
-    from backend.models.review import ReviewResult
-    rr = db.query(ReviewResult).filter(ReviewResult.id == review_id).first()
-    if not rr:
-        raise HTTPException(404, "审查记录不存在")
 
-    outputs = json.loads(rr.model_outputs) if rr.model_outputs else {}
-    selected_output = outputs.get(selected_model, "")
-    if not selected_output:
-        raise HTTPException(400, f"未找到模型 {selected_model} 的输出")
+@router.post("/export-batch")
+def export_batch(req: BatchExportRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    if not req.case_ids:
+        raise ValidationError("请选择要导出的案件")
 
-    rr.selected_model = selected_model
-    rr.final_output = selected_output
+    cases = case_query_for_user(db, current_user).filter(Case.id.in_(req.case_ids)).all()
+    case_map = {case.id: case for case in cases}
+    missing_ids = [case_id for case_id in req.case_ids if case_id not in case_map]
+    if missing_ids:
+        raise NotFoundError("部分案件不存在或无权访问")
 
     engine = WorkflowEngine(db)
-    engine.create_or_update_node(
-        case_id=case_id, stage=StageType.REVIEW_OPTIMIZATION,
-        prompt="multi_compare", output=selected_output,
-        model_used=f"compare:{selected_model}",
-    )
+    export_service = ExportService(db)
+    buffer = BytesIO()
+    used_names: dict[str, int] = {}
+
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for case_id in req.case_ids:
+            case = case_map[case_id]
+            _ensure_export_ready(engine, case_id)
+            base_name = _safe_filename(case.name)
+            count = used_names.get(base_name, 0) + 1
+            used_names[base_name] = count
+            filename = f"{base_name}.docx" if count == 1 else f"{base_name}_{count}.docx"
+            archive.writestr(filename, export_service.export_to_word(case_id))
+
+    record_audit(db, "workflow.export_batch", "case", "", f"批量导出 {len(req.case_ids)} 个案件")
     db.commit()
-    return {"output": selected_output, "model": selected_model}
+    buffer.seek(0)
+    filename = f"LegalDocGen_批量导出_{len(req.case_ids)}份.zip"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
-class AIEditRequest(BaseModel):
-    text: str
-    instruction: str = ""
-    provider: str = ""
-    model: str = ""
-
-
-@router.post("/ai-edit")
-async def ai_edit(req: AIEditRequest):
-    instruction = req.instruction or "润色以下法律文书文本，使其更加专业、严谨、符合法律文书的行文规范，保持原意不变："
-    prompt = f"{instruction}\n\n---\n\n{req.text}"
+@router.get("/diff/{case_id}/{stage}")
+def get_version_diff(
+    case_id: str,
+    stage: str,
+    version1: int,
+    version2: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    get_accessible_case(db, case_id, current_user)
     try:
-        result = await dispatcher.generate(prompt, req.provider, req.model)
-        return {"result": result}
-    except Exception as e:
-        raise HTTPException(500, f"AI编辑失败: {e}")
+        stage_type = StageType(stage)
+    except ValueError:
+        raise ValidationError(f"无效的工作流阶段: {stage}")
 
-
-class QuickGenerateRequest(BaseModel):
-    document_type: str = ""
-    provider: str = ""
-    model: str = ""
-
-
-@router.post("/quick-generate/{case_id}")
-async def quick_generate(case_id: str, req: QuickGenerateRequest, db: Session = Depends(get_db)):
     engine = WorkflowEngine(db)
-    pm = PromptManager(db)
-    total = len(STAGE_ORDER)
-
-    async def run():
-        for i, stage in enumerate(STAGE_ORDER):
-            yield f"data: {json.dumps({'stage': stage.value, 'name': STAGE_NAMES[stage], 'status': 'running', 'progress': int(i / total * 100)}, ensure_ascii=False)}\n\n"
-            doc_type = req.document_type if stage in (StageType.DRAFT_GENERATION, StageType.REVIEW_OPTIMIZATION) else ""
-            prompt_template = pm.get_prompt(stage, document_type=doc_type)
-            materials_context = engine.get_case_context(case_id)
-            previous_context = engine.get_previous_stages_output(case_id, stage)
-            try:
-                final_prompt = prompt_template.format(
-                    materials=materials_context["materials"],
-                    previous_context=previous_context,
-                )
-                output = await dispatcher.generate(final_prompt, req.provider, req.model)
-            except Exception as e:
-                yield f"data: {json.dumps({'error': f'{STAGE_NAMES[stage]}失败: {e}'}, ensure_ascii=False)}\n\n"
-                return
-            node = engine.create_or_update_node(
-                case_id=case_id, stage=stage, prompt=prompt_template,
-                output=output, model_used=f"{req.provider}/{req.model}" if req.provider else "auto",
-            )
-            # Common post-processing for FACT_EXTRACTION
-            _structure_and_save(case_id, stage, output, db)
-            yield f"data: {json.dumps({'stage': stage.value, 'name': STAGE_NAMES[stage], 'status': 'done', 'progress': int((i + 1) / total * 100)}, ensure_ascii=False)}\n\n"
-        final_node = engine.get_stage_node(case_id, StageType.REVIEW_OPTIMIZATION)
-        final_output = final_node.output if final_node else ""
-        yield f"data: {json.dumps({'done': True, 'output': final_output, 'document_type': req.document_type}, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(run(), media_type="text/event-stream")
-
-
-class VerifyCitationRequest(BaseModel):
-    citation: str
-    provider: str = ""
-    model: str = ""
-
-
-@router.post("/verify-citation")
-async def verify_citation(req: VerifyCitationRequest):
-    prompt = f"""请核查以下法律条文引用是否准确、是否现行有效：
-
-"{req.citation}"
-
-请回答：
-1. 该法条是否存在？（是/否/不确定）
-2. 条文内容是否准确？（是/否/部分准确）
-3. 该法条是否已被修订或废止？
-4. 如有错误，请给出正确的引用。
-
-仅返回核查结果，不要添加额外解释。"""
-    try:
-        result = await dispatcher.generate(prompt, req.provider, req.model)
-        return {"result": result}
-    except Exception as e:
-        raise HTTPException(500, f"核查失败: {e}")
-
-
-class ExtractEvidenceRequest(BaseModel):
-    provider: str = ""
-    model: str = ""
-
-
-@router.post("/extract-evidence/{case_id}")
-async def extract_evidence(case_id: str, req: ExtractEvidenceRequest, db: Session = Depends(get_db)):
-    engine = WorkflowEngine(db)
-    context = engine.get_case_context(case_id)
-    materials_text = context.get("materials", "")
-
-    if not materials_text.strip():
-        raise HTTPException(400, "无案件材料可供分析")
-
-    dispute_node = engine.get_stage_node(case_id, StageType.DISPUTE_FOCUS)
-    dispute_text = dispute_node.output if dispute_node else ""
-
-    prompt = f"""你是一名资深诉讼律师，请从以下案件材料中逐项识别所有可用证据。
-
-对每份证据，请分析：
-1. 证据名称（简明扼要）
-2. 证据类型：合同/票据/电子数据/视听资料/证人证言/鉴定意见/公证书/其他
-3. 证据形式：原件/复印件/电子数据
-4. 证明目的：这份证据能证明什么事实？结合争议焦点分析其法律价值
-5. 证明力评估：强/中/弱
-
-请以JSON数组格式返回，每个证据包含：
-- name: 证据名称
-- type: 证据类型
-- form: 证据形式（原件/复印件/电子数据）
-- purpose: 证明目的（详细说明）
-- strength: 证明力（强/中/弱）
-- source: 来源于哪份材料
-
-只返回JSON数组，不要其他内容。
-
-案件材料：
-{materials_text}
-
-{"争议焦点：" + dispute_text if dispute_text else ""}"""
-
-    try:
-        result = await dispatcher.generate(prompt, req.provider, req.model)
-        text = result.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        import json as _json
-        evidence_list = _json.loads(text)
-        return {"evidence": evidence_list, "count": len(evidence_list)}
-    except _json.JSONDecodeError:
-        return {"evidence": [], "raw": result, "count": 0}
-    except Exception as e:
-        raise HTTPException(500, f"提取失败: {e}")
-
-class ExportRequest(BaseModel):
-    content: str = ""
-    include_cover: bool = False
-    font_size: int = 16
-    margin: str = "standard"  # standard | narrow | wide
-    preset: str = "standard"  # standard | court_strict
-    deanonymize: bool = True  # reverse anonymization on export when possible
-
-
-@router.post("/export/{case_id}")
-def export_docx(case_id: str, req: ExportRequest, db: Session = Depends(get_db)):
-    from docx import Document
-    from docx.shared import Pt, Cm, Twips
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.oxml.ns import qn
-    import re
-
-    content = req.content
-    court_preset = getattr(req, 'preset', 'standard') == 'court_strict'
-
-    # Optional: deanonymize content using stored mappings before export
-    if req.deanonymize:
-        try:
-            from backend.models.material import Material
-            anonymizer_path = __import__('backend.services.anonymizer.anonymizer', fromlist=['Anonymizer'])
-            Anonymizer = anonymizer_path.Anonymizer
-            import json as _json
-            all_materials = db.query(Material).filter(Material.case_id == case_id).all()
-            # Merge all mappings into a single mapping for de-anonymization
-            merged_mapping = {}
-            for m in all_materials:
-                if getattr(m, 'anonymize_mapping', None):
-                    try:
-                        merged_mapping.update(_json.loads(m.anonymize_mapping) or {})
-                    except Exception:
-                        pass
-            if merged_mapping:
-                anonymizer = Anonymizer()
-                content = anonymizer.deanonymize(content, merged_mapping)
-        except Exception:
-            # If anything goes wrong, fall back to original content
-            pass
-    if not content:
-        node = WorkflowEngine(db).get_stage_node(case_id, StageType.DRAFT_GENERATION)
-        if not node or not node.output:
-            raise HTTPException(404, "无文书内容可导出")
-        content = node.output
-
-    doc = Document()
-
-    # Page margins based on margin option
-    margins = {"narrow": (2.0, 2.0, 2.0, 2.0), "wide": (4.0, 4.0, 3.5, 3.5)}
-    if court_preset:
-        mt, mb, ml, mr = (3.7, 3.5, 2.8, 2.6)
-    else:
-        mt, mb, ml, mr = margins.get(req.margin, (3.7, 3.5, 2.8, 2.6))
-    for section in doc.sections:
-        section.top_margin = Cm(mt)
-        section.bottom_margin = Cm(mb)
-        section.left_margin = Cm(ml)
-        section.right_margin = Cm(mr)
-
-    def set_font(run, name_ascii: str, name_eastasia: str, size: Pt, bold: bool = False):
-        run.font.name = name_ascii
-        run.font.size = size
-        run.bold = bold
-        run._element.rPr.rFonts.set(qn('w:eastAsia'), name_eastasia)
-
-    def set_paragraph(paragraph, alignment=None, first_line_indent=None, line_spacing=None, space_before=None, space_after=None):
-        if alignment is not None:
-            paragraph.alignment = alignment
-        pf = paragraph.paragraph_format
-        if first_line_indent is not None:
-            pf.first_line_indent = first_line_indent
-        if line_spacing is not None:
-            pf.line_spacing = line_spacing
-        if space_before is not None:
-            pf.space_before = space_before
-        if space_after is not None:
-            pf.space_after = space_after
-
-    # Normal style defaults
-    fs = Pt(req.font_size)
-    style = doc.styles['Normal']
-    style.font.name = 'Times New Roman'
-    style.font.size = fs
-    style._element.rPr.rFonts.set(qn('w:eastAsia'), '仿宋_GB2312')
-    style.paragraph_format.line_spacing = Pt(28)
-
-    for line in content.split('\n'):
-        line = line.strip()
-        if not line:
+    nodes = engine.get_version_history(case_id, stage_type)
+    
+    node1 = next((n for n in nodes if n.version == version1), None)
+    node2 = next((n for n in nodes if n.version == version2), None)
+    
+    if not node1 or not node2:
+        raise NotFoundError("指定版本不存在")
+    
+    import difflib
+    text1 = (node1.output or "").splitlines(keepends=True)
+    text2 = (node2.output or "").splitlines(keepends=True)
+    
+    diff = list(difflib.unified_diff(text1, text2, lineterm="", n=3))
+    
+    changes = []
+    for line in diff:
+        if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
             continue
-
-        # H1: document title - 黑体, centered
-        if line.startswith('# '):
-            p = doc.add_paragraph()
-            run = p.add_run(line[2:])
-            if court_preset:
-                set_font(run, 'Times New Roman', '方正小标宋简体', Pt(22), bold=True)
-            else:
-                set_font(run, 'Times New Roman', '黑体', Pt(req.font_size + 6), bold=True)
-            set_paragraph(p, alignment=WD_ALIGN_PARAGRAPH.CENTER, line_spacing=Pt(28), space_before=Pt(10), space_after=Pt(10))
-
-        # H2: section title - 黑体, bold
-        elif line.startswith('## '):
-            p = doc.add_paragraph()
-            run = p.add_run(line[3:])
-            if court_preset:
-                set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
-            else:
-                set_font(run, 'Times New Roman', '黑体', fs, bold=True)
-            set_paragraph(p, line_spacing=Pt(28), space_before=Pt(6), space_after=Pt(3))
-
-        # H3: subsection - 楷体, bold
-        elif line.startswith('### '):
-            p = doc.add_paragraph()
-            run = p.add_run(line[4:])
-            if court_preset:
-                set_font(run, 'Times New Roman', '楷体_GB2312', Pt(16), bold=True)
-            else:
-                set_font(run, 'Times New Roman', '楷体_GB2312', fs, bold=True)
-            set_paragraph(p, line_spacing=Pt(28))
-
-        # List items
-        elif line.startswith('- ') or line.startswith('* '):
-            p = doc.add_paragraph()
-            run = p.add_run(line[2:])
-            if court_preset:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
-            else:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
-            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
-
-        elif re.match(r'^\d+\.\s', line):
-            p = doc.add_paragraph()
-            run = p.add_run(re.sub(r'^\d+\.\s', '', line))
-            if court_preset:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
-            else:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
-            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
-
-        # Bold line
-        elif line.startswith('**') and line.endswith('**'):
-            p = doc.add_paragraph()
-            run = p.add_run(line[2:-2])
-            if court_preset:
-                set_font(run, 'Times New Roman', '黑体', Pt(16), bold=True)
-            else:
-                set_font(run, 'Times New Roman', '黑体', fs, bold=True)
-            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
-
-        # Normal text
+        if line.startswith("+"):
+            changes.append({"type": "insert", "text": line[1:]})
+        elif line.startswith("-"):
+            changes.append({"type": "delete", "text": line[1:]})
         else:
-            p = doc.add_paragraph()
-            run = p.add_run(line)
-            if court_preset:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', Pt(16))
-            else:
-                set_font(run, 'Times New Roman', '仿宋_GB2312', fs)
-            set_paragraph(p, first_line_indent=Cm(0.74), line_spacing=Pt(28))
-
-    import io
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return Response(
-        content=buf.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename=document.docx"},
-    )
-
-
-class EvidenceCoverRequest(BaseModel):
-    case_name: str = ""
-    submitter: str = ""
-    case_number: str = ""
-    court: str = ""
-
-
-@router.post("/export-evidence-cover/{case_id}")
-def export_evidence_cover(case_id: str, req: EvidenceCoverRequest, db: Session = Depends(get_db)):
-    from docx import Document
-    from docx.shared import Pt, Cm
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.oxml.ns import qn
-    from backend.models.case import Case
-    from backend.models.party import Party
-
-    case = db.query(Case).filter(Case.id == case_id).first()
-    if not case:
-        raise HTTPException(404, "案件不存在")
-
-    case_name = req.case_name or case.name
-    case_number = req.case_number or case.case_number or "（    ）"
-    court = req.court or case.court or "______人民法院"
-
-    parties = db.query(Party).filter(Party.case_id == case_id).all()
-    submitter = req.submitter
-    if not submitter:
-        plaintiff = next((p for p in parties if "原告" in p.role or "申请人" in p.role), None)
-        submitter = plaintiff.name if plaintiff else "______"
-
-    doc = Document()
-    for section in doc.sections:
-        section.top_margin = Cm(3.7)
-        section.bottom_margin = Cm(3.5)
-        section.left_margin = Cm(2.8)
-        section.right_margin = Cm(2.6)
-
-    def add_line(text, font_name='仿宋_GB2312', size=Pt(16), bold=False, align=None, spacing=Pt(28)):
-        p = doc.add_paragraph()
-        run = p.add_run(text)
-        run.font.name = 'Times New Roman'
-        run.font.size = size
-        run.bold = bold
-        run._element.rPr.rFonts.set(qn('w:eastAsia'), font_name)
-        pf = p.paragraph_format
-        pf.line_spacing = spacing
-        if align:
-            p.alignment = align
-        return p
-
-    for _ in range(4):
-        add_line('', size=Pt(16))
-
-    add_line('证 据 目 录', font_name='方正小标宋简体', size=Pt(22), bold=True,
-             align=WD_ALIGN_PARAGRAPH.CENTER, spacing=Pt(28))
-
-    add_line('', size=Pt(16))
-
-    add_line(f'案　　件：{case_name}', font_name='仿宋_GB2312', size=Pt(16))
-    add_line(f'案　　号：{case_number}', font_name='仿宋_GB2312', size=Pt(16))
-    add_line(f'提 交 人：{submitter}', font_name='仿宋_GB2312', size=Pt(16))
-    add_line(f'管辖法院：{court}', font_name='仿宋_GB2312', size=Pt(16))
-
-    for _ in range(6):
-        add_line('', size=Pt(16))
-
-    add_line('（证据目录附后）', font_name='仿宋_GB2312', size=Pt(16),
-             align=WD_ALIGN_PARAGRAPH.CENTER)
-
-    import io
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return Response(
-        content=buf.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename=evidence_cover.docx"},
-    )
+            changes.append({"type": "equal", "text": line})
+    
+    return {
+        "version1": version1,
+        "version2": version2,
+        "changes": changes,
+        "node1_created_at": node1.created_at.isoformat() if node1.created_at else None,
+        "node2_created_at": node2.created_at.isoformat() if node2.created_at else None,
+    }

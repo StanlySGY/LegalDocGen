@@ -1,7 +1,8 @@
 from sqlalchemy import Column, String, Text, Integer, DateTime, Boolean
+from datetime import datetime
 import json
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 class CaseTemplate(Base):
     __tablename__ = "case_templates"
@@ -12,7 +13,7 @@ class CaseTemplate(Base):
     category = Column(String(50), nullable=False)
     materials_checklist = Column(Text)
     default_prompts = Column(Text)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
     is_default = Column(Boolean, default=False)
 
     def get_materials_checklist(self):

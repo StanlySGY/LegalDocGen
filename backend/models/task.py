@@ -1,9 +1,10 @@
+from datetime import datetime
 import uuid
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 
 class TaskStatus:
@@ -23,7 +24,7 @@ class BackgroundTask(Base):
     message = Column(Text, default="")
     result = Column(Text, default="{}")
     error = Column(Text, default="")
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 

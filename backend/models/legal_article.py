@@ -1,8 +1,9 @@
+from datetime import datetime
 import uuid
 
 from sqlalchemy import Column, DateTime, String, Text, UniqueConstraint
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 
 class LegalArticle(Base):
@@ -14,5 +15,5 @@ class LegalArticle(Base):
     article_no = Column(String(50), nullable=False)
     title = Column(String(200), default="")
     content = Column(Text, default="")
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

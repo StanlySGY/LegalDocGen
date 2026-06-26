@@ -1,7 +1,8 @@
 from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean
+from datetime import datetime
 import uuid
 
-from backend.database import Base, utcnow
+from backend.database import Base
 
 
 class Channel(Base):
@@ -18,5 +19,5 @@ class Channel(Base):
     test_status = Column(String(50), default="untested")  # untested / success / failed
     balance = Column(String(100), default="")
     priority = Column(Integer, default=0)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

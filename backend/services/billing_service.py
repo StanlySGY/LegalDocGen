@@ -1,10 +1,10 @@
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.database import utcnow
 from backend.models.billing import BillingOrder, BillingOrderStatus, Plan, SubscriptionStatus, TeamSubscription, UsageMetric, UsageRecord
 from backend.models.case import Case
 from backend.models.material import Material
@@ -56,7 +56,7 @@ METRIC_LABELS = {
 
 
 def current_period() -> str:
-    return utcnow().strftime("%Y-%m")
+    return datetime.utcnow().strftime("%Y-%m")
 
 
 def seed_default_plans(db: Session):
@@ -263,7 +263,7 @@ def update_team_subscription(db: Session, team_id: str, plan_code: str, status: 
     subscription = ensure_team_subscription(db, team_id)
     subscription.plan_code = plan.code
     subscription.status = status
-    subscription.updated_at = utcnow()
+    subscription.updated_at = datetime.utcnow()
     record_audit(db, "billing.subscription.updated", "team", team_id, f"切换套餐为：{plan.name}")
     db.flush()
     return subscription
@@ -284,7 +284,7 @@ def _sync_subscription_from_paid_orders(db: Session, team_id: str, operator: Use
     subscription = ensure_team_subscription(db, team_id)
     subscription.plan_code = "free"
     subscription.status = SubscriptionStatus.TRIALING
-    subscription.updated_at = utcnow()
+    subscription.updated_at = datetime.utcnow()
     record_audit(db, "billing.subscription.reverted", "team", team_id, "无有效已支付订单，套餐回退为免费体验版")
     db.flush()
     return subscription
@@ -325,9 +325,9 @@ def update_billing_order_status(db: Session, order_id: str, status: str, operato
     order.status = status
     order.operator_id = operator.id
     order.notes = notes.strip() or order.notes
-    order.updated_at = utcnow()
+    order.updated_at = datetime.utcnow()
     if status == BillingOrderStatus.PAID:
-        order.paid_at = order.paid_at or utcnow()
+        order.paid_at = order.paid_at or datetime.utcnow()
         update_team_subscription(db, order.team_id, order.plan_code, SubscriptionStatus.ACTIVE, operator)
     elif previous_status == BillingOrderStatus.PAID and status in (BillingOrderStatus.CANCELLED, BillingOrderStatus.REFUNDED):
         _sync_subscription_from_paid_orders(db, order.team_id, operator)

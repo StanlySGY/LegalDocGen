@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Enum as SAEnum
+from sqlalchemy import Column, String, DateTime, Text, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -11,6 +11,7 @@ class CaseStatus(str, enum.Enum):
     DRAFT = "draft"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    ARCHIVED = "archived"
 
 
 class Case(Base):
@@ -20,13 +21,25 @@ class Case(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, default="")
     case_type = Column(String(100), default="")
-    case_number = Column(String(100), default="")
-    court = Column(String(200), default="")
-    cause = Column(String(200), default="")
-    filing_date = Column(String(50), default="")
+    template_id = Column(String(36), ForeignKey("case_templates.id"), nullable=True)
+    owner_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    team_id = Column(String(36), ForeignKey("teams.id"), nullable=True)
     status = Column(SAEnum(CaseStatus), default=CaseStatus.DRAFT)
+    document_type = Column(String(50), default="")
+    archived_at = Column(DateTime, nullable=True)
+    archive_note = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    materials = relationship("Material", back_populates="case", cascade="all, delete-orphan")
-    workflow_nodes = relationship("WorkflowNode", back_populates="case", cascade="all, delete-orphan")
+    materials = relationship(
+        "Material", back_populates="case", cascade="all, delete-orphan"
+    )
+    documents = relationship(
+        "CaseDocument", back_populates="case", cascade="all, delete-orphan"
+    )
+    workflow_nodes = relationship(
+        "WorkflowNode", back_populates="case", cascade="all, delete-orphan"
+    )
+    template = relationship("CaseTemplate")
+    owner = relationship("User", back_populates="cases")
+    team = relationship("Team", back_populates="cases")

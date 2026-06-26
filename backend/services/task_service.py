@@ -1,13 +1,13 @@
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from backend.database import utcnow
 from backend.models.task import BackgroundTask, TaskStatus
 
 
 def start_task(db: Session, task_type: str, case_id: Optional[str] = None, message: str = "") -> BackgroundTask:
-    task = BackgroundTask(case_id=case_id, task_type=task_type, status=TaskStatus.RUNNING, message=message, started_at=utcnow())
+    task = BackgroundTask(case_id=case_id, task_type=task_type, status=TaskStatus.RUNNING, message=message, started_at=datetime.utcnow())
     db.add(task)
     db.flush()
     return task
@@ -17,7 +17,7 @@ def complete_task(db: Session, task: BackgroundTask, result: str = "{}", message
     task.status = TaskStatus.COMPLETED
     task.result = result
     task.message = message or task.message
-    task.completed_at = utcnow()
+    task.completed_at = datetime.utcnow()
     db.flush()
     return task
 
@@ -25,7 +25,7 @@ def complete_task(db: Session, task: BackgroundTask, result: str = "{}", message
 def fail_task(db: Session, task: BackgroundTask, error: str) -> BackgroundTask:
     task.status = TaskStatus.FAILED
     task.error = error
-    task.completed_at = utcnow()
+    task.completed_at = datetime.utcnow()
     db.flush()
     return task
 
