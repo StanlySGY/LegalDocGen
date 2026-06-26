@@ -237,6 +237,7 @@ export const api = {
     rollback: (caseId: string, nodeId: string) =>
       request<any>(`/workflow/rollback/${caseId}`, { method: 'POST', body: JSON.stringify({ node_id: nodeId }) }),
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
+    diff: (caseId: string, stage: string, v1: number, v2: number) => request<any>(`/workflow/diff/${caseId}/${stage}?version1=${v1}&version2=${v2}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
     reviewChain: async function* (caseId: string, data: any) {

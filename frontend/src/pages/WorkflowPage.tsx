@@ -48,6 +48,8 @@ export default function WorkflowPage() {
   const [generationError, setGenerationError] = useState('')
   const [history, setHistory] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [diffResult, setDiffResult] = useState<any>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
   const [models, setModels] = useState<any[]>([])
   const [selChannelId, setSelChannelId] = useState('')
   const [selModel, setSelModel] = useState('')
@@ -88,6 +90,12 @@ export default function WorkflowPage() {
     }
   }, [caseId])
   const loadHistory = useCallback(async (s: StageType) => { setHistory(await api.workflow.history(caseId, s)) }, [caseId])
+  const loadDiff = useCallback(async (v1: number, v2: number) => {
+    setDiffLoading(true); setDiffResult(null)
+    try { setDiffResult(await api.workflow.diff(caseId, activeStage, v1, v2)) }
+    catch (e: any) { showToast(e.message || '对比加载失败', { type: 'err' }) }
+    setDiffLoading(false)
+  }, [caseId, activeStage])
 
   useEffect(() => { loadProgress().catch((e: any) => showToast(e.message || '工作流加载失败', { type: 'err' })) }, [loadProgress])
   useEffect(() => { loadNode(activeStage).catch((e: any) => showToast(e.message || '阶段加载失败', { type: 'err' })) }, [activeStage, loadNode])
@@ -456,16 +464,33 @@ export default function WorkflowPage() {
             <div style={{marginTop:16,paddingTop:16,borderTop:'1px solid #e5e7eb'}}>
               <div style={{fontSize:12,color:'#86909c',marginBottom:8,fontWeight:600}}>版本历史</div>
               <div style={{maxHeight:150,overflow:'auto',display:'flex',flexDirection:'column',gap:6}}>
-                {history.map(h=>(
+                {history.map((h,i)=>(
                   <div key={h.id} className="flex items-center justify-between" style={{background:'#f7f8fa',borderRadius:8,padding:'8px 12px'}}>
                     <div className="flex items-center gap-2">
                       <span className="tag t-purple">v{h.version}</span>
                       <span style={{fontSize:11,color:'#86909c'}}>{new Date(h.created_at).toLocaleString('zh-CN')}</span>
                     </div>
-                    <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)} disabled={isArchived}>回滚</button>
+                    <div className="flex gap-1">
+                      {i<history.length-1 && <button className="btn btn-o btn-sm" onClick={()=>loadDiff(h.version,history[i+1].version)} disabled={isArchived}>对比</button>}
+                      <button className="btn btn-o btn-sm" onClick={()=>handleRollback(h.id)} disabled={isArchived}>回滚</button>
+                    </div>
                   </div>
                 ))}
               </div>
+              {diffLoading && <div style={{padding:12,textAlign:'center',color:'#86909c',fontSize:13}}>加载对比中...</div>}
+              {diffResult && (
+                <div style={{marginTop:12,padding:12,background:'#f7f8fa',borderRadius:8,maxHeight:300,overflow:'auto',fontSize:13,lineHeight:1.8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:12,fontWeight:600}}>版本 v{diffResult.version1} → v{diffResult.version2} 对比</span>
+                    <button className="btn btn-o" style={{fontSize:11,padding:'2px 8px'}} onClick={()=>setDiffResult(null)}>关闭</button>
+                  </div>
+                  {diffResult.changes?.map((c:any,i:number)=>(
+                    <div key={i} style={{padding:'2px 0',color:c.type==='insert'?'#16a34a':c.type==='delete'?'#dc2626':'inherit',background:c.type==='insert'?'#dcfce7':c.type==='delete'?'#fee2e2':'transparent',textDecoration:c.type==='delete'?'line-through':'none',borderRadius:4}}>
+                      {c.type==='insert'?'+ ':c.type==='delete'?'- ':'  '}{c.text}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

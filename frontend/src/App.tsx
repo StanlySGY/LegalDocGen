@@ -73,6 +73,19 @@ export default function App() {
   }, [])
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); window.location.href = '/cases' }
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault()
+        const el = document.querySelector('input[placeholder*="搜索"]') as HTMLInputElement
+        if (el) el.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const saveAdminToken = (token: string) => {
     setAdminToken(token)
     setAdminTokenState(token)
