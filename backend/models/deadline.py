@@ -12,6 +12,7 @@ class CaseDeadline(Base):
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(200), nullable=False)
     due_date = Column(Date, nullable=False)
+    deadline_type = Column(String(50), default="custom")
     reminder_days = Column(Integer, default=3)
     note = Column(Text, default="")
     is_completed = Column(Boolean, default=False)

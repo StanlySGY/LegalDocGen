@@ -169,6 +169,8 @@ export const api = {
     update: (id: string, data: any) => request<any>(`/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/cases/${id}`, { method: 'DELETE' }),
     batchDelete: (caseIds: string[]) => request<any>('/cases/batch-delete', { method: 'POST', body: JSON.stringify({ case_ids: caseIds }) }),
+    batchArchive: (caseIds: string[]) => request<any>('/cases/batch-archive', { method: 'POST', body: JSON.stringify({ case_ids: caseIds }) }),
+    batchStatus: (ids: string[], status: string) => request<any>('/cases/batch-status', { method: 'POST', body: JSON.stringify({ ids, status }) }),
     archive: (id: string, note?: string) => request<any>(`/cases/${id}/archive`, { method: 'POST', body: JSON.stringify({ note: note || '' }) }),
     unarchive: (id: string) => request<any>(`/cases/${id}/unarchive`, { method: 'POST' }),
     upcomingDeadlines: () => request<any[]>('/cases/upcoming-deadlines'),
@@ -200,6 +202,7 @@ export const api = {
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
     updateCategory: (id: string, category: string) => request<any>(`/materials/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }),
     search: (caseId: string, query: string) => request<any>(`/materials/case/${caseId}/search?q=${encodeURIComponent(query)}`),
+    preview: (materialId: string) => request<any>(`/materials/${materialId}/preview`),
   },
   workflow: {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),
@@ -368,6 +371,16 @@ export const api = {
       if (params?.resource_id) query.set('resource_id', params.resource_id)
       const suffix = query.toString() ? `?${query}` : ''
       return request<any[]>(`/audit${suffix}`)
+    },
+    exportCsv: async (limit?: number) => {
+      const url = `${BASE}/audit/export${limit ? `?limit=${limit}` : ''}`
+      const res = await fetch(url, { headers: authHeaders() })
+      if (!res.ok) throw new Error('导出失败')
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'audit_log.csv'
+      a.click()
     },
   },
   channel: {

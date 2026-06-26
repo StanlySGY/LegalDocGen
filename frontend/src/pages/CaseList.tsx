@@ -164,6 +164,32 @@ export default function CaseList() {
     }
   }
 
+  const batchArchive = async () => {
+    if (!selectedIds.length) return showToast('请先选择案件', { type: 'err' })
+    const ok = await confirm({ title: '批量归档', message: `确认归档 ${selectedIds.length} 个案件？`, confirmText: '归档' })
+    if (!ok) return
+    try { await api.cases.batchArchive(selectedIds); setSelectedIds([]); load(); showToast('批量归档完成') }
+    catch (e: any) { showToast(e.message || '批量归档失败', { type: 'err' }) }
+  }
+
+  const batchComplete = async () => {
+    if (!selectedIds.length) return showToast('请先选择案件', { type: 'err' })
+    try { await api.cases.batchStatus(selectedIds, 'completed'); setSelectedIds([]); load(); showToast('已标记完成') }
+    catch (e: any) { showToast(e.message || '操作失败', { type: 'err' }) }
+  }
+
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('search_history') || '[]') } catch { return [] }
+  })
+  const [showSearchHistory, setShowSearchHistory] = useState(false)
+
+  const addToSearchHistory = (term: string) => {
+    if (!term.trim()) return
+    const updated = [term, ...searchHistory.filter(h => h !== term)].slice(0, 10)
+    setSearchHistory(updated)
+    localStorage.setItem('search_history', JSON.stringify(updated))
+  }
+
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -256,11 +282,23 @@ export default function CaseList() {
             <div className="bulk-actions compact">
               <span>已选择 {selectedIds.length} 个案件</span>
               <button className="btn btn-o btn-sm" onClick={batchExport}>批量导出</button>
+              <button className="btn btn-o btn-sm" onClick={batchArchive}>批量归档</button>
+              <button className="btn btn-o btn-sm" onClick={batchComplete}>标记完成</button>
               <button className="btn btn-d btn-sm" onClick={batchDelete}>批量删除</button>
             </div>
           </div>
-          <div className="filters-grid" style={{padding:'0 16px 16px'}}>
-            <input ref={searchInputRef} className="input" placeholder="搜索名称、描述或类型 (按 / 聚焦)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+          <div className="filters-grid" style={{padding:'0 16px 16px', position: 'relative'}}>
+            <div style={{position:'relative'}}>
+              <input ref={searchInputRef} className="input" placeholder="搜索名称、描述或类型 (按 / 聚焦)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addToSearchHistory(searchTerm)}} onFocus={()=>setShowSearchHistory(true)} onBlur={()=>setTimeout(()=>setShowSearchHistory(false),200)}/>
+              {showSearchHistory && searchHistory.length > 0 && !searchTerm && (
+                <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:20,background:'var(--bg-card)',border:'1px solid #e5e7eb',borderRadius:8,boxShadow:'0 4px 12px rgba(0,0,0,0.1)',padding:8}}>
+                  <div style={{fontSize:11,color:'#86909c',marginBottom:4}}>最近搜索</div>
+                  {searchHistory.map((h,i)=>(
+                    <div key={i} style={{padding:'4px 8px',cursor:'pointer',fontSize:13,borderRadius:4}} onMouseDown={()=>{setSearchTerm(h);addToSearchHistory(h)}}>{h}</div>
+                  ))}
+                </div>
+              )}
+            </div>
             <select className="select" value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}>
               <option value="">全部状态</option>
               <option value="draft">草稿</option>

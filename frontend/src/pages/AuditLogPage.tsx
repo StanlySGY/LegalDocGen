@@ -42,6 +42,7 @@ export default function AuditLogPage() {
           <p>记录案件、材料、工作流和系统配置关键操作，帮助团队追踪交付过程、定位问题并满足内部合规复核要求。</p>
         </div>
         <button className="btn btn-o" onClick={load}>刷新日志</button>
+        <button className="btn btn-o" onClick={() => api.audit.exportCsv().catch((e: any) => showToast(e.message || '导出失败', { type: 'err' }))}>导出CSV</button>
       </div>
 
       <div className="task-stat-row">

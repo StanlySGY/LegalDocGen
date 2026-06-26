@@ -120,6 +120,21 @@ def get_material(material_id: str, db: Session = Depends(get_db), current_user: 
     return material
 
 
+@router.get("/{material_id}/preview")
+def preview_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise NotFoundError(f"材料 {material_id} 不存在")
+    get_accessible_case(db, material.case_id, current_user)
+    return {
+        "id": material.id,
+        "filename": material.filename,
+        "file_type": material.file_type,
+        "parsed_content": material.parsed_content or "",
+        "file_path": material.file_path,
+    }
+
+
 @router.delete("/{material_id}")
 def delete_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     material = db.query(Material).filter(Material.id == material_id).first()

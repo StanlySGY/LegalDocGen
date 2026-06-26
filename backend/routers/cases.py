@@ -100,6 +100,35 @@ def batch_delete_cases(data: CaseBatchRequest, db: Session = Depends(get_db), cu
     return {"message": f"已删除 {len(cases)} 个案件", "deleted": len(cases)}
 
 
+@router.post("/batch-archive")
+def batch_archive_cases(data: CaseBatchRequest, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    if not data.case_ids:
+        raise HTTPException(400, "请选择要归档的案件")
+    cases = case_query_for_user(db, current_user).filter(Case.id.in_(data.case_ids)).all()
+    from datetime import datetime
+    archived = 0
+    for case in cases:
+        if case.status != CaseStatus.ARCHIVED:
+            case.status = CaseStatus.ARCHIVED
+            case.archived_at = datetime.utcnow()
+            archived += 1
+    db.commit()
+    return {"message": f"已归档 {archived} 个案件"}
+
+
+@router.post("/batch-status")
+def batch_update_status(body: dict, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    ids = body.get("ids", [])
+    status = body.get("status", "")
+    if status not in ("draft", "in_progress", "completed"):
+        raise HTTPException(400, "无效状态")
+    cases = case_query_for_user(db, current_user).filter(Case.id.in_(ids)).all()
+    for case in cases:
+        case.status = status
+    db.commit()
+    return {"message": f"已更新 {len(cases)} 个案件状态"}
+
+
 @router.get("/upcoming-deadlines")
 def upcoming_deadlines(db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     case_ids = [c.id for c in case_query_for_user(db, current_user).all()]
