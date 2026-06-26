@@ -81,10 +81,6 @@ export interface Case {
   name: string
   description: string
   case_type: string
-  case_number?: string
-  court?: string
-  cause?: string
-  filing_date?: string
   document_type?: string
   template_id?: string | null
   owner_id?: string | null
@@ -127,16 +123,15 @@ export const DOCUMENT_TYPES: Record<string, string> = {
 }
 
 export interface Material {
+  category?: string
   id: string
   case_id: string
   filename: string
   file_type: string
   file_size: number
   parsed_content: string
-  structured_data?: string
   parse_status: string
   parse_task_id?: string | null
-  category?: string
   created_at: string
 }
 
@@ -210,8 +205,6 @@ export interface StageProgress {
   status: string
   has_output: boolean
   version: number
-  locked?: boolean
-  locked_reason?: string
 }
 
 export interface PromptTemplate {
@@ -245,33 +238,3 @@ export const STAGE_ORDER: StageType[] = [
   'draft_generation',
   'review_optimization',
 ]
-
-export type ReviewMode = 'single' | 'chain' | 'compare'
-
-export interface DocumentTypeOption {
-  key: string
-  name: string
-  desc: string
-  scenario: string
-}
-
-export const STAGE_NAMES_LAWYER: Record<string, string> = {
-  fact_extraction: '案件梳理',
-  legal_analysis: '法律分析',
-  dispute_focus: '争议归纳',
-  draft_generation: '文书生成',
-  review_optimization: '审查优化',
-}
-
-export interface Party {
-  id: string
-  name: string
-  role: string
-  id_number?: string
-  phone?: string
-  address?: string
-  legal_representative?: string
-  notes?: string
-  case_id: string
-  created_at?: string
-}

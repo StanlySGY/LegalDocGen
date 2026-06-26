@@ -1,4 +1,4 @@
-import type { BillingOrder, BillingOrderStatus, BillingStatus, DocumentTypeOption, OperationsSummary, Plan, QuotaExceededDetail } from '../types'
+import type { BillingOrder, BillingOrderStatus, BillingStatus, OperationsSummary, Plan, QuotaExceededDetail } from '../types'
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const ADMIN_TOKEN_KEY = 'legaldocgen_admin_token'
@@ -95,33 +95,6 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   })
   if (!res.ok) throw await createApiError(res, '请求失败')
   return parseJsonResponse<T>(res, '请求失败')
-}
-
-async function* streamSSE(url: string, body: any): AsyncGenerator<any> {
-  const res = await fetch(`${BASE}${url}`, {
-    method: 'POST',
-    headers: jsonHeaders(),
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw await createApiError(res, '生成失败')
-  if (!res.body) throw new Error('生成响应为空')
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          yield JSON.parse(line.slice(6))
-        } catch {}
-      }
-    }
-  }
 }
 
 export const api = {
@@ -227,7 +200,6 @@ export const api = {
     delete: (id: string) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
     updateCategory: (id: string, category: string) => request<any>(`/materials/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }),
     search: (caseId: string, query: string) => request<any>(`/materials/case/${caseId}/search?q=${encodeURIComponent(query)}`),
-    anonymize: (caseId: string) => request<any>(`/materials/anonymize/${caseId}`, { method: 'POST' }),
   },
   workflow: {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),
@@ -264,13 +236,6 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
-    reviewChain: (caseId: string, data: any) => streamSSE(`/workflow/review-chain/${caseId}`, data),
-    multiCompare: (caseId: string, data: any) => streamSSE(`/workflow/multi-compare/${caseId}`, data),
-    reviewSelect: (caseId: string, data: any) =>
-      request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
-    aiEdit: (data: { text: string; instruction?: string; provider?: string; model?: string }) =>
-      request<{ result: string }>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
-    quickGenerate: (caseId: string, data: any) => streamSSE(`/workflow/quick-generate/${caseId}`, data),
     export: async (caseId: string, modules?: string[]) => {
       const exportUrl = modules && modules.length > 0
         ? `${BASE}/workflow/export/${caseId}?modules=${modules.map(encodeURIComponent).join(',')}`
@@ -324,10 +289,6 @@ export const api = {
     createPrompt: (data: any) => request<any>('/config/prompts', { method: 'POST', body: JSON.stringify(data) }),
     updatePrompt: (id: string, data: any) => request<any>(`/config/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     getStages: () => request<any[]>('/config/stages'),
-    getDocumentTypes: () => request<{ types: DocumentTypeOption[] }>('/config/document-types'),
-    getStageVariables: (stage: string) => request<{ variables: any[] }>(`/config/stage-variables/${stage}`),
-    optimizePrompt: (data: { prompt: string; instruction: string }) =>
-      request<{ result: string }>('/config/optimize-prompt', { method: 'POST', body: JSON.stringify(data) }),
   },
   audit: {
     list: (params?: { limit?: number; resource_type?: string; resource_id?: string }) => {
@@ -368,27 +329,6 @@ export const api = {
       request<any>(`/documents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/documents/${id}`, { method: 'DELETE' }),
     getTypes: () => request<any>('/documents/types'),
-  },
-  parties: {
-    list: (caseId: string) => request<any[]>(`/parties/case/${caseId}`),
-    create: (data: any) => request<any>('/parties', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: any) => request<any>(`/parties/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: string) => request<any>(`/parties/${id}`, { method: 'DELETE' }),
-    extract: (caseId: string) => request<any[]>(`/parties/extract/${caseId}`, { method: 'POST' }),
-  },
-  referenceDocs: {
-    list: () => request<any[]>('/reference-docs'),
-    create: (data: { name: string; doc_type: string; content: string }) =>
-      request<any>('/reference-docs', { method: 'POST', body: JSON.stringify(data) }),
-    get: (id: string) => request<any>(`/reference-docs/${id}`),
-    upload: async (file: File) => {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch(`${BASE}/reference-docs/upload`, { method: 'POST', headers: authHeaders(), body: form })
-      if (!res.ok) throw await createApiError(res, '上传失败')
-      return res.json()
-    },
-    delete: (id: string) => request<any>(`/reference-docs/${id}`, { method: 'DELETE' }),
   },
 }
 

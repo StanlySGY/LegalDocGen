@@ -1,7 +1,11 @@
+import { useToast } from '../hooks/useToast'
+import { validateChannelForm } from '../utils/validation'
+import Toaster from '../components/Toaster'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
-import ConfirmDialog from '../components/ConfirmDialog'
+import { useConfirmDialog } from '../hooks/useConfirmDialog'
 
 interface Channel {
   id: string
@@ -19,6 +23,15 @@ interface Channel {
   created_at: string
 }
 
+const testStatusText: Record<string, string> = { success: '连接正常', failed: '测试失败' }
+const testStatusClass = (status: string) => status === 'success' ? 't-green' : status === 'failed' ? 't-red' : 't-gray'
+const channelRiskTip = (channel: Channel) => {
+  if (!channel.api_key_set) return '未保存密钥，生成前需补齐 API Key'
+  if (channel.test_status === 'failed') return '连接测试失败，建议检查地址、密钥和网络'
+  if ((channel.models || []).length === 0) return '尚未配置模型，建议获取模型后勾选可用项'
+  return '可用于工作流生成，建议定期测试连接'
+}
+
 export default function ChannelManage() {
   const navigate = useNavigate()
   const [channels, setChannels] = useState<Channel[]>([])
@@ -28,17 +41,15 @@ export default function ChannelManage() {
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [loading, setLoading] = useState('')
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const { toasts, showToast, removeToast } = useToast()
+  const { confirm, dialogProps } = useConfirmDialog()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const [form, setForm] = useState({
     name: '', type: 'openai', base_url: '', api_key: '', priority: 0
   })
 
-  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-    setToast({ msg, type }); setTimeout(() => setToast(null), 2500)
-  }
-  const load = () => api.channel.list().then(setChannels)
+  const load = () => api.channel.list().then(setChannels).catch((e: any) => showToast(e.message || '渠道加载失败', { type: 'err' }))
   useEffect(() => { load() }, [])
 
   const openAdd = () => {
@@ -54,7 +65,13 @@ export default function ChannelManage() {
   }
 
   const saveChannel = async () => {
-    if (!form.name.trim() || !form.base_url.trim()) { showToast('名称和URL必填', 'err'); return }
+    const validation = validateChannelForm(form)
+    if (!validation.valid) {
+      setFormErrors(validation.errors)
+      showToast(Object.values(validation.errors)[0], { type: 'err' })
+      return
+    }
+    setFormErrors({})
     try {
       if (editingChannel) {
         const update: any = { ...form }
@@ -67,23 +84,34 @@ export default function ChannelManage() {
       }
       setShowDrawer(false)
       load()
-    } catch (e: any) { showToast(e.message, 'err') }
+    } catch (e: any) { showToast(e.message, { type: 'err' }) }
   }
 
   const deleteChannel = async (id: string) => {
-    await api.channel.delete(id)
-    setConfirmDelete(null)
-    showToast('已删除')
-    load()
+    const channel = channels.find(item => item.id === id)
+    const confirmed = await confirm({
+      title: '删除渠道',
+      message: `确定删除${channel ? `「${channel.name}」` : '该渠道'}？删除后工作流将无法再使用该模型渠道。`,
+      variant: 'danger',
+      confirmText: '删除'
+    })
+    if (!confirmed) return
+    try {
+      await api.channel.delete(id)
+      showToast('已删除')
+      load()
+    } catch (e: any) {
+      showToast(e.message || '删除失败', { type: 'err' })
+    }
   }
 
   const testChannel = async (id: string) => {
     setLoading('test-' + id)
     try {
       const r = await api.channel.test(id)
-      showToast(r.success ? '连接成功' : `连接失败: ${r.message}`, r.success ? 'ok' : 'err')
+      showToast(r.success ? '连接成功' : `连接失败: ${r.message}`, { type: r.success ? 'ok' : 'err' })
       load()
-    } catch (e: any) { showToast(e.message, 'err') }
+    } catch (e: any) { showToast(e.message, { type: 'err' }) }
     setLoading('')
   }
 
@@ -98,9 +126,9 @@ export default function ChannelManage() {
         showToast(`发现 ${r.count} 个模型`)
       } else {
         setDiscoveredModels([])
-        showToast(`获取失败: ${r.message}`, 'err')
+        showToast(`获取失败: ${r.message}`, { type: 'err' })
       }
-    } catch (e: any) { showToast(e.message, 'err'); setDiscoveredModels([]) }
+    } catch (e: any) { showToast(e.message, { type: 'err' }); setDiscoveredModels([]) }
     setLoading('')
   }
 
@@ -119,83 +147,113 @@ export default function ChannelManage() {
   const selectAll = () => setSelectedModels([...discoveredModels])
   const deselectAll = () => setSelectedModels([])
 
+  const enabledCount = channels.filter(ch => ch.status === 1).length
+  const testedCount = channels.filter(ch => ch.test_status === 'success').length
+  const modelCount = channels.reduce((total, ch) => total + (ch.models?.length || 0), 0)
+  const riskyCount = channels.filter(ch => !ch.api_key_set || ch.test_status === 'failed' || (ch.models || []).length === 0).length
+
   return (
     <div>
-        <div className="flex items-center justify-between mb-6">
+      <div className="dashboard-hero">
         <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>助手配置</h2>
-          <p style={{ fontSize: 13, color: '#86909c', marginTop: 4 }}>管理AI助手，自动发现可用AI助手</p>
+          <div className="eyebrow">MODEL OPERATIONS</div>
+          <h2>渠道管理</h2>
+          <p>集中管理模型 API 渠道、连接测试和可用模型，确保法律文书生成链路具备稳定、可切换的模型供应能力。</p>
         </div>
-        <button className="btn btn-p" onClick={openAdd}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          添加AI助手
-        </button>
+        <div className="hero-action-card">
+          <div><strong>配置建议</strong><span>先测试连接，再获取模型并保留至少一个可用渠道。</span></div>
+          <button className="btn btn-p" onClick={openAdd}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            添加渠道
+          </button>
+        </div>
       </div>
+
+      <div className="task-stat-row">
+        <div className="stat-card s-purple"><div className="s-label">渠道总数</div><div className="s-value">{channels.length}</div><div className="s-hint">已接入 API 渠道</div></div>
+        <div className="stat-card s-green"><div className="s-label">启用渠道</div><div className="s-value">{enabledCount}</div><div className="s-hint">可参与调度</div></div>
+        <div className="stat-card s-blue"><div className="s-label">可用模型</div><div className="s-value">{modelCount}</div><div className="s-hint">已保存模型数量</div></div>
+        <div className="stat-card s-orange"><div className="s-label">需处理</div><div className="s-value">{riskyCount}</div><div className="s-hint">密钥、测试或模型待完善</div></div>
+      </div>
+
+      {channels.length > 0 && testedCount === 0 && (
+        <div className="notice-card notice-warn">
+          <div><strong>暂无已验证渠道</strong><span>建议至少完成一个渠道的连接测试，避免生成阶段才暴露模型不可用问题。</span></div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 0 }}>
-        <table className="data-table">
-              <thead>
-                <tr>
-                  <th>名称</th>
-                  <th>类型</th>
-                  <th>服务地址</th>
-                  <th>状态</th>
-                  <th>可用AI助手</th>
-                  <th>优先级</th>
-                  <th style={{ textAlign: 'right' }}>操作</th>
-                </tr>
-              </thead>
-          <tbody>
-            {channels.map(ch => (
-              <tr key={ch.id}>
-                <td><span style={{ fontWeight: 600 }}>{ch.name}</span></td>
-                <td><span className="tag t-blue">{ch.type}</span></td>
-                    <td><span style={{ fontSize: 12, color: '#86909c', fontFamily: 'monospace' }}>{ch.base_url}</span></td>
-                <td>
-                  <span className={`tag ${ch.status === 1 ? 't-green' : 't-gray'}`}>
-                    {ch.status === 1 ? '启用' : '禁用'}
-                  </span>
-                  {ch.test_status === 'success' && <span className="tag t-green" style={{ marginLeft: 4 }}>✓</span>}
-                  {ch.test_status === 'failed' && <span className="tag t-red" style={{ marginLeft: 4 }}>✗</span>}
-                </td>
-                <td><span style={{ fontWeight: 600 }}>{ch.models.length}</span></td>
-                <td>{ch.priority}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <button className="btn btn-o btn-sm" onClick={() => testChannel(ch.id)} disabled={loading === 'test-' + ch.id}>
-                      {loading === 'test-' + ch.id ? '测试中...' : '测试'}
-                    </button>
-                    <button className="btn btn-o btn-sm" onClick={() => openFetchModels(ch)} disabled={loading === 'fetch'}>
-                      发现AI助手
-                    </button>
-                    <button className="btn btn-o btn-sm" onClick={() => openEdit(ch)}>编辑</button>
-                    <button className="btn btn-d btn-sm" onClick={() => setConfirmDelete(ch.id)}>删除</button>
-                  </div>
-                </td>
+        <div className="panel-head">
+          <div>
+            <span className="card-title">渠道列表</span>
+            <p>优先级越高越靠前；测试状态和模型数量会影响生成链路可用性。</p>
+          </div>
+          <span className="tag t-purple">{testedCount} 个已验证</span>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>类型</th>
+                <th>Base URL</th>
+                <th>状态</th>
+                <th>模型数</th>
+                <th>优先级</th>
+                <th>处理建议</th>
+                <th style={{ textAlign: 'right' }}>操作</th>
               </tr>
-            ))}
-            {channels.length === 0 && (
-              <tr><td colSpan={7}>
-                <div className="empty" style={{ padding: '50px 0' }}>
-                  <p>暂无AI助手</p>
-                </div>
-              </td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {channels.map(ch => (
+                <tr key={ch.id}>
+                  <td><span style={{ fontWeight: 600 }}>{ch.name}</span></td>
+                  <td><span className="tag t-blue">{ch.type}</span></td>
+                  <td><span className="mono-cell">{ch.base_url}</span></td>
+                  <td>
+                    <div className="cell-tags">
+                      <span className={`tag ${ch.status === 1 ? 't-green' : 't-gray'}`}>{ch.status === 1 ? '启用' : '禁用'}</span>
+                      <span className={`tag ${testStatusClass(ch.test_status)}`}>{testStatusText[ch.test_status] || '未测试'}</span>
+                    </div>
+                  </td>
+                  <td><span style={{ fontWeight: 600 }}>{ch.models.length}</span></td>
+                  <td>{ch.priority}</td>
+                  <td style={{fontSize:12,color:ch.test_status === 'failed' ? '#b45309' : '#64748b'}}>{channelRiskTip(ch)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div className="row-actions">
+                      <button className="btn btn-o btn-sm" onClick={() => testChannel(ch.id)} disabled={loading === 'test-' + ch.id}>
+                        {loading === 'test-' + ch.id ? '测试中...' : '测试'}
+                      </button>
+                      <button className="btn btn-o btn-sm" onClick={() => openFetchModels(ch)} disabled={loading === 'fetch'}>获取模型</button>
+                      <button className="btn btn-o btn-sm" onClick={() => openEdit(ch)}>编辑</button>
+                      <button className="btn btn-d btn-sm" onClick={() => deleteChannel(ch.id)}>删除</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {channels.length === 0 && (
+                <tr><td colSpan={8}>
+                  <div className="empty refined-empty" style={{ padding: '54px 0' }}>
+                    <p>暂无渠道，添加并测试渠道后才能在工作流中生成内容</p>
+                  </div>
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-        {showDrawer && (
+      {showDrawer && (
         <div className="modal-mask" onClick={() => setShowDrawer(false)}>
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <h3>{editingChannel ? '编辑助手' : '添加助手'}</h3>
+            <h3>{editingChannel ? '编辑渠道' : '添加渠道'}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手名称 *</label>
-                <input className="input" placeholder="如：OpenAI主助手" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                <label className="text-xs-label">渠道名称 *</label>
+                <input className="input" placeholder="如：OpenAI主渠道" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>助手类型</label>
+                <label className="text-xs-label">渠道类型</label>
                 <select className="select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                   <option value="openai">OpenAI 兼容</option>
                   <option value="claude">Claude</option>
@@ -203,20 +261,23 @@ export default function ChannelManage() {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>Base URL *</label>
+                <label className="text-xs-label">Base URL *</label>
                 <input className="input" placeholder="https://api.openai.com/v1" value={form.base_url} onChange={e => setForm({ ...form, base_url: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>服务密钥 {editingChannel ? '(留空不修改)' : ''} <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" style={{color:'#6366f1',fontSize:11}}>如何获取？</a></label>
+                <label className="text-xs-label">API Key {editingChannel ? '(留空不修改)' : ''}</label>
                 <input type="password" className="input" placeholder="sk-..." value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#86909c', marginBottom: 6, display: 'block' }}>优先级 (越高越优先)</label>
+                <label className="text-xs-label">优先级 (越高越优先)</label>
                 <input type="number" className="input" value={form.priority} onChange={e => setForm({ ...form, priority: parseInt(e.target.value) || 0 })} />
               </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-                <button className="btn btn-o" onClick={() => setShowDrawer(false)}>取消</button>
-                <button className="btn btn-p" onClick={saveChannel}>{editingChannel ? '保存' : '创建'}</button>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', paddingTop: 8 }}>
+                <button className="btn btn-o" onClick={() => navigate('/cases')}>返回案件</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-o" onClick={() => setShowDrawer(false)}>取消</button>
+                  <button className="btn btn-p" onClick={saveChannel}>{editingChannel ? '保存' : '创建'}</button>
+                </div>
               </div>
             </div>
           </div>
@@ -227,24 +288,22 @@ export default function ChannelManage() {
         <div className="modal-mask" onClick={() => setShowModelsDialog(null)}>
           <div className="modal-box" style={{ maxWidth: 640, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0 }}>可用AI助手</h3>
+              <h3 style={{ margin: 0 }}>可用模型</h3>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-o btn-sm" onClick={selectAll}>全选</button>
                 <button className="btn btn-o btn-sm" onClick={deselectAll}>全不选</button>
               </div>
             </div>
             {loading === 'fetch' ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>正在获取AI助手列表...</div>
+              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>正在获取模型列表...</div>
             ) : discoveredModels.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>未发现AI助手，请检查URL和Key</div>
+              <div style={{ textAlign: 'center', padding: 40, color: '#86909c' }}>未发现模型，请检查URL和Key</div>
             ) : (
               <div style={{ maxHeight: 400, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                 {discoveredModels.map(m => (
-                  <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', fontSize: 13 }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fa')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                  <label key={m} className="model-option">
                     <input type="checkbox" checked={selectedModels.includes(m)} onChange={() => toggleModel(m)} style={{ width: 16, height: 16 }} />
-                    <span style={{ fontFamily: 'monospace' }}>{m}</span>
+                    <span>{m}</span>
                   </label>
                 ))}
               </div>
@@ -254,14 +313,14 @@ export default function ChannelManage() {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12 }}>
               <button className="btn btn-o" onClick={() => setShowModelsDialog(null)}>取消</button>
-              <button className="btn btn-p" onClick={saveModels} disabled={selectedModels.length === 0}>保存所选AI助手</button>
+              <button className="btn btn-p" onClick={saveModels} disabled={selectedModels.length === 0}>保存所选模型</button>
             </div>
           </div>
         </div>
       )}
 
-      {confirmDelete && <ConfirmDialog message="确定删除该AI助手？" onConfirm={() => deleteChannel(confirmDelete)} onCancel={() => setConfirmDelete(null)} />}
-      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+      <Toaster toasts={toasts} onRemove={removeToast} />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   )
 }

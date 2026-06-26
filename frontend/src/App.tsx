@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { FormEvent, useEffect, useState } from 'react'
 import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
@@ -132,6 +132,7 @@ export default function App() {
   }
 
   return (
+    <BrowserRouter>
       <AppLayout
         health={health}
         checkHealth={checkHealth}
@@ -160,8 +161,11 @@ export default function App() {
           <Route path="*" element={<Navigate to="/cases" replace />} />
         </Routes>
       </AppLayout>
+    </BrowserRouter>
   )
 }
+
+import { NavLink, useLocation } from 'react-router-dom'
 
 interface AppLayoutProps {
   children: React.ReactNode
