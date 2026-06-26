@@ -1,6 +1,12 @@
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from backend.config import settings
+
+
+def utcnow() -> datetime:
+    """返回 naive UTC 时间，保持与现有 DateTime 列的 naive 存储语义一致。"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 connect_args = (
     {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}

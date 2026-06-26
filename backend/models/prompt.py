@@ -1,8 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean
-from datetime import datetime
 import uuid
 
-from backend.database import Base
+from backend.database import Base, utcnow
 
 
 class PromptTemplate(Base):
@@ -14,4 +13,4 @@ class PromptTemplate(Base):
     content = Column(Text, nullable=False)
     version = Column(Integer, default=1)
     is_default = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)

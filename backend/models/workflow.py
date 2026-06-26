@@ -1,10 +1,9 @@
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 import enum
 
-from backend.database import Base
+from backend.database import Base, utcnow
 
 
 class StageType(str, enum.Enum):
@@ -46,8 +45,8 @@ class WorkflowNode(Base):
     is_current = Column(Boolean, default=True)
     parent_version_id = Column(String, ForeignKey("workflow_nodes.id"), nullable=True)
     status = Column(String(50), default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     case = relationship("Case", back_populates="workflow_nodes")
     document = relationship("CaseDocument", back_populates="workflow_nodes")

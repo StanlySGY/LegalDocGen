@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Date, DateTime, Integer, Boolean, Text, ForeignKey
-from datetime import datetime, date
+from datetime import date
 import uuid
 
 from backend.database import Base
@@ -15,4 +15,4 @@ class CaseDeadline(Base):
     reminder_days = Column(Integer, default=3)
     note = Column(Text, default="")
     is_completed = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)

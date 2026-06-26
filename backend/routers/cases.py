@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date, timedelta
 
-from backend.database import get_db
+from backend.database import get_db, utcnow
 from backend.dependencies import assign_case_owner, case_query_for_user, get_accessible_case, get_current_user
 from backend.models.case import Case, CaseStatus
 from backend.models.billing import UsageMetric
@@ -173,9 +173,8 @@ def archive_case(case_id: str, data: ArchiveRequest, db: Session = Depends(get_d
     case = get_accessible_case(db, case_id, current_user)
     if case.status == CaseStatus.ARCHIVED:
         raise ValidationError("案件已归档")
-    from datetime import datetime
     case.status = CaseStatus.ARCHIVED
-    case.archived_at = datetime.utcnow()
+    case.archived_at = utcnow()
     case.archive_note = data.note
     record_audit(db, "case.archive", "case", case.id, f"归档案件：{case.name}")
     db.commit()

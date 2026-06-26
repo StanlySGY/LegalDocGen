@@ -1,9 +1,8 @@
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer
 from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 
-from backend.database import Base
+from backend.database import Base, utcnow
 
 
 class CaseDocument(Base):
@@ -17,8 +16,8 @@ class CaseDocument(Base):
     final_file_path = Column(String(1000), nullable=True)
     final_file_name = Column(String(500), nullable=True)
     final_uploaded_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     case = relationship("Case", back_populates="documents")
     workflow_nodes = relationship(

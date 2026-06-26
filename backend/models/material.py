@@ -1,9 +1,8 @@
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer
 from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 
-from backend.database import Base
+from backend.database import Base, utcnow
 
 EVIDENCE_CATEGORIES = {
     "identity": "诉讼主体材料",
@@ -27,6 +26,6 @@ class Material(Base):
     parse_task_id = Column(String(36), nullable=True)
     parse_status = Column(String(50), default="pending")
     category = Column(String(50), default="other")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     case = relationship("Case", back_populates="materials")

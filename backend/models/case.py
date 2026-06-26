@@ -1,10 +1,9 @@
 from sqlalchemy import Column, String, DateTime, Text, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 import enum
 
-from backend.database import Base
+from backend.database import Base, utcnow
 
 
 class CaseStatus(str, enum.Enum):
@@ -28,8 +27,8 @@ class Case(Base):
     document_type = Column(String(50), default="")
     archived_at = Column(DateTime, nullable=True)
     archive_note = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     materials = relationship(
         "Material", back_populates="case", cascade="all, delete-orphan"
