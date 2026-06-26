@@ -1,7 +1,7 @@
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0004_personal_lawyer_enhancements"
+revision = "0004_personal_lawyer"
 down_revision = "0003_billing_orders"
 branch_labels = None
 depends_on = None
