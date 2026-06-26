@@ -116,10 +116,45 @@ export interface CaseNote {
 }
 
 export const DOCUMENT_TYPES: Record<string, string> = {
-  complaint: '起诉状',
-  defense: '答辩状/反驳意见',
+  complaint: '民事起诉状',
+  defense: '民事答辩状',
   representation: '代理词',
-  lawyer_letter: '律师函/催告函',
+  defense_opinion: '辩护词',
+  lawyer_letter: '律师函',
+  legal_opinion: '法律意见书',
+  evidence_list: '证据目录',
+  cross_examination: '质证意见',
+  contract_review: '合同审查意见书',
+}
+
+export interface DocumentTypeOption {
+  key: string
+  name: string
+  desc: string
+  scenario: string
+}
+
+export type ReviewMode = 'single' | 'chain' | 'compare'
+
+export interface Party {
+  id: string
+  name: string
+  role: string
+  id_number?: string
+  phone?: string
+  address?: string
+  legal_representative?: string
+  notes?: string
+  case_id: string
+  created_at?: string
+}
+
+export const STAGE_NAMES_LAWYER: Record<string, string> = {
+  fact_extraction: '案件梳理',
+  legal_analysis: '法律分析',
+  dispute_focus: '争议归纳',
+  draft_generation: '文书生成',
+  review_optimization: '审查优化',
 }
 
 export interface Material {

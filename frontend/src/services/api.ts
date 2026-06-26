@@ -236,6 +236,76 @@ export const api = {
     history: (caseId: string, stage: string) => request<any[]>(`/workflow/history/${caseId}/${stage}`),
     saveOutput: (caseId: string, stage: string, output: string) =>
       request<any>(`/workflow/save-output/${caseId}/${stage}`, { method: 'POST', body: JSON.stringify({ output }) }),
+    reviewChain: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/review-chain/${caseId}`, {
+        method: 'POST', headers: jsonHeaders(), body: JSON.stringify(data),
+      })
+      if (!res.ok) throw await createApiError(res, '审查失败')
+      if (!res.body) throw new Error('响应为空')
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
+    multiCompare: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/multi-compare/${caseId}`, {
+        method: 'POST', headers: jsonHeaders(), body: JSON.stringify(data),
+      })
+      if (!res.ok) throw await createApiError(res, '对比失败')
+      if (!res.body) throw new Error('响应为空')
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
+    reviewSelect: (caseId: string, data: any) =>
+      request<any>(`/workflow/review-select/${caseId}`, { method: 'POST', body: JSON.stringify(data) }),
+    aiEdit: (data: { text: string; instruction?: string; provider?: string; model?: string }) =>
+      request<{ result: string }>('/workflow/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
+    quickGenerate: async function* (caseId: string, data: any) {
+      const res = await fetch(`${BASE}/workflow/quick-generate/${caseId}`, {
+        method: 'POST', headers: jsonHeaders(), body: JSON.stringify(data),
+      })
+      if (!res.ok) throw await createApiError(res, '生成失败')
+      if (!res.body) throw new Error('响应为空')
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { yield JSON.parse(line.slice(6)) } catch {}
+          }
+        }
+      }
+    },
     export: async (caseId: string, modules?: string[]) => {
       const exportUrl = modules && modules.length > 0
         ? `${BASE}/workflow/export/${caseId}?modules=${modules.map(encodeURIComponent).join(',')}`
