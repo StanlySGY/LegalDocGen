@@ -144,7 +144,7 @@ def reparse_material(material_id: str, db: Session = Depends(get_db), current_us
     if case.status == CaseStatus.ARCHIVED:
         raise ForbiddenError("案件已归档，无法重新解析")
     storage = get_storage()
-    file_content = storage.load(material.file_path)
+    file_content = storage.read(material.file_path)
     if not file_content:
         raise NotFoundError("文件不存在，无法重新解析")
     from pathlib import Path
