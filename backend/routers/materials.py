@@ -135,6 +135,30 @@ def preview_material(material_id: str, db: Session = Depends(get_db), current_us
     }
 
 
+@router.post("/{material_id}/reparse")
+def reparse_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise NotFoundError(f"材料 {material_id} 不存在")
+    case = get_accessible_case(db, material.case_id, current_user)
+    if case.status == CaseStatus.ARCHIVED:
+        raise ForbiddenError("案件已归档，无法重新解析")
+    storage = get_storage()
+    file_content = storage.load(material.file_path)
+    if not file_content:
+        raise NotFoundError("文件不存在，无法重新解析")
+    from pathlib import Path
+    parsed = parse_file_with_pages(Path(material.file_path))
+    material.parsed_content = parsed["text"]
+    import json
+    material.structured_data = json.dumps({"pages": parsed["pages"]}, ensure_ascii=False)
+    material.parse_status = "completed" if parsed["text"] and not parsed["text"].startswith("[") else "failed"
+    record_audit(db, "material.reparse", "case", material.case_id, f"重新解析材料：{material.filename}")
+    db.commit()
+    db.refresh(material)
+    return material
+
+
 @router.delete("/{material_id}")
 def delete_material(material_id: str, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     material = db.query(Material).filter(Material.id == material_id).first()

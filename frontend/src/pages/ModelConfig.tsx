@@ -16,6 +16,7 @@ export default function ModelConfig() {
   const [showRefDocForm, setShowRefDocForm] = useState(false)
   const [refDocForm, setRefDocForm] = useState({ name: '', doc_type: 'complaint', content: '' })
   const [refDocFile, setRefDocFile] = useState<File | null>(null)
+  const [refDocSearch, setRefDocSearch] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -140,11 +141,16 @@ export default function ModelConfig() {
           </div>
           <button className="btn btn-p btn-sm" onClick={() => setShowRefDocForm(true)}>+ 添加文书</button>
         </div>
+        {refDocs.length > 3 && (
+          <div style={{ marginBottom: 12 }}>
+            <input className="input" placeholder="搜索文书名称..." value={refDocSearch} onChange={e => setRefDocSearch(e.target.value)} style={{ fontSize: 12 }} />
+          </div>
+        )}
         {refDocs.length === 0 ? (
           <div className="empty refined-empty" style={{ padding: 32 }}><p>暂无参考文书，添加后 AI 可学习您的写作风格</p></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {refDocs.map(doc => (
+            {refDocs.filter(d => !refDocSearch || d.name.toLowerCase().includes(refDocSearch.toLowerCase())).map(doc => (
               <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f7f8fa', borderRadius: 8 }}>
                 <div>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{doc.name}</span>

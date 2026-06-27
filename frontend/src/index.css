@@ -3104,3 +3104,36 @@ body {
 .toast-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
 .toast-err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== Work Reminders ===== */
+.work-reminder { padding: 12px 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; margin-bottom: 16px; }
+.work-reminder h4 { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 8px; }
+.work-reminder-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #fef3c7; }
+.work-reminder-item:last-child { border-bottom: none; }
+
+/* ===== Print Styles ===== */
+@media print {
+  .sidebar, .top-bar, .mobile-toggle, .theme-toggle, .btn, .health-chip, .breadcrumb { display: none !important; }
+  .main-wrap { margin-left: 0 !important; }
+  .page-body { padding: 0 !important; }
+  .workflow-output-shell { border: none !important; box-shadow: none !important; }
+  body { background: #fff !important; }
+  .md.legal-prose { font-size: 12pt; line-height: 1.8; }
+}
+
+/* ===== Deep Mobile ===== */
+@media (max-width: 480px) {
+  .stat-card { min-width: 100% !important; }
+  .workbench-grid { flex-direction: column; }
+  .workbench-grid > .card { width: 100% !important; }
+  .modal-box { margin: 8px !important; max-width: calc(100vw - 16px) !important; }
+  .dashboard-hero { flex-direction: column; }
+  .hero-action-card { width: 100%; }
+  .top-actions { flex-wrap: wrap; gap: 4px; }
+  .filter-grid { flex-direction: column; }
+  .btn { font-size: 12px; padding: 6px 10px; }
+}
+
+/* ===== Archived case style ===== */
+tr.archived-row { opacity: 0.6; }
+tr.archived-row:hover { opacity: 0.85; }

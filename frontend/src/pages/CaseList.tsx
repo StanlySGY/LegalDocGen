@@ -263,6 +263,15 @@ export default function CaseList() {
         </div>
       )}
 
+      {(draftCount > 0 || activeCount > 0) && (
+        <div className="work-reminder">
+          <h4>今日待办</h4>
+          {draftCount > 0 && <div className="work-reminder-item"><span style={{color:'#f59e0b'}}>📋</span><span>{draftCount} 个案件需要补材料后才能开始工作流</span></div>}
+          {activeCount > 0 && <div className="work-reminder-item"><span style={{color:'#3b82f6'}}>✏️</span><span>{activeCount} 个案件正在生成文书中，可继续推进</span></div>}
+          {completedCount > 0 && <div className="work-reminder-item"><span style={{color:'#10b981'}}>✅</span><span>{completedCount} 个案件已完成，可复核导出</span></div>}
+        </div>
+      )}
+
       {!loading && cases.length === 0 && toasts.length === 0 && (
         <div className="notice-card notice-info">
           <div>
@@ -420,43 +429,24 @@ export default function CaseList() {
       {showCreate && (
         <div className="modal-mask" onClick={()=>setShowCreate(false)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()}>
-            <h3>新建案件</h3>
+            <h3>快速立案</h3>
+            <p style={{fontSize:13,color:'#86909c',marginBottom:12}}>填写名称后一键创建，其他信息后续补充。</p>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div>
-                <label className="text-xs-label">案件名称 *</label>
-                <input className={`input${formErrors.name ? ' input-error' : ''}`} placeholder="输入案件名称" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setFormErrors(prev=>({...prev,name:''}))}}/>
+                <input className={`input${formErrors.name ? ' input-error' : ''}`} placeholder="案件名称，例如：张三诉李四民间借贷" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setFormErrors(prev=>({...prev,name:''}))}} autoFocus/>
                 {formErrors.name && <span className="field-error">{formErrors.name}</span>}
               </div>
-              <div>
-                <label className="text-xs-label">案件类型</label>
-                <input className="input" placeholder="如：民间借贷、合同纠纷、劳动争议" value={form.case_type} onChange={e=>setForm({...form,case_type:e.target.value})}/>
-                <div className="quick-type-row">
-                  {caseTypePresets.map(type => (
-                    <button key={type} type="button" className={`chip-btn ${form.case_type === type ? 'on' : ''}`} onClick={() => setForm({...form, case_type: type})}>{type}</button>
-                  ))}
-                </div>
+              <div className="quick-type-row">
+                {caseTypePresets.map(type => (
+                  <button key={type} type="button" className={`chip-btn ${form.case_type === type ? 'on' : ''}`} onClick={() => setForm({...form, case_type: type})}>{type}</button>
+                ))}
               </div>
               <div>
-                <label className="text-xs-label">目标文书</label>
-                <div className="quick-type-row">
-                  {Object.entries(DOCUMENT_TYPES).map(([key, label]) => (
-                    <button key={key} type="button" className={`chip-btn ${form.document_type === key ? 'on' : ''}`} onClick={() => setForm({...form, document_type: form.document_type === key ? '' : key})}>{label}</button>
-                  ))}
-                </div>
+                <textarea className="textarea" style={{height:80}} placeholder="简要描述办案目标（可选，后续补充）" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
               </div>
-              <div>
-                <label className="text-xs-label">办案目标与目标文书</label>
-                <textarea className="textarea" style={{height:96}} placeholder="例如：为原告起草民间借贷起诉状；争议金额、关键事实、已掌握证据和待补材料可以一并写入。" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
-              </div>
-              {selectedTemplate && (
-                <div style={{padding:10,background:'#f0fdf4',borderRadius:8,border:'1px solid #d1fae5',fontSize:12,color:'#10b981'}}>
-                  已选择模板：{selectedTemplate.name}
-                </div>
-              )}
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:8}}>
-                <button className="btn btn-o" onClick={()=>setShowTemplateSelector(true)}>选择案由模板</button>
                 <button className="btn btn-o" onClick={()=>setShowCreate(false)}>取消</button>
-                <button className="btn btn-p" onClick={create}>创建并上传材料</button>
+                <button className="btn btn-p" onClick={create}>一键立案</button>
               </div>
             </div>
           </div>

@@ -621,6 +621,7 @@ export default function WorkflowPage() {
       <div className="flex justify-between" style={{marginTop:20}}>
         <button className="btn btn-o" disabled={idx===0} onClick={()=>setActiveStage(STAGE_ORDER[idx-1])}>上一阶段</button>
         <button className="btn btn-p" onClick={handleExportClick} disabled={!canExport || !finalReviewedAt}>导出为 Word</button>
+        {output && <button className="btn btn-o" onClick={()=>window.print()}>打印预览</button>}
         <button className="btn btn-o" disabled={idx===STAGE_ORDER.length-1} onClick={()=>setActiveStage(STAGE_ORDER[idx+1])}>下一阶段</button>
       </div>
       <ExportOptionsModal

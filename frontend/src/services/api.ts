@@ -203,6 +203,7 @@ export const api = {
     updateCategory: (id: string, category: string) => request<any>(`/materials/${id}/category`, { method: 'PUT', body: JSON.stringify({ category }) }),
     search: (caseId: string, query: string) => request<any>(`/materials/case/${caseId}/search?q=${encodeURIComponent(query)}`),
     preview: (materialId: string) => request<any>(`/materials/${materialId}/preview`),
+    reparse: (materialId: string) => request<any>(`/materials/${materialId}/reparse`, { method: 'POST' }),
   },
   workflow: {
     progress: (caseId: string) => request<any[]>(`/workflow/progress/${caseId}`),

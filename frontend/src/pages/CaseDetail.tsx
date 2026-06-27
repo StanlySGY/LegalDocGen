@@ -391,6 +391,7 @@ export default function CaseDetail() {
             {uploading ? '处理中...' : '+ 上传材料'}
             <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" hidden onChange={handleUpload} disabled={uploading}/>
           </label>
+          <span style={{fontSize:11,color:'#86909c'}}>支持 PDF/Word/图片，扫描件会自动 OCR 识别文字</span>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {materials.map(m => (
@@ -408,6 +409,7 @@ export default function CaseDetail() {
               </div>
               <div className="flex gap-2">
                 <button className="btn btn-o btn-sm" onClick={()=>openPreview(m.filename, m.parsed_content)}>查看</button>
+                <button className="btn btn-o btn-sm" onClick={async()=>{try{await api.materials.reparse(m.id);showToast('重新解析成功');load(true)}catch(e:any){showToast(e.message||'重解析失败',{type:'err'})}}}>重解析</button>
                 <button className="btn btn-d btn-sm" onClick={()=>del(m.id)}>删除</button>
               </div>
               {isFailedStatus(m.parse_status) && (
