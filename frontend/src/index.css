@@ -132,6 +132,7 @@ body {
   height: 100vh;
   overflow-y: auto;
   z-index: 50;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.15);
 }
 
 .sidebar-logo {
@@ -190,6 +191,7 @@ body {
 .nav-item:hover {
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.9);
+  transform: translateX(2px);
 }
 
 .nav-item.active {
@@ -197,6 +199,7 @@ body {
   color: #fff;
   font-weight: 600;
   box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+  transform: translateX(2px);
 }
 
 .nav-item svg {
@@ -222,7 +225,8 @@ body {
 }
 
 .top-bar {
-  background: #fff;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid #e5e7eb;
   padding: 0 32px;
   height: 56px;
@@ -384,11 +388,17 @@ body {
 
 .stat-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 20px;
   border: 1px solid #e5e7eb;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
 
 .stat-card::before {
@@ -410,10 +420,13 @@ body {
 /* ===== Card ===== */
 .card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid #e5e7eb;
   padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
 }
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
 
 .card-hd {
   display: flex;
@@ -469,9 +482,9 @@ body {
   white-space: nowrap;
 }
 
-.btn-p { background: #6366f1; color: #fff; }
-.btn-p:hover { background: #4f46e5; }
-.btn-p:disabled { background: #c7d2fe; cursor: not-allowed; }
+.btn-p { background: linear-gradient(135deg, #6366f1, #818cf8); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,0.25); }
+.btn-p:hover { background: linear-gradient(135deg, #4f46e5, #6366f1); box-shadow: 0 4px 12px rgba(99,102,241,0.35); transform: translateY(-1px); }
+.btn-p:disabled { background: #c7d2fe; cursor: not-allowed; box-shadow: none; transform: none; }
 
 .btn-o { background: #fff; color: var(--text-main); border: 1px solid #e5e7eb; }
 .btn-o:hover { background: #f7f8fa; }
@@ -497,6 +510,7 @@ body {
 
 .input:focus, .select:focus, .textarea:focus {
   border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
 }
 
