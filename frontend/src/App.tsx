@@ -18,7 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useNetworkStatus } from './hooks/useNetworkStatus'
 
 type HealthState = {
-  status: 'checking' | 'ok' | 'degraded' | 'offline'
+  status: 'checking' | 'ok' | 'degraded' | 'offline' | 'no-ai'
   message: string
 }
 
@@ -31,6 +31,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [adminToken, setAdminTokenState] = useState(getAdminToken())
   const [health, setHealth] = useState<HealthState>({ status: 'checking', message: '正在检测后端连接' })
+  const [aiChannelCount, setAiChannelCount] = useState(0)
   const [authLoading, setAuthLoading] = useState(true)
   const [authRequired, setAuthRequired] = useState(false)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
@@ -42,11 +43,19 @@ export default function App() {
   const checkHealth = async () => {
     setHealth(prev => prev.status === 'ok' ? prev : { status: 'checking', message: '正在检测后端连接' })
     try {
-      const data = await api.health()
-      setHealth({
-        status: data.status === 'ok' ? 'ok' : 'degraded',
-        message: data.status === 'ok' ? '后端已连接' : '后端已连接，但部分诊断异常',
-      })
+      const [healthData, channels] = await Promise.all([
+        api.health(),
+        api.channel.list().catch(() => [])
+      ])
+      const hasChannels = channels.length > 0
+      setAiChannelCount(channels.length)
+      if (healthData.status !== 'ok') {
+        setHealth({ status: 'degraded', message: '后端已连接，但部分诊断异常' })
+      } else if (!hasChannels) {
+        setHealth({ status: 'no-ai', message: '后端已连接，但未配置 AI 渠道' })
+      } else {
+        setHealth({ status: 'ok', message: '后端已连接，AI 渠道就绪' })
+      }
     } catch (e: any) {
       setHealth({ status: 'offline', message: e.message || `后端未连接：${apiBaseUrl}` })
     }
@@ -367,10 +376,12 @@ function AppLayout({
               {health.status === 'checking'
                 ? '检测中'
                 : health.status === 'offline'
-                  ? (isPersonalLawyerMode ? 'AI 服务未连接' : '后端未连接')
-                  : health.status === 'degraded'
-                    ? (isPersonalLawyerMode ? 'AI 服务异常' : '诊断异常')
-                    : (isPersonalLawyerMode ? 'AI 服务正常' : '后端已连接')}
+                  ? 'AI 服务未连接'
+                  : health.status === 'no-ai'
+                    ? '未配置 AI 渠道'
+                    : health.status === 'degraded'
+                      ? 'AI 服务异常'
+                      : 'AI 服务正常'}
             </button>
             {!isOnline && (
               <span className="network-offline-badge">
@@ -380,17 +391,8 @@ function AppLayout({
             )}
             {currentUser && (
               <span className="user-chip" title={currentUser.username}>
-                {currentUser.display_name || currentUser.username} · {currentUser.role === 'admin' ? '管理员' : '成员'}
+                {currentUser.display_name || currentUser.username}
               </span>
-            )}
-            {(!isPersonalLawyerMode || isAdvancedRoute) && (
-              <input
-                className="input admin-token-input"
-                type="password"
-                placeholder={isPersonalLawyerMode ? '高级管理 Token' : '管理 Token（可选）'}
-                value={adminToken}
-                onChange={e=>saveAdminToken(e.target.value)}
-              />
             )}
             {currentUser ? (
               <button className="btn btn-o btn-sm" onClick={logout}>退出</button>
