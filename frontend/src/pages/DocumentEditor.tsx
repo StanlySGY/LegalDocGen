@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
 import { useToast } from '../hooks/useToast'
 import Toaster from '../components/Toaster'
@@ -24,6 +25,7 @@ export default function DocumentEditor() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnnotation, setAiAnnotation] = useState('')
   const [selectedText, setSelectedText] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
   const { toasts, showToast, removeToast } = useToast()
 
   useEffect(() => {
@@ -106,10 +108,11 @@ export default function DocumentEditor() {
           <button className="btn btn-o btn-sm" onClick={handleRedo} disabled={redoStack.length === 0}>重做</button>
           <button className="btn btn-o btn-sm" onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存'}</button>
           <button className="btn btn-p btn-sm" onClick={handleExport}>导出Word</button>
+          <button className={`btn btn-sm ${showPreview ? 'btn-p' : 'btn-o'}`} onClick={() => setShowPreview(!showPreview)}>{showPreview ? '编辑模式' : '预览模式'}</button>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16 }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: showPreview ? 1 : undefined, width: showPreview ? undefined : '100%' }}>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: '#86909c', marginRight: 4 }}>格式：</span>
             <button className="btn btn-o" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => handleToolbarAction('**', '**')}>B</button>
@@ -145,6 +148,12 @@ export default function DocumentEditor() {
             </div>
           )}
         </div>
+        {showPreview && (
+          <div style={{ flex: 1, border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'auto', padding: 20, background: '#f8fafc', minHeight: 600 }}>
+            <div style={{ fontSize: 11, color: '#86909c', marginBottom: 12, borderBottom: '1px solid #e5e7eb', paddingBottom: 8 }}>实时预览</div>
+            <div className="md legal-prose"><ReactMarkdown>{content || '（开始编辑后这里会显示排版预览）'}</ReactMarkdown></div>
+          </div>
+        )}
         {history.length > 0 && (
           <div style={{ width: 240, flexShrink: 0 }}>
             <div className="card" style={{ padding: 16, position: 'sticky', top: 80 }}>

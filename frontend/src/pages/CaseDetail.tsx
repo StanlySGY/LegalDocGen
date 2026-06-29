@@ -49,6 +49,7 @@ export default function CaseDetail() {
   const [noteForm, setNoteForm] = useState({ title: '', content: '' })
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editNoteForm, setEditNoteForm] = useState({ title: '', content: '' })
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval>>()
 
   const load = useCallback(async (silent = false) => {
@@ -394,8 +395,12 @@ export default function CaseDetail() {
           <span style={{fontSize:11,color:'#86909c'}}>支持 PDF/Word/图片，扫描件会自动 OCR 识别文字</span>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {materials.map(m => (
-            <div key={m.id} className={`material-card ${isFailedStatus(m.parse_status) ? 'failed' : ''}`}>
+          {materials.map((m, idx) => (
+            <div key={m.id} className={`material-card ${isFailedStatus(m.parse_status) ? 'failed' : ''}`}
+              draggable onDragStart={() => setDragIdx(idx)}
+              onDragOver={e => { e.preventDefault(); if (dragIdx !== null && dragIdx !== idx) { const copy = [...materials]; const item = copy.splice(dragIdx, 1)[0]; copy.splice(idx, 0, item); setMaterials(copy); setDragIdx(idx) } }}
+              onDragEnd={() => setDragIdx(null)}
+              style={{ cursor: 'grab', opacity: dragIdx === idx ? 0.5 : 1 }}>
               <div className="material-card-main">
                 <span className="file-icon">{fileLabel(m.file_type)}</span>
                 <div style={{minWidth:0}}>
