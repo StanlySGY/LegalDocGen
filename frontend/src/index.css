@@ -3118,6 +3118,7 @@ body {
 .toast-item { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: toast-in 0.3s ease-out; }
 .toast-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
 .toast-err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.toast-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
 @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
 /* ===== Work Reminders ===== */

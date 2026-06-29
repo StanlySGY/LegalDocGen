@@ -190,6 +190,11 @@ export default function CaseList() {
     localStorage.setItem('search_history', JSON.stringify(updated))
   }
 
+  const [groupMode, setGroupMode] = useState<'list' | 'type'>('list')
+  const groupedCases = groupMode === 'type'
+    ? cases.reduce((acc, c) => { const key = c.case_type || '未分类'; if (!acc[key]) acc[key] = []; acc[key].push(c); return acc }, {} as Record<string, typeof cases>)
+    : null
+
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -290,6 +295,7 @@ export default function CaseList() {
             </div>
             <div className="bulk-actions compact">
               <span>已选择 {selectedIds.length} 个案件</span>
+              <button className="btn btn-o btn-sm" onClick={() => setGroupMode(groupMode === 'list' ? 'type' : 'list')}>{groupMode === 'list' ? '按类型分组' : '列表视图'}</button>
               <button className="btn btn-o btn-sm" onClick={batchExport}>批量导出</button>
               <button className="btn btn-o btn-sm" onClick={batchArchive}>批量归档</button>
               <button className="btn btn-o btn-sm" onClick={batchComplete}>标记完成</button>
@@ -344,7 +350,12 @@ export default function CaseList() {
                     </div>
                   </td></tr>
                 ))}
-                {!loading && cases.map(c => (
+                {!loading && groupMode === 'type' && groupedCases && Object.entries(groupedCases).map(([type, items]) => (
+                  <tr key={`group-${type}`}><td colSpan={6} style={{background:'#f0f2f5',fontWeight:600,fontSize:12,color:'#6366f1',padding:'8px 16px'}}>
+                    {type} ({items.length})
+                  </td></tr>
+                ))}
+                {!loading && (groupMode === 'type' && groupedCases ? Object.values(groupedCases).flat() : cases).map(c => (
                   <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>navigate(`/cases/${c.id}`)}>
                     <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(c.id)} onChange={()=>toggleSelected(c.id)}/></td>
                     <td>

@@ -15,6 +15,7 @@ import DocumentEditor from './pages/DocumentEditor'
 import HelpPage from './pages/HelpPage'
 import { api, apiBaseUrl, type AuthUser, getAdminToken, getAuthToken, setAdminToken, setAuthToken } from './services/api'
 import ErrorBoundary from './components/ErrorBoundary'
+import CommandPalette from './components/CommandPalette'
 import { useNetworkStatus } from './hooks/useNetworkStatus'
 
 type HealthState = {
@@ -83,8 +84,11 @@ export default function App() {
   }, [])
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme) }, [theme])
 
+  const [cmdOpen, setCmdOpen] = useState(false)
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(v => !v) }
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); window.location.href = '/cases' }
       if ((e.ctrlKey || e.metaKey) && e.key === '/') {
         e.preventDefault()
@@ -159,6 +163,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <AppLayout
         health={health}
         checkHealth={checkHealth}
@@ -172,6 +177,7 @@ export default function App() {
         logout={logout}
         theme={theme}
         setTheme={setTheme}
+        onOpenCmd={() => setCmdOpen(true)}
       >
         <Routes>
           <Route path="/" element={<Navigate to="/cases" replace />} />
@@ -211,6 +217,7 @@ interface AppLayoutProps {
   logout: () => void
   theme: string
   setTheme: (t: string) => void
+  onOpenCmd: () => void
 }
 
 function AppLayout({
@@ -226,7 +233,8 @@ function AppLayout({
   setShowAuthPanel,
   logout,
   theme,
-  setTheme
+  setTheme,
+  onOpenCmd
 }: AppLayoutProps) {
   const location = useLocation()
   const isOnline = useNetworkStatus()
@@ -365,6 +373,9 @@ function AppLayout({
             <div className="breadcrumb">{breadcrumb()}</div>
             <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title={theme === 'light' ? '切换暗色模式' : '切换亮色模式'}>
               {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+            <button className="btn btn-o btn-sm" onClick={onOpenCmd} style={{fontSize:11,gap:4}}>
+              <span>⌘K</span> 搜索
             </button>
             <NavLink to="/help" className="btn btn-o btn-sm" style={{textDecoration:'none',fontSize:12}}>使用教程</NavLink>
             <button
